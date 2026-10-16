@@ -72,11 +72,17 @@ export async function POST(
   /* Verify tenant exists */
   const { data: tenant } = await service
     .from('tenants')
-    .select('id')
+    .select('id, infrastructure_mode')
     .eq('id', params.id)
     .maybeSingle();
   if (!tenant) {
     return NextResponse.json({ error: 'Empresa no encontrada.' }, { status: 404 });
+  }
+  if (tenant.infrastructure_mode !== 'dedicated') {
+    return NextResponse.json(
+      { error: 'La conexión dedicada solo aplica a empresas en modalidad Dedicated.' },
+      { status: 409 },
+    );
   }
 
   const row = {
@@ -99,7 +105,7 @@ export async function POST(
   if (error) {
     console.error('[database] upsert error', error.message);
     return NextResponse.json(
-      { error: 'No se pudo registrar la conexion.', detail: error.message },
+      { error: 'No se pudo registrar la conexion.' },
       { status: 500 },
     );
   }

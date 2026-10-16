@@ -1,111 +1,91 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { Building2, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, Plus } from 'lucide-react';
 
 import { requireSuperAdmin } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { TenantsTable, type TenantRow } from '@/components/tenants-table';
+import type { CommercialStatus } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
 export default async function TenantsListPage() {
   const user = await requireSuperAdmin();
-  if (!user) redirect('/login');
+  if (!user) redirect('/login?redirect=/admin/tenants');
 
   const supabase = getSupabaseServerClient();
+  const [{ data, error }, { data: plans }] = await Promise.all([
+    supabase
+      .from('tenants')
+      .select(
+        'id, commercial_name, legal_name, tax_id, slug, commercial_status, technical_status, infrastructure_mode, plan_id, created_at, plans ( name )',
+      )
+      .order('created_at', { ascending: false }),
+    supabase.from('plans').select('id, name').order('name'),
+  ]);
 
-  /* Fetch tenants with related database + branding + template name ---------- */
-  const { data, error } = await supabase
-    .from('tenants')
-    .select(
-      `
-        id,
-        commercial_name,
-        slug,
-        commercial_status,
-        technical_status,
-        business_template_id,
-        business_templates (
-          name
-        ),
-        tenant_databases (
-          connection_status
-        ),
-        tenant_branding (
-          primary_color,
-          logo_url
-        )
-      `,
-    )
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('[admin/tenants] fetch error', error.message);
-  }
+  if (error) console.error('[admin/tenants] fetch error', error.message);
 
   const rows: TenantRow[] = (data ?? []).map((t: any) => ({
     id: t.id,
     commercial_name: t.commercial_name,
+    legal_name: t.legal_name ?? null,
+    tax_id: t.tax_id ?? null,
     slug: t.slug,
     commercial_status: t.commercial_status,
     technical_status: t.technical_status,
-    template_name:
-      t.business_templates?.name ?? null,
-    connection_status:
-      t.tenant_databases?.[0]?.connection_status ?? null,
-    branding_primary: t.tenant_branding?.[0]?.primary_color ?? null,
-    branding_logo_url: t.tenant_branding?.[0]?.logo_url ?? null,
+    infrastructure_mode: t.infrastructure_mode ?? 'shared',
+    plan_id: t.plan_id ?? null,
+    plan_name: t.plans?.name ?? null,
+    created_at: t.created_at,
   }));
 
+  const count = (status: CommercialStatus) => rows.filter((row) => row.commercial_status === status).length;
+  const stats = [
+    { label: 'Empresas', value: rows.length },
+    { label: 'Activas', value: count('active') },
+    { label: 'Pendientes', value: count('pending') + count('trial') },
+    { label: 'Suspendidas', value: count('suspended') },
+  ];
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Top bar */}
-      <header className="border-b bg-card">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <h1 className="text-lg font-semibold leading-tight">
-                Panel Super Admin
-              </h1>
-              <p className="text-xs text-muted-foreground">
-                EKOSCRM · {user.email}
-              </p>
-            </div>
-          </div>
-          <nav className="flex items-center gap-1 text-sm">
-            <a
-              href="/admin/tenants"
-              className="rounded-md bg-muted px-3 py-1.5 font-medium text-foreground"
-            >
-              Empresas
-            </a>
-            <a
-              href="/admin"
-              className="rounded-md px-3 py-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              Inicio
-            </a>
-          </nav>
+    <div className="mx-auto max-w-7xl space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#A4573A]">VORA Core</p>
+          <h1 className="mt-2 font-jakarta text-3xl font-extrabold tracking-[-0.02em] text-[#285C49]">Empresas</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#52675A]">
+            Registra empresas, asigna su plan y modalidad de infraestructura y administra su estado.
+          </p>
         </div>
-      </header>
+        <Link
+          href="/admin/tenants/new"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-[#285C49] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#285C49] focus-visible:ring-offset-2"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" /> Registrar empresa
+        </Link>
+      </div>
 
-      {/* Page body */}
-      <main className="mx-auto max-w-7xl px-6 py-8">
-        <div className="mb-6 flex items-center gap-2">
-          <Building2 className="h-6 w-6 text-primary" />
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Empresas</h2>
-            <p className="text-sm text-muted-foreground">
-              Administra todas las empresas (tenants) de la plataforma, su
-              configuración, estado y conexión de base de datos.
-            </p>
+      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {stats.map((stat) => (
+          <div key={stat.label} className="rounded-2xl border border-[#E2DACB] bg-white px-5 py-4">
+            <dt className="text-xs font-semibold uppercase tracking-wider text-[#52675A]">{stat.label}</dt>
+            <dd className="mt-1 font-jakarta text-3xl font-extrabold text-[#285C49]">{stat.value}</dd>
           </div>
-        </div>
+        ))}
+      </dl>
 
-        <TenantsTable tenants={rows} />
-      </main>
+      {error && (
+        <div role="alert" className="flex gap-3 rounded-2xl border border-[#E9C9B8] bg-[#FBF1EA] p-4 text-sm text-[#8A4528]">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+          <p>
+            No se pudo cargar el listado de empresas. Si es la primera vez que usas esta versión, aplica la migración{' '}
+            <code className="rounded bg-white px-1.5 py-0.5">20261017000000_vora_tenant_management.sql</code> en Supabase.
+          </p>
+        </div>
+      )}
+
+      <TenantsTable tenants={rows} plans={(plans ?? []) as { id: string; name: string }[]} />
     </div>
   );
 }

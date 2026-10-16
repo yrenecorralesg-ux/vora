@@ -1,5 +1,8 @@
-export type CommercialStatus = 'trial' | 'active' | 'suspended' | 'cancelled';
+/** Administrative status of a company. 'pending' = registered, not activated yet. */
+export type CommercialStatus = 'pending' | 'trial' | 'active' | 'suspended' | 'cancelled';
+/** Provisioning (technical) status; only 'ready' once the infrastructure is verified. */
 export type TechnicalStatus = 'pending_setup' | 'ready' | 'error';
+export type InfrastructureMode = 'shared' | 'dedicated';
 export type ConnectionStatus = 'not_configured' | 'checking' | 'connected' | 'error';
 export type ImplementationStatus = 'implemented' | 'planned' | 'unavailable';
 export type FeatureConfigState = 'enabled' | 'pending_config' | 'configured' | 'operational';
@@ -44,8 +47,13 @@ export interface Tenant {
   currency: string;
   language: string;
   timezone: string;
+  business_type?: string | null;
   business_template_id: string | null;
   plan_id: string | null;
+  tax_id?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  infrastructure_mode?: InfrastructureMode;
   wizard_step: number;
   wizard_completed: boolean;
   created_at: string;
@@ -133,6 +141,16 @@ export interface DemoRequest {
   consent: boolean;
   status: string;
   created_at: string;
+}
+
+export interface TenantSubscription {
+  id: string;
+  tenant_id: string;
+  plan_id: string;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
+  updated_at: string | null;
 }
 
 export interface AuditLog {

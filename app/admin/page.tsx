@@ -34,6 +34,7 @@ interface AuditRow {
 }
 
 const commercialStatusLabels: Record<CommercialStatus, string> = {
+  pending: 'Pendiente',
   trial: 'Prueba',
   active: 'Activa',
   suspended: 'Suspendida',
@@ -47,6 +48,7 @@ const technicalStatusLabels: Record<TechnicalStatus, string> = {
 };
 
 const commercialStatusBadge: Record<CommercialStatus, string> = {
+  pending: 'border-transparent bg-warning/15 text-warning',
   trial: 'border-transparent bg-info/15 text-info',
   active: 'border-transparent bg-success/15 text-success',
   suspended: 'border-transparent bg-warning/15 text-warning',

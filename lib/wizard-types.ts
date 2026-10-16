@@ -1,8 +1,13 @@
-import type { ImplementationStatus } from '@/lib/types';
+import type { ImplementationStatus, InfrastructureMode } from '@/lib/types';
 
 export interface WizardData {
   commercial_name: string;
   legal_name: string;
+  tax_id: string;
+  contact_email: string;
+  contact_phone: string;
+  infrastructure_mode: InfrastructureMode;
+  plan_id: string;
   slug: string;
   slugTouched: boolean;
   country: string;
@@ -38,10 +43,11 @@ export interface SubmitResults {
 
 export const STEPS = [
   { key: 'empresa', label: 'Empresa', icon: 'Building2' },
+  { key: 'plan', label: 'Plan y modalidad', icon: 'CreditCard' },
   { key: 'template', label: 'Plantilla', icon: 'LayoutTemplate' },
   { key: 'branding', label: 'Branding', icon: 'Palette' },
   { key: 'modulos', label: 'Modulos', icon: 'Boxes' },
-  { key: 'supabase', label: 'Supabase', icon: 'Database' },
+  { key: 'infraestructura', label: 'Infraestructura', icon: 'Database' },
   { key: 'admin', label: 'Administrador', icon: 'UserPlus' },
   { key: 'resumen', label: 'Resumen', icon: 'ClipboardCheck' },
 ] as const;

@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { WizardData, COUNTRIES, CURRENCIES, LANGUAGES, TIMEZONES, BUSINESS_TYPES } from '@/lib/wizard-types';
+import { WizardData } from '@/lib/wizard-types';
+import { TENANT_BUSINESS_TYPES, TENANT_COUNTRIES, TENANT_CURRENCIES, normalizeTaxId } from '@/lib/tenant-management';
 import { getFontFamily, ALLOWED_FONTS } from '@/lib/fonts';
 
 export function StepEmpresa({
@@ -21,6 +22,16 @@ export function StepEmpresa({
   slugAvailable: null | boolean;
   checkingSlug: boolean;
 }) {
+  const taxIdValid = data.tax_id.trim() === '' || normalizeTaxId(data.tax_id, data.country) !== null;
+  const emailValid = data.contact_email.trim() === '' || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.contact_email.trim());
+  const onCountryChange = (code: string) => {
+    update('country', code);
+    const country = TENANT_COUNTRIES.find((c) => c.value === code);
+    if (country) {
+      update('timezone', country.timezone);
+      if (TENANT_CURRENCIES.some((c) => c.value === country.currency)) update('currency', country.currency);
+    }
+  };
   return (
     <>
       <CardHeader>
@@ -29,69 +40,74 @@ export function StepEmpresa({
           Datos de la empresa
         </CardTitle>
         <CardDescription>
-          Informacion comercial basica del nuevo tenant. El slug se genera automaticamente pero puedes editarlo.
+          Datos comerciales, fiscales y de contacto. Los campos con <span className="text-destructive">*</span> son obligatorios.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        <div className="space-y-2">
-          <Label htmlFor="commercial_name">Nombre comercial <span className="text-destructive">*</span></Label>
-          <Input id="commercial_name" value={data.commercial_name} onChange={(e) => update('commercial_name', e.target.value)} placeholder="Ej. Mi Empresa SAS" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="commercial_name">Nombre comercial <span className="text-destructive">*</span></Label>
+            <Input id="commercial_name" required maxLength={120} value={data.commercial_name} onChange={(e) => update('commercial_name', e.target.value)} placeholder="Ej. Inversiones Ávila" />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="legal_name">Razón social <span className="text-destructive">*</span></Label>
+            <Input id="legal_name" required maxLength={200} value={data.legal_name} onChange={(e) => update('legal_name', e.target.value)} placeholder="Ej. Inversiones Ávila, C.A." />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="country">País <span className="text-destructive">*</span></Label>
+            <Select value={data.country} onValueChange={onCountryChange}>
+              <SelectTrigger id="country"><SelectValue /></SelectTrigger>
+              <SelectContent>{TENANT_COUNTRIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="tax_id">{data.country === 'VE' ? 'RIF' : 'Identificación fiscal'} <span className="text-destructive">*</span></Label>
+            <Input id="tax_id" required maxLength={30} value={data.tax_id} onChange={(e) => update('tax_id', e.target.value.toUpperCase())} placeholder={data.country === 'VE' ? 'J-12345678-9' : 'Número fiscal'} aria-invalid={!taxIdValid} aria-describedby="tax_id_help" className="font-mono" />
+            <p id="tax_id_help" className={taxIdValid ? 'text-xs text-muted-foreground' : 'text-xs text-destructive'}>
+              {taxIdValid ? (data.country === 'VE' ? 'Letra V, E, J, P, G o C, 8 dígitos y dígito verificador.' : 'Debe ser único en VORA.') : (data.country === 'VE' ? 'Formato de RIF inválido. Ejemplo: J-12345678-9.' : 'Identificación fiscal inválida.')}
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="contact_email">Correo de contacto <span className="text-destructive">*</span></Label>
+            <Input id="contact_email" type="email" required maxLength={254} value={data.contact_email} onChange={(e) => update('contact_email', e.target.value)} placeholder="administracion@empresa.com" aria-invalid={!emailValid} />
+            {!emailValid && <p className="text-xs text-destructive">Correo inválido.</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="contact_phone">Teléfono</Label>
+            <Input id="contact_phone" type="tel" maxLength={20} value={data.contact_phone} onChange={(e) => update('contact_phone', e.target.value)} placeholder="+58 212 555 1234" />
+          </div>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="currency">Moneda <span className="text-destructive">*</span></Label>
+            <Select value={data.currency} onValueChange={(v) => update('currency', v)}>
+              <SelectTrigger id="currency"><SelectValue /></SelectTrigger>
+              <SelectContent>{TENANT_CURRENCIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="business_type">Tipo de negocio <span className="text-destructive">*</span></Label>
+            <Select value={data.business_type} onValueChange={(v) => update('business_type', v)}>
+              <SelectTrigger id="business_type"><SelectValue /></SelectTrigger>
+              <SelectContent>{TENANT_BUSINESS_TYPES.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="legal_name">Razon social (opcional)</Label>
-          <Input id="legal_name" value={data.legal_name} onChange={(e) => update('legal_name', e.target.value)} placeholder="Ej. Mi Empresa S.A.S. NIT 900.123.456-7" />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="slug">Slug (identificador unico) <span className="text-destructive">*</span></Label>
+          <Label htmlFor="slug">Slug (identificador único) <span className="text-destructive">*</span></Label>
           <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">ekoscrm.app/</div>
-            <Input id="slug" value={data.slug} onChange={(e) => { update('slug', e.target.value.toLowerCase()); update('slugTouched', true); }} placeholder="mi-empresa" className="flex-1" />
+            <div className="hidden items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground sm:flex">/t/</div>
+            <Input id="slug" required value={data.slug} onChange={(e) => { update('slug', e.target.value.toLowerCase()); update('slugTouched', true); }} placeholder="inversiones-avila" className="flex-1 font-mono" />
             {checkingSlug && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             {!checkingSlug && slugAvailable === true && data.slug && <CheckCircle2 className="h-4 w-4 text-success" />}
             {!checkingSlug && slugAvailable === false && data.slug && <XCircle className="h-4 w-4 text-destructive" />}
           </div>
-          {slugAvailable === false && data.slug && <p className="text-xs text-destructive">Este slug ya esta en uso. Elige otro.</p>}
-          {slugAvailable === true && data.slug && <p className="text-xs text-success">Slug disponible.</p>}
-          <p className="text-xs text-muted-foreground">Solo minusculas, numeros y guiones. Se usara en URLs y como identificador unico del tenant.</p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Pais</Label>
-            <Select value={data.country} onValueChange={(v) => update('country', v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{COUNTRIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Moneda</Label>
-            <Select value={data.currency} onValueChange={(v) => update('currency', v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{CURRENCIES.map((c) => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label>Idioma</Label>
-            <Select value={data.language} onValueChange={(v) => update('language', v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{LANGUAGES.map((l) => <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Zona horaria</Label>
-            <Select value={data.timezone} onValueChange={(v) => update('timezone', v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{TIMEZONES.map((tz) => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}</SelectContent>
-            </Select>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label>Tipo de negocio</Label>
-          <Select value={data.business_type} onValueChange={(v) => update('business_type', v)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>{BUSINESS_TYPES.map((b) => <SelectItem key={b.value} value={b.value}>{b.label}</SelectItem>)}</SelectContent>
-          </Select>
+          {slugAvailable === false && data.slug && <p className="text-xs text-destructive">Este slug ya está en uso. Elige otro.</p>}
+          <p className="text-xs text-muted-foreground">Solo minúsculas, números y guiones. Se genera desde el nombre comercial.</p>
         </div>
       </CardContent>
     </>

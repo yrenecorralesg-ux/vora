@@ -56,7 +56,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
   }
 
   const { data: database } = await service.from('tenant_databases').update({ connection_status: connectionStatus, last_checked_at: new Date().toISOString(), error_message: errorMessage }).eq('id', dbRow.id).select('id, connection_status, last_checked_at, error_message, schema_version').maybeSingle();
-  if (connectionStatus === 'connected') await service.from('tenants').update({ technical_status: 'ready' }).eq('id', params.id);
+  // Only a verified Dedicated infrastructure marks the company as technically ready.
+  if (connectionStatus === 'connected') await service.from('tenants').update({ technical_status: 'ready' }).eq('id', params.id).eq('infrastructure_mode', 'dedicated');
   await service.from('platform_audit_logs').insert({ actor_id: user.id, tenant_id: params.id, action: 'tenant.database.test_connection', resource: 'tenant_databases', resource_id: params.id, details: { connection_status: connectionStatus, error_message: errorMessage } });
   return NextResponse.json({ connection_status: connectionStatus, error_message: errorMessage, database });
 }

@@ -28,6 +28,7 @@ import {
   Image as ImageIcon,
   ChevronDown,
   ChevronRight,
+  RotateCcw,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -37,6 +38,20 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { CRM_MODULES_CATALOG } from '@/lib/modules-config';
+import { AdminStatusBadge, InfrastructureBadge, OperationalIndicator, TechnicalStatusBadge } from '@/components/admin/tenant-badges';
+import {
+  ADMIN_STATUS_LABEL,
+  INFRASTRUCTURE_MODES,
+  STATUS_ACTIONS,
+  SUBSCRIPTION_STATUS_LABEL,
+  TENANT_BUSINESS_TYPES,
+  TENANT_COUNTRIES,
+  TENANT_CURRENCIES,
+  availableStatusActions,
+  businessTypeLabel,
+  countryLabel,
+  type TenantStatusAction,
+} from '@/lib/tenant-management';
 import {
   Card,
   CardContent,
@@ -70,6 +85,8 @@ import type {
   TechnicalStatus,
   ConnectionStatus,
   FeatureConfigState,
+  Plan,
+  TenantSubscription,
 } from '@/lib/types';
 
 /* -------------------------------------------------------------------------- */
@@ -77,12 +94,14 @@ import type {
 /* -------------------------------------------------------------------------- */
 
 const COMMERCIAL_LABEL: Record<CommercialStatus, string> = {
+  pending: 'Pendiente',
   trial: 'Prueba',
   active: 'Activo',
   suspended: 'Suspendido',
   cancelled: 'Cancelado',
 };
 const COMMERCIAL_BADGE: Record<CommercialStatus, string> = {
+  pending: 'bg-warning text-warning-foreground',
   trial: 'bg-warning text-warning-foreground',
   active: 'bg-success text-success-foreground',
   suspended: 'bg-destructive text-destructive-foreground',
@@ -140,6 +159,8 @@ export interface TenantTabsProps {
   auditLogs: AuditLog[];
   templateName: string | null;
   planName?: string | null;
+  subscription?: TenantSubscription | null;
+  plans?: Plan[];
 }
 
 /* -------------------------------------------------------------------------- */
@@ -159,14 +180,17 @@ export function TenantTabs(props: TenantTabsProps) {
         <TabsTrigger value="empresa" className="gap-1.5">
           <Building2 className="h-4 w-4" /> Empresa
         </TabsTrigger>
+        <TabsTrigger value="plan" className="gap-1.5">
+          <CreditCard className="h-4 w-4" /> Plan y suscripción
+        </TabsTrigger>
         <TabsTrigger value="branding" className="gap-1.5">
           <Palette className="h-4 w-4" /> Branding
         </TabsTrigger>
         <TabsTrigger value="modulos" className="gap-1.5">
           <Boxes className="h-4 w-4" /> Módulos
         </TabsTrigger>
-        <TabsTrigger value="basededatos" className="gap-1.5">
-          <DatabaseIcon className="h-4 w-4" /> Base de datos
+        <TabsTrigger value="infraestructura" className="gap-1.5">
+          <DatabaseIcon className="h-4 w-4" /> Infraestructura
         </TabsTrigger>
         <TabsTrigger value="usuarios" className="gap-1.5">
           <UsersIcon className="h-4 w-4" /> Usuarios
@@ -185,14 +209,17 @@ export function TenantTabs(props: TenantTabsProps) {
       <TabsContent value="empresa" className="mt-6">
         <EmpresaTab tenant={tenant} />
       </TabsContent>
+      <TabsContent value="plan" className="mt-6">
+        <PlanTab tenant={tenant} planName={props.planName} subscription={props.subscription} plans={props.plans ?? []} />
+      </TabsContent>
       <TabsContent value="branding" className="mt-6">
         <BrandingTab branding={branding} tenant={tenant} />
       </TabsContent>
       <TabsContent value="modulos" className="mt-6">
         <ModulosTab features={features} tenantId={tenant.id} />
       </TabsContent>
-      <TabsContent value="basededatos" className="mt-6">
-        <BaseDeDatosTab database={database} tenantId={tenant.id} />
+      <TabsContent value="infraestructura" className="mt-6">
+        <InfraestructuraTab tenant={tenant} database={database} />
       </TabsContent>
       <TabsContent value="usuarios" className="mt-6">
         <UsuariosTab memberships={memberships} />
@@ -238,22 +265,24 @@ function ResumenTab(props: TenantTabsProps) {
     icon: React.ElementType;
   }[] = [
     {
-      label: 'Estado comercial',
-      value: (
-        <Badge className={cn('border-transparent', COMMERCIAL_BADGE[tenant.commercial_status])}>
-          {COMMERCIAL_LABEL[tenant.commercial_status]}
-        </Badge>
-      ),
+      label: 'Estado administrativo',
+      value: <AdminStatusBadge status={tenant.commercial_status} />,
       icon: ShieldAlert,
     },
     {
-      label: 'Estado técnico',
-      value: (
-        <Badge className={cn('border-transparent', TECHNICAL_BADGE[tenant.technical_status])}>
-          {TECHNICAL_LABEL[tenant.technical_status]}
-        </Badge>
-      ),
+      label: 'Aprovisionamiento',
+      value: <TechnicalStatusBadge status={tenant.technical_status} />,
       icon: Building2,
+    },
+    {
+      label: 'Modalidad',
+      value: <InfrastructureBadge mode={tenant.infrastructure_mode} />,
+      icon: DatabaseIcon,
+    },
+    {
+      label: 'Operativa',
+      value: <OperationalIndicator status={tenant.commercial_status} technical={tenant.technical_status} />,
+      icon: CheckCircle2,
     },
     {
       label: 'Conexión BD',
@@ -297,7 +326,7 @@ function ResumenTab(props: TenantTabsProps) {
       label: 'Plan',
       value: (
         <span className="text-sm font-semibold text-primary">
-          {planName ?? 'Starter'}
+          {planName ?? 'Sin plan'}
         </span>
       ),
       icon: CreditCard,
@@ -315,7 +344,7 @@ function ResumenTab(props: TenantTabsProps) {
       label: 'País / Moneda',
       value: (
         <span className="text-sm font-medium">
-          {tenant.country ? `${tenant.country} (${tenant.currency ?? 'COP'})` : (tenant.currency ?? '—')}
+          {tenant.country ? `${countryLabel(tenant.country)} (${tenant.currency ?? '—'})` : (tenant.currency ?? '—')}
         </span>
       ),
       icon: Globe,
@@ -337,8 +366,12 @@ function ResumenTab(props: TenantTabsProps) {
         <div>
           <h3 className="text-lg font-semibold">{tenant.commercial_name}</h3>
           <p className="text-sm text-muted-foreground">
-            {tenant.legal_name ?? tenant.commercial_name} ·{' '}
+            {tenant.legal_name ?? tenant.commercial_name}
+            {tenant.tax_id && <> · <span className="font-mono">{tenant.tax_id}</span></>} ·{' '}
             <code className="rounded bg-muted px-1.5 py-0.5 text-xs">{tenant.slug}</code>
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {[tenant.contact_email, tenant.contact_phone, businessTypeLabel(tenant.business_type)].filter((v) => v && v !== '—').join(' · ')}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -549,36 +582,69 @@ function ResumenTab(props: TenantTabsProps) {
 /*  Empresa (editable form)                                                   */
 /* -------------------------------------------------------------------------- */
 
+const nativeSelect =
+  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+
+function normalizeLabel(value: string) {
+  return value.normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toLowerCase();
+}
+
+/** Existing companies may store the country name instead of the code. */
+function resolveCountryCode(value: string | null | undefined): string {
+  if (!value) return '';
+  if (TENANT_COUNTRIES.some((c) => c.value === value)) return value;
+  return TENANT_COUNTRIES.find((c) => normalizeLabel(c.label) === normalizeLabel(value))?.value ?? value;
+}
+
+type ApiError = { error?: string; fields?: Record<string, string> };
+
+function apiErrorMessage(body: ApiError, fallback: string) {
+  const fields = body.fields ? Object.values(body.fields).join(' ') : '';
+  return [body.error ?? fallback, fields].filter(Boolean).join(' ');
+}
+
 function EmpresaTab({ tenant }: { tenant: Tenant }) {
-  const [form, setForm] = React.useState({
-    commercial_name: tenant.commercial_name,
-    legal_name: tenant.legal_name ?? '',
-    slug: tenant.slug,
-    country: tenant.country ?? '',
-    currency: tenant.currency,
-    language: tenant.language,
-    timezone: tenant.timezone,
-  });
+  const initial = React.useMemo(
+    () => ({
+      commercial_name: tenant.commercial_name,
+      legal_name: tenant.legal_name ?? '',
+      tax_id: tenant.tax_id ?? '',
+      contact_email: tenant.contact_email ?? '',
+      contact_phone: tenant.contact_phone ?? '',
+      slug: tenant.slug,
+      country: resolveCountryCode(tenant.country),
+      currency: tenant.currency ?? '',
+      business_type: tenant.business_type ?? '',
+    }),
+    [tenant],
+  );
+  const [form, setForm] = React.useState(initial);
   const router = useRouter();
   const [saving, setSaving] = React.useState(false);
-  const [result, setResult] = React.useState<
-    { ok: boolean; message: string } | null
-  >(null);
+  const [result, setResult] = React.useState<{ ok: boolean; message: string } | null>(null);
+
+  const set = (key: keyof typeof initial) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm((s) => ({ ...s, [key]: e.target.value }));
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
+    const changed = Object.fromEntries(
+      Object.entries(form).filter(([key, value]) => value !== initial[key as keyof typeof initial]),
+    );
+    if (Object.keys(changed).length === 0) {
+      setResult({ ok: true, message: 'No hay cambios por guardar.' });
+      return;
+    }
     setSaving(true);
     setResult(null);
     try {
       const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(changed),
       });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? 'Error al guardar');
-      }
+      const body = (await res.json().catch(() => ({}))) as ApiError;
+      if (!res.ok) throw new Error(apiErrorMessage(body, 'Error al guardar'));
       setResult({ ok: true, message: 'Empresa actualizada correctamente.' });
       router.refresh();
     } catch (err: any) {
@@ -588,94 +654,327 @@ function EmpresaTab({ tenant }: { tenant: Tenant }) {
     }
   }
 
+  const countryIsKnown = TENANT_COUNTRIES.some((c) => c.value === form.country);
+  const currencyIsKnown = TENANT_CURRENCIES.some((c) => c.value === form.currency);
+  const businessIsKnown = TENANT_BUSINESS_TYPES.some((b) => b.value === form.business_type);
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Datos de la empresa</CardTitle>
-        <CardDescription>
-          Edita la información comercial y de configuración regional.
-        </CardDescription>
+        <CardTitle className="text-base">Datos generales</CardTitle>
+        <CardDescription>Datos comerciales, fiscales y de contacto. Solo se envían los campos modificados.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSave} className="grid gap-4 sm:grid-cols-2">
           <Field label="Nombre comercial" required>
-            <Input
-              required
-              value={form.commercial_name}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, commercial_name: e.target.value }))
-              }
-            />
+            <Input required maxLength={120} value={form.commercial_name} onChange={set('commercial_name')} />
           </Field>
-          <Field label="Razón social">
-            <Input
-              value={form.legal_name}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, legal_name: e.target.value }))
-              }
-            />
+          <Field label="Razón social" required>
+            <Input required maxLength={200} value={form.legal_name} onChange={set('legal_name')} />
+          </Field>
+          <Field label="País" required>
+            <select className={nativeSelect} value={form.country} onChange={set('country')} aria-label="País">
+              {!countryIsKnown && <option value={form.country}>{form.country || 'Selecciona un país'}</option>}
+              {TENANT_COUNTRIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </Field>
+          <Field label={form.country === 'VE' ? 'RIF' : 'Identificación fiscal'} required>
+            <Input required maxLength={30} className="font-mono" value={form.tax_id} onChange={(e) => setForm((s) => ({ ...s, tax_id: e.target.value.toUpperCase() }))} placeholder="J-12345678-9" />
+          </Field>
+          <Field label="Correo de contacto" required>
+            <Input type="email" required maxLength={254} value={form.contact_email} onChange={set('contact_email')} />
+          </Field>
+          <Field label="Teléfono">
+            <Input type="tel" maxLength={20} value={form.contact_phone} onChange={set('contact_phone')} />
+          </Field>
+          <Field label="Moneda" required>
+            <select className={nativeSelect} value={form.currency} onChange={set('currency')} aria-label="Moneda">
+              {!currencyIsKnown && <option value={form.currency}>{form.currency || 'Selecciona'}</option>}
+              {TENANT_CURRENCIES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+          </Field>
+          <Field label="Tipo de negocio" required>
+            <select className={nativeSelect} value={form.business_type} onChange={set('business_type')} aria-label="Tipo de negocio">
+              {!businessIsKnown && <option value={form.business_type}>{businessTypeLabel(form.business_type) || 'Selecciona'}</option>}
+              {TENANT_BUSINESS_TYPES.map((b) => <option key={b.value} value={b.value}>{b.label}</option>)}
+            </select>
           </Field>
           <Field label="Slug" required>
-            <Input
-              required
-              value={form.slug}
-              onChange={(e) => setForm((s) => ({ ...s, slug: e.target.value }))}
-            />
-          </Field>
-          <Field label="País">
-            <Input
-              value={form.country}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, country: e.target.value }))
-              }
-            />
-          </Field>
-          <Field label="Moneda">
-            <Input
-              value={form.currency}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, currency: e.target.value }))
-              }
-            />
-          </Field>
-          <Field label="Idioma">
-            <Input
-              value={form.language}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, language: e.target.value }))
-              }
-            />
-          </Field>
-          <Field label="Zona horaria">
-            <Input
-              value={form.timezone}
-              onChange={(e) =>
-                setForm((s) => ({ ...s, timezone: e.target.value }))
-              }
-            />
+            <Input required className="font-mono" value={form.slug} onChange={(e) => setForm((s) => ({ ...s, slug: e.target.value.toLowerCase() }))} />
           </Field>
 
-          <div className="col-span-full flex items-center gap-3 pt-2">
-            <Button type="submit" disabled={saving}>
-              {saving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
+          <div className="col-span-full flex flex-wrap items-center gap-3 pt-2">
+            <Button type="submit" disabled={saving} className="bg-[#285C49] hover:bg-[#1F4A3A]">
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Guardar cambios
             </Button>
             {result && (
-              <span
-                className={cn(
-                  'flex items-center gap-1.5 text-sm',
-                  result.ok ? 'text-success' : 'text-destructive',
-                )}
-              >
-                {result.ok ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <AlertCircle className="h-4 w-4" />
-                )}
+              <span role={result.ok ? 'status' : 'alert'} className={cn('flex items-center gap-1.5 text-sm', result.ok ? 'text-success' : 'text-destructive')}>
+                {result.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                {result.message}
+              </span>
+            )}
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Plan y suscripción                                                        */
+/* -------------------------------------------------------------------------- */
+
+function PlanTab({
+  tenant,
+  planName,
+  subscription,
+  plans,
+}: {
+  tenant: Tenant;
+  planName?: string | null;
+  subscription?: TenantSubscription | null;
+  plans: Plan[];
+}) {
+  const router = useRouter();
+  const activePlans = plans.filter((p) => p.is_active);
+  const [selected, setSelected] = React.useState(tenant.plan_id ?? '');
+  const [saving, setSaving] = React.useState(false);
+  const [result, setResult] = React.useState<{ ok: boolean; message: string } | null>(null);
+
+  async function assignPlan() {
+    setSaving(true);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenant.id}/plan`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan_id: selected }),
+      });
+      const body = (await res.json().catch(() => ({}))) as ApiError & { plan?: { name: string } };
+      if (!res.ok) throw new Error(apiErrorMessage(body, 'No se pudo asignar el plan'));
+      setResult({ ok: true, message: `Plan ${body.plan?.name ?? ''} asignado.` });
+      router.refresh();
+    } catch (err: any) {
+      setResult({ ok: false, message: err.message ?? 'No se pudo asignar el plan' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Plan y suscripción</CardTitle>
+          <CardDescription>Plan asignado actualmente y estado de su suscripción.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid gap-4 sm:grid-cols-2">
+            <DetailRow label="Plan" value={planName ?? 'Sin plan'} />
+            <DetailRow label="Suscripción" value={subscription ? SUBSCRIPTION_STATUS_LABEL[subscription.status] ?? subscription.status : 'Sin suscripción'} />
+            <DetailRow label="Desde" value={subscription?.started_at ? formatDate(subscription.started_at) : '—'} />
+            <DetailRow label="Estado administrativo" value={ADMIN_STATUS_LABEL[tenant.commercial_status] ?? tenant.commercial_status} />
+          </dl>
+          <p className="mt-5 rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
+            La suscripción sigue el estado de la empresa: pendiente hasta activarla y suspendida si la empresa se suspende. VORA no genera cobros en esta fase.
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{tenant.plan_id ? 'Cambiar plan' : 'Asignar plan'}</CardTitle>
+          <CardDescription>Solo se muestran los planes activos.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {activePlans.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No hay planes activos disponibles.</p>
+          ) : (
+            <div role="radiogroup" aria-label="Planes disponibles" className="grid gap-2 sm:grid-cols-2">
+              {activePlans.map((plan) => {
+                const current = plan.id === tenant.plan_id;
+                const checked = plan.id === selected;
+                return (
+                  <label
+                    key={plan.id}
+                    className={cn(
+                      'flex cursor-pointer items-start gap-3 rounded-lg border p-3 text-sm transition-colors focus-within:ring-2 focus-within:ring-[#285C49]',
+                      checked ? 'border-[#285C49] bg-[#EFF4EC]' : 'border-border hover:border-[#A9BEA5]',
+                    )}
+                  >
+                    <input type="radio" name="plan" value={plan.id} checked={checked} onChange={() => setSelected(plan.id)} className="mt-0.5 accent-[#285C49]" />
+                    <span>
+                      <span className="font-semibold text-foreground">{plan.name}</span>
+                      {current && <span className="ml-2 rounded-full bg-[#DDE8D8] px-2 py-0.5 text-[10px] font-semibold text-[#1F4A3A]">Actual</span>}
+                      {plan.description && <span className="mt-0.5 block text-xs text-muted-foreground">{plan.description}</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-3">
+            <Button onClick={assignPlan} disabled={saving || !selected || selected === tenant.plan_id} className="bg-[#285C49] hover:bg-[#1F4A3A]">
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
+              {tenant.plan_id ? 'Cambiar plan' : 'Asignar plan'}
+            </Button>
+            {result && (
+              <span role={result.ok ? 'status' : 'alert'} className={cn('flex items-center gap-1.5 text-sm', result.ok ? 'text-success' : 'text-destructive')}>
+                {result.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                {result.message}
+              </span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Infraestructura (modalidad + aprovisionamiento)                           */
+/* -------------------------------------------------------------------------- */
+
+function InfraestructuraTab({ tenant, database }: { tenant: Tenant; database: TenantDatabase | null }) {
+  const router = useRouter();
+  const mode = tenant.infrastructure_mode ?? 'shared';
+  const locked = tenant.technical_status === 'ready';
+  const [nextMode, setNextMode] = React.useState(mode);
+  const [saving, setSaving] = React.useState(false);
+  const [result, setResult] = React.useState<{ ok: boolean; message: string } | null>(null);
+
+  async function changeMode() {
+    setSaving(true);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ infrastructure_mode: nextMode }),
+      });
+      const body = (await res.json().catch(() => ({}))) as ApiError;
+      if (!res.ok) throw new Error(apiErrorMessage(body, 'No se pudo cambiar la modalidad'));
+      setResult({ ok: true, message: 'Modalidad actualizada.' });
+      router.refresh();
+    } catch (err: any) {
+      setResult({ ok: false, message: err.message ?? 'No se pudo cambiar la modalidad' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle className="text-base">Modalidad de infraestructura</CardTitle>
+            <CardDescription>El estado administrativo y el aprovisionamiento técnico son independientes.</CardDescription>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <InfrastructureBadge mode={mode} />
+            <TechnicalStatusBadge status={tenant.technical_status} />
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {INFRASTRUCTURE_MODES.find((m) => m.value === mode)?.description}
+          </p>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">Estado operativo:</span>
+            <OperationalIndicator status={tenant.commercial_status} technical={tenant.technical_status} />
+          </div>
+          {mode === 'shared' && (
+            <div className="flex gap-3 rounded-md border border-warning/30 bg-warning/5 p-3 text-sm text-muted-foreground">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
+              <p>Las tablas comerciales y el aislamiento por tenant_id de la modalidad Shared todavía están en preparación. La empresa seguirá con aprovisionamiento pendiente.</p>
+            </div>
+          )}
+          {locked ? (
+            <p className="text-xs text-muted-foreground">La modalidad no se puede cambiar porque la infraestructura ya está verificada.</p>
+          ) : (
+            <div className="flex flex-wrap items-end gap-3 border-t pt-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="infra-mode" className="text-xs font-medium text-muted-foreground">Cambiar modalidad</Label>
+                <select id="infra-mode" className={cn(nativeSelect, 'w-48')} value={nextMode} onChange={(e) => setNextMode(e.target.value as typeof mode)}>
+                  {INFRASTRUCTURE_MODES.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+                </select>
+              </div>
+              <Button variant="outline" onClick={changeMode} disabled={saving || nextMode === mode}>
+                {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                Guardar modalidad
+              </Button>
+              {result && (
+                <span role={result.ok ? 'status' : 'alert'} className={cn('flex items-center gap-1.5 text-sm', result.ok ? 'text-success' : 'text-destructive')}>
+                  {result.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                  {result.message}
+                </span>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {mode === 'dedicated' && (database ? <BaseDeDatosTab database={database} tenantId={tenant.id} /> : <DedicatedConnectionForm tenantId={tenant.id} />)}
+    </div>
+  );
+}
+
+function DedicatedConnectionForm({ tenantId }: { tenantId: string }) {
+  const router = useRouter();
+  const [form, setForm] = React.useState({ project_ref: '', supabase_url: '', secret_ref: '' });
+  const [saving, setSaving] = React.useState(false);
+  const [result, setResult] = React.useState<{ ok: boolean; message: string } | null>(null);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/admin/tenants/${tenantId}/database`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project_ref: form.project_ref.trim(), supabase_url: form.supabase_url.trim(), secret_ref: form.secret_ref.trim() }),
+      });
+      const body = (await res.json().catch(() => ({}))) as ApiError;
+      if (!res.ok) throw new Error(apiErrorMessage(body, 'No se pudo registrar la conexión'));
+      setResult({ ok: true, message: 'Conexión registrada. Usa «Probar conexión» para verificarla.' });
+      router.refresh();
+    } catch (err: any) {
+      setResult({ ok: false, message: err.message ?? 'No se pudo registrar la conexión' });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Registrar proyecto dedicado</CardTitle>
+        <CardDescription>
+          VORA no crea proyectos Supabase automáticamente. Cuando el proyecto exista, registra su conexión; la empresa solo pasa a «Infraestructura lista» al verificarla.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-3">
+          <Field label="Project ref" required>
+            <Input required className="font-mono" value={form.project_ref} onChange={(e) => setForm((s) => ({ ...s, project_ref: e.target.value }))} placeholder="abcdwxyzqprsmainxxxx" />
+          </Field>
+          <Field label="URL del proyecto" required>
+            <Input required className="font-mono" value={form.supabase_url} onChange={(e) => setForm((s) => ({ ...s, supabase_url: e.target.value }))} placeholder="https://xyz.supabase.co" />
+          </Field>
+          <Field label="Secret ref (nombre de la variable)" required>
+            <Input required className="font-mono" value={form.secret_ref} onChange={(e) => setForm((s) => ({ ...s, secret_ref: e.target.value }))} placeholder="TENANT_EMPRESA_SERVICE_KEY" />
+          </Field>
+          <div className="col-span-full flex flex-wrap items-center gap-3">
+            <Button type="submit" disabled={saving} className="bg-[#285C49] hover:bg-[#1F4A3A]">
+              {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseIcon className="mr-2 h-4 w-4" />}
+              Registrar conexión
+            </Button>
+            {result && (
+              <span role={result.ok ? 'status' : 'alert'} className={cn('flex items-center gap-1.5 text-sm', result.ok ? 'text-success' : 'text-destructive')}>
+                {result.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
                 {result.message}
               </span>
             )}
@@ -1677,79 +1976,79 @@ function AuditoriaTab({ auditLogs }: { auditLogs: AuditLog[] }) {
 /* -------------------------------------------------------------------------- */
 
 function TenantStatusActions({ tenant }: { tenant: Tenant }) {
-  const [state, setState] = React.useState<'idle' | 'loading' | 'ok' | 'error'>(
-    'idle',
-  );
-  const [current, setCurrent] = React.useState(tenant.commercial_status);
-  const [message, setMessage] = React.useState('');
+  const router = useRouter();
+  const [running, setRunning] = React.useState<TenantStatusAction | null>(null);
+  const [confirmSuspend, setConfirmSuspend] = React.useState(false);
+  const [result, setResult] = React.useState<{ ok: boolean; message: string } | null>(null);
+  const actions = availableStatusActions(tenant.commercial_status);
 
-  async function updateStatus(next: CommercialStatus) {
-    setState('loading');
-    setMessage('');
+  async function run(action: TenantStatusAction) {
+    setRunning(action);
+    setResult(null);
     try {
       const res = await fetch(`/api/admin/tenants/${tenant.id}/status`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commercial_status: next }),
+        body: JSON.stringify({ action }),
       });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(body.error ?? 'Error al actualizar estado');
-      }
-      setCurrent(next);
-      setState('ok');
-      setMessage(
-        next === 'suspended'
-          ? 'Empresa suspendida.'
-          : 'Empresa activada.',
-      );
+      const body = (await res.json().catch(() => ({}))) as ApiError;
+      if (!res.ok) throw new Error(apiErrorMessage(body, 'Error al actualizar el estado'));
+      setConfirmSuspend(false);
+      setResult({
+        ok: true,
+        message:
+          action === 'suspend'
+            ? 'Empresa suspendida.'
+            : tenant.technical_status === 'ready'
+              ? 'Empresa activa y operativa.'
+              : 'Empresa activa. Seguirá no operativa hasta verificar su infraestructura.',
+      });
+      router.refresh();
     } catch (err: any) {
-      setState('error');
-      setMessage(err.message ?? 'Error al actualizar estado');
+      setResult({ ok: false, message: err.message ?? 'Error al actualizar el estado' });
+    } finally {
+      setRunning(null);
     }
   }
 
   return (
-    <div className="flex items-center gap-2">
-      {current === 'suspended' ? (
-        <Button
-          variant="default"
-          size="sm"
-          disabled={state === 'loading'}
-          onClick={() => updateStatus('active')}
-        >
-          {state === 'loading' ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+    <div className="flex flex-col items-start gap-2 sm:items-end">
+      <div className="flex flex-wrap items-center gap-2">
+        {actions.includes('activate') && (
+          <Button size="sm" disabled={running !== null} onClick={() => run('activate')} className="bg-[#285C49] hover:bg-[#1F4A3A]">
+            {running === 'activate' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+            {STATUS_ACTIONS.activate.label}
+          </Button>
+        )}
+        {actions.includes('reactivate') && (
+          <Button size="sm" disabled={running !== null} onClick={() => run('reactivate')} className="bg-[#285C49] hover:bg-[#1F4A3A]">
+            {running === 'reactivate' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RotateCcw className="mr-2 h-4 w-4" />}
+            {STATUS_ACTIONS.reactivate.label}
+          </Button>
+        )}
+        {actions.includes('suspend') &&
+          (confirmSuspend ? (
+            <>
+              <span className="text-sm font-medium text-destructive">¿Suspender la empresa?</span>
+              <Button size="sm" variant="destructive" disabled={running !== null} onClick={() => run('suspend')}>
+                {running === 'suspend' ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}
+                Sí, suspender
+              </Button>
+              <Button size="sm" variant="ghost" disabled={running !== null} onClick={() => setConfirmSuspend(false)}>
+                Cancelar
+              </Button>
+            </>
           ) : (
-            <Play className="mr-2 h-4 w-4" />
-          )}
-          Activar
-        </Button>
-      ) : (
-        <Button
-          variant="destructive"
-          size="sm"
-          disabled={state === 'loading' || current === 'cancelled'}
-          onClick={() => updateStatus('suspended')}
-        >
-          {state === 'loading' ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <Ban className="mr-2 h-4 w-4" />
-          )}
-          Suspender
-        </Button>
-      )}
-      {state === 'ok' && (
-        <span className="flex items-center gap-1 text-sm text-success">
-          <CheckCircle2 className="h-4 w-4" />
-          {message}
-        </span>
-      )}
-      {state === 'error' && (
-        <span className="flex items-center gap-1 text-sm text-destructive">
-          <AlertCircle className="h-4 w-4" />
-          {message}
+            <Button size="sm" variant="outline" disabled={running !== null} onClick={() => setConfirmSuspend(true)} className="border-destructive/40 text-destructive hover:bg-destructive/10">
+              <Ban className="mr-2 h-4 w-4" />
+              {STATUS_ACTIONS.suspend.label}
+            </Button>
+          ))}
+      </div>
+      {result && (
+        <span role={result.ok ? 'status' : 'alert'} className={cn('flex items-center gap-1 text-sm', result.ok ? 'text-success' : 'text-destructive')}>
+          {result.ok ? <CheckCircle2 className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+          {result.message}
         </span>
       )}
     </div>

@@ -2,296 +2,192 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import {
-  Search,
-  Plus,
-  Building2,
-  ArrowRight,
-  CircleDot,
-  Database as DatabaseIcon,
-} from 'lucide-react';
+import { ArrowRight, Building2, Search, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import type {
-  CommercialStatus,
-  TechnicalStatus,
-  ConnectionStatus,
-} from '@/lib/types';
-
-/* -------------------------------------------------------------------------- */
-/*  Types                                                                     */
-/* -------------------------------------------------------------------------- */
+import { AdminStatusBadge, InfrastructureBadge, TechnicalStatusBadge } from '@/components/admin/tenant-badges';
+import { ADMIN_STATUS_LABEL } from '@/lib/tenant-management';
+import type { CommercialStatus, InfrastructureMode, TechnicalStatus } from '@/lib/types';
 
 export interface TenantRow {
   id: string;
   commercial_name: string;
+  legal_name: string | null;
+  tax_id: string | null;
   slug: string;
   commercial_status: CommercialStatus;
   technical_status: TechnicalStatus;
-  template_name: string | null;
-  connection_status: ConnectionStatus | null;
-  branding_primary: string | null;
-  branding_logo_url: string | null;
+  infrastructure_mode: InfrastructureMode;
+  plan_id: string | null;
+  plan_name: string | null;
+  created_at: string;
 }
 
-/* ------------------------------- badges ---------------------------------- */
+const STATUS_FILTERS: CommercialStatus[] = ['pending', 'active', 'suspended', 'trial', 'cancelled'];
 
-const COMMERCIAL_LABEL: Record<CommercialStatus, string> = {
-  trial: 'Prueba',
-  active: 'Activo',
-  suspended: 'Suspendido',
-  cancelled: 'Cancelado',
-};
+/** Deterministic dd/mm/yyyy (same output on server and browser). */
+function formatDate(iso: string) {
+  const [date] = iso.split('T');
+  const [year, month, day] = date.split('-');
+  return day && month && year ? `${day}/${month}/${year}` : iso;
+}
 
-const COMMERCIAL_BADGE: Record<CommercialStatus, string> = {
-  trial: 'bg-warning text-warning-foreground',
-  active: 'bg-success text-success-foreground',
-  suspended: 'bg-destructive text-destructive-foreground',
-  cancelled: 'bg-muted text-muted-foreground',
-};
+const selectClass =
+  'h-11 rounded-xl border border-[#DCE3D6] bg-white px-3 text-sm text-[#25332D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#285C49]';
 
-const TECHNICAL_LABEL: Record<TechnicalStatus, string> = {
-  pending_setup: 'Pendiente',
-  ready: 'Listo',
-  error: 'Error',
-};
-
-const TECHNICAL_BADGE: Record<TechnicalStatus, string> = {
-  pending_setup: 'bg-muted text-muted-foreground',
-  ready: 'bg-success text-success-foreground',
-  error: 'bg-destructive text-destructive-foreground',
-};
-
-const CONNECTION_LABEL: Record<ConnectionStatus, string> = {
-  not_configured: 'No configurada',
-  checking: 'Verificando',
-  connected: 'Conectada',
-  error: 'Error',
-};
-
-const CONNECTION_DOT: Record<ConnectionStatus, string> = {
-  not_configured: 'bg-muted-foreground',
-  checking: 'bg-warning',
-  connected: 'bg-success',
-  error: 'bg-destructive',
-};
-
-/* -------------------------------------------------------------------------- */
-/*  Component                                                                 */
-/* -------------------------------------------------------------------------- */
-
-export function TenantsTable({ tenants }: { tenants: TenantRow[] }) {
+export function TenantsTable({ tenants, plans }: { tenants: TenantRow[]; plans: { id: string; name: string }[] }) {
   const [query, setQuery] = React.useState('');
-  const [status, setStatus] = React.useState<CommercialStatus | 'all'>('all');
+  const [status, setStatus] = React.useState<'all' | CommercialStatus>('all');
+  const [planId, setPlanId] = React.useState('all');
+  const [mode, setMode] = React.useState<'all' | InfrastructureMode>('all');
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
     return tenants.filter((t) => {
-      const matchesQuery =
-        !q ||
-        t.commercial_name.toLowerCase().includes(q) ||
-        t.slug.toLowerCase().includes(q);
-      const matchesStatus = status === 'all' || t.commercial_status === status;
-      return matchesQuery && matchesStatus;
+      if (status !== 'all' && t.commercial_status !== status) return false;
+      if (planId !== 'all' && (planId === 'none' ? t.plan_id !== null : t.plan_id !== planId)) return false;
+      if (mode !== 'all' && t.infrastructure_mode !== mode) return false;
+      if (!q) return true;
+      return [t.commercial_name, t.legal_name, t.tax_id, t.slug].some((value) => value?.toLowerCase().includes(q));
     });
-  }, [tenants, query, status]);
+  }, [tenants, query, status, planId, mode]);
+
+  const hasFilters = query !== '' || status !== 'all' || planId !== 'all' || mode !== 'all';
+  const clearFilters = () => {
+    setQuery('');
+    setStatus('all');
+    setPlanId('all');
+    setMode('all');
+  };
 
   return (
-    <div className="space-y-4">
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nombre o slug…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          <Select
-            value={status}
-            onValueChange={(v) => setStatus(v as CommercialStatus | 'all')}
-          >
-            <SelectTrigger className="w-full sm:w-52">
-              <SelectValue placeholder="Estado comercial" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos los estados</SelectItem>
-              <SelectItem value="trial">Prueba</SelectItem>
-              <SelectItem value="active">Activo</SelectItem>
-              <SelectItem value="suspended">Suspendido</SelectItem>
-              <SelectItem value="cancelled">Cancelado</SelectItem>
-            </SelectContent>
-          </Select>
+    <section aria-label="Listado de empresas" className="rounded-[1.5rem] border border-[#E2DACB] bg-white">
+      <div className="flex flex-col gap-3 border-b border-[#EFE8DC] p-4 lg:flex-row lg:items-center">
+        <label className="relative flex-1">
+          <span className="sr-only">Buscar empresa</span>
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#52675A]" aria-hidden="true" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre, razón social, RIF o slug"
+            className="h-11 w-full rounded-xl border border-[#DCE3D6] bg-[#FBF9F4] pl-9 pr-3 text-sm text-[#25332D] placeholder:text-[#7A8A7F] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#285C49]"
+          />
+        </label>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:flex">
+          <select aria-label="Filtrar por estado" value={status} onChange={(e) => setStatus(e.target.value as typeof status)} className={selectClass}>
+            <option value="all">Todos los estados</option>
+            {STATUS_FILTERS.map((s) => (
+              <option key={s} value={s}>{ADMIN_STATUS_LABEL[s]}</option>
+            ))}
+          </select>
+          <select aria-label="Filtrar por plan" value={planId} onChange={(e) => setPlanId(e.target.value)} className={selectClass}>
+            <option value="all">Todos los planes</option>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+            <option value="none">Sin plan</option>
+          </select>
+          <select aria-label="Filtrar por modalidad" value={mode} onChange={(e) => setMode(e.target.value as typeof mode)} className={selectClass}>
+            <option value="all">Shared y Dedicated</option>
+            <option value="shared">Shared</option>
+            <option value="dedicated">Dedicated</option>
+          </select>
         </div>
-        <Button asChild>
-          <Link href="/admin/tenants/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva empresa
-          </Link>
-        </Button>
       </div>
 
-      {/* Table / empty state */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Building2 className="h-5 w-5 text-primary" />
-            Empresas
-            <span className="ml-1 text-sm font-normal text-muted-foreground">
-              ({filtered.length}
-              {filtered.length !== tenants.length ? ` de ${tenants.length}` : ''})
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {filtered.length === 0 ? (
-            <EmptyState hasTenants={tenants.length > 0} />
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Nombre</TableHead>
-                  <TableHead>Slug</TableHead>
-                  <TableHead>Estado comercial</TableHead>
-                  <TableHead>Estado técnico</TableHead>
-                  <TableHead>Conexión</TableHead>
-                  <TableHead>Template</TableHead>
-                  <TableHead className="w-[60px]" />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
+      <div className="flex items-center justify-between px-4 py-3 text-sm text-[#52675A]">
+        <p aria-live="polite">
+          {filtered.length} de {tenants.length} empresa{tenants.length === 1 ? '' : 's'}
+        </p>
+        {hasFilters && (
+          <button type="button" onClick={clearFilters} className="inline-flex items-center gap-1 rounded-full px-3 py-1 font-semibold text-[#285C49] hover:bg-[#E6EBDF]">
+            <X className="h-3.5 w-3.5" aria-hidden="true" /> Limpiar filtros
+          </button>
+        )}
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center gap-3 px-6 pb-14 pt-8 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#E6EBDF] text-[#285C49]">
+            <Building2 className="h-6 w-6" aria-hidden="true" />
+          </span>
+          <p className="font-jakarta text-lg font-bold text-[#285C49]">{tenants.length === 0 ? 'Todavía no hay empresas registradas' : 'Ninguna empresa coincide con los filtros'}</p>
+          <p className="max-w-sm text-sm text-[#52675A]">
+            {tenants.length === 0 ? 'Registra la primera empresa para asignarle un plan y su modalidad de infraestructura.' : 'Prueba con otro término o limpia los filtros.'}
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className="hidden overflow-x-auto lg:block">
+            <table className="w-full text-left text-sm">
+              <thead className="border-y border-[#EFE8DC] bg-[#FBF9F4] text-xs uppercase tracking-wider text-[#52675A]">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-semibold">Empresa</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">RIF</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Estado</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Plan</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Modalidad</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Creada</th>
+                  <th scope="col" className="px-4 py-3"><span className="sr-only">Acciones</span></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#EFE8DC]">
                 {filtered.map((t) => (
-                  <TableRow key={t.id} className="group">
-                    <TableCell>
+                  <tr key={t.id} className="transition hover:bg-[#FBF9F4]">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-[#25332D]">{t.commercial_name}</p>
+                      <p className="text-xs text-[#52675A]">{t.legal_name ?? '—'}</p>
+                      <code className="text-[11px] text-[#7A8A7F]">/{t.slug}</code>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-[#25332D]">{t.tax_id ?? '—'}</td>
+                    <td className="px-4 py-3"><AdminStatusBadge status={t.commercial_status} /></td>
+                    <td className="px-4 py-3 text-[#25332D]">{t.plan_name ?? <span className="text-[#7A8A7F]">Sin plan</span>}</td>
+                    <td className="space-y-1.5 px-4 py-3">
+                      <InfrastructureBadge mode={t.infrastructure_mode} />
+                      <TechnicalStatusBadge status={t.technical_status} className="block w-max" />
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-[#52675A]">{formatDate(t.created_at)}</td>
+                    <td className="px-4 py-3 text-right">
                       <Link
                         href={`/admin/tenants/${t.id}`}
-                        className="flex items-center gap-3 font-medium text-foreground hover:text-primary"
+                        className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-sm font-semibold text-[#285C49] hover:bg-[#E6EBDF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#285C49]"
+                        aria-label={`Ver detalle de ${t.commercial_name}`}
                       >
-                        <span
-                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-xs font-bold text-white"
-                          style={{
-                            backgroundColor:
-                              t.branding_primary ?? 'hsl(225 93% 23%)',
-                          }}
-                        >
-                          {t.commercial_name.slice(0, 2).toUpperCase()}
-                        </span>
-                        {t.commercial_name}
+                        Ver <ArrowRight className="h-4 w-4" aria-hidden="true" />
                       </Link>
-                    </TableCell>
-                    <TableCell>
-                      <code className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-                        {t.slug}
-                      </code>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={cn(
-                          'border-transparent',
-                          COMMERCIAL_BADGE[t.commercial_status],
-                        )}
-                      >
-                        {COMMERCIAL_LABEL[t.commercial_status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        className={cn(
-                          'border-transparent',
-                          TECHNICAL_BADGE[t.technical_status],
-                        )}
-                      >
-                        {TECHNICAL_LABEL[t.technical_status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <ConnectionBadge
-                        status={t.connection_status ?? 'not_configured'}
-                      />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {t.template_name ?? (
-                        <span className="text-muted-foreground/60">—</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-                    </TableCell>
-                  </TableRow>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
+              </tbody>
+            </table>
+          </div>
 
-function ConnectionBadge({ status }: { status: ConnectionStatus }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 text-sm">
-      <CircleDot
-        className={cn('h-2.5 w-2.5 fill-current', CONNECTION_DOT[status])}
-      />
-      <span className="text-muted-foreground">{CONNECTION_LABEL[status]}</span>
-    </span>
-  );
-}
-
-function EmptyState({ hasTenants }: { hasTenants: boolean }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted">
-        <DatabaseIcon className="h-7 w-7 text-muted-foreground" />
-      </div>
-      <div>
-        <p className="font-medium text-foreground">
-          {hasTenants
-            ? 'Sin resultados para tu búsqueda'
-            : 'No hay empresas registradas'}
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {hasTenants
-            ? 'Ajusta los filtros o el término de búsqueda para encontrar empresas.'
-            : 'Crea la primera empresa para empezar a gestionar tu plataforma.'}
-        </p>
-      </div>
-      {!hasTenants && (
-        <Button asChild className="mt-2">
-          <Link href="/admin/tenants/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Nueva empresa
-          </Link>
-        </Button>
+          {/* Mobile / tablet cards */}
+          <ul className="divide-y divide-[#EFE8DC] border-t border-[#EFE8DC] lg:hidden">
+            {filtered.map((t) => (
+              <li key={t.id}>
+                <Link href={`/admin/tenants/${t.id}`} className={cn('block px-4 py-4 transition hover:bg-[#FBF9F4] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#285C49]')}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-[#25332D]">{t.commercial_name}</p>
+                      <p className="truncate text-xs text-[#52675A]">{t.legal_name ?? '—'} · <span className="font-mono">{t.tax_id ?? 'sin RIF'}</span></p>
+                    </div>
+                    <AdminStatusBadge status={t.commercial_status} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#52675A]">
+                    <InfrastructureBadge mode={t.infrastructure_mode} />
+                    <span>{t.plan_name ?? 'Sin plan'}</span>
+                    <span aria-hidden="true">·</span>
+                    <span>{formatDate(t.created_at)}</span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-    </div>
+    </section>
   );
 }
