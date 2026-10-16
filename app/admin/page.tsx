@@ -194,7 +194,7 @@ export default async function AdminDashboardPage() {
             Panel de control
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Resumen general de la plataforma EKOSCRM
+            Resumen general de la plataforma VORA
           </p>
         </div>
         <Button asChild>
@@ -217,7 +217,7 @@ export default async function AdminDashboardPage() {
               </h3>
               <p className="max-w-md text-sm text-muted-foreground">
                 Crea la primera empresa para comenzar a gestionar tenants,
-                modulos y configuraciones dentro de EKOSCRM.
+                modulos y configuraciones dentro de VORA.
               </p>
             </div>
             <Button asChild>

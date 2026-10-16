@@ -10,7 +10,7 @@ import {
   Menu,
 } from 'lucide-react';
 import { requireSuperAdmin } from '@/lib/auth';
-import { EkosLogo } from '@/components/ekos-logo';
+import { VoraLogo } from '@/components/landing/vora-logo';
 import { AdminLogout } from '@/components/admin-logout';
 
 export const dynamic = 'force-dynamic';
@@ -19,10 +19,10 @@ export const revalidate = 0;
 const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/tenants', label: 'Empresas', icon: Building2 },
-  { href: '/admin/modules', label: 'Modulos', icon: Layers },
+  { href: '/admin/modules', label: 'Módulos', icon: Layers },
   { href: '/admin/plans', label: 'Planes', icon: CreditCard },
   { href: '/admin/users', label: 'Usuarios', icon: Users },
-  { href: '/admin/audit', label: 'Auditoria', icon: ScrollText },
+  { href: '/admin/audit', label: 'Auditoría', icon: ScrollText },
 ];
 
 export default async function AdminLayout({
@@ -36,15 +36,15 @@ export default async function AdminLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#F6F2E9] font-inter text-[#25332D]">
       {/* Mobile top bar */}
-      <div className="flex items-center justify-between border-b bg-primary px-4 py-3 text-primary-foreground md:hidden">
-        <EkosLogo />
+      <div className="flex items-center justify-between border-b bg-[#285C49] px-4 py-3 text-white md:hidden">
+        <VoraLogo tone="cream" />
         <label className="flex h-10 w-10 items-center justify-center rounded-md hover:bg-primary-foreground/10">
           <Menu className="h-5 w-5" />
           <input type="checkbox" className="peer hidden" />
           {/* Mobile dropdown via peer-checked */}
-          <div className="fixed inset-x-0 top-[57px] z-50 hidden origin-top bg-primary px-4 pb-4 pt-2 shadow-lg peer-checked:block">
+          <div className="fixed inset-x-0 top-[57px] z-50 hidden origin-top bg-[#285C49] px-4 pb-4 pt-2 shadow-lg peer-checked:block">
             <div className="flex flex-col gap-1">
               {navItems.map((item) => {
                 const Icon = item.icon;
@@ -71,9 +71,9 @@ export default async function AdminLayout({
 
       <div className="flex">
         {/* Desktop sidebar */}
-        <aside className="sticky top-0 hidden h-screen w-64 flex-col bg-primary text-primary-foreground md:flex">
-          <div className="flex h-16 items-center border-b border-primary-foreground/10 px-6">
-            <EkosLogo />
+        <aside className="sticky top-0 hidden h-screen w-64 flex-col bg-[#285C49] text-[#F6F2E9] md:flex">
+          <div className="flex h-16 items-center border-b border-white/10 px-6">
+            <VoraLogo tone="cream" />
           </div>
 
           <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-4">
@@ -103,15 +103,15 @@ export default async function AdminLayout({
         {/* Main content */}
         <div className="flex min-h-screen flex-1 flex-col">
           {/* Desktop header */}
-          <header className="hidden h-16 items-center justify-between border-b bg-card px-6 md:flex">
+          <header className="hidden h-16 items-center justify-between border-b border-[#E2DACB] bg-white/80 px-6 backdrop-blur md:flex">
             <div>
               <span className="text-sm font-medium text-muted-foreground">
-                Panel de Super Administrador
+                VORA · Panel Super Admin
               </span>
             </div>
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#285C49] text-xs font-semibold text-white">
                   {user.email.charAt(0).toUpperCase()}
                 </div>
                 <span className="text-sm font-medium text-foreground">
