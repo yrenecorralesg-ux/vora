@@ -237,6 +237,10 @@ export const landingPlans: LandingPlan[] = [
   },
 ];
 
+/** Public contact address for advisory and information requests. */
+export const CONTACT_EMAIL = 'info@venesoftca.com';
+export const CONTACT_MAILTO = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Solicitud de información VORA')}`;
+
 export const navLinks = [
   { label: 'Soluciones', href: '#soluciones' },
   { label: 'Beneficios', href: '#beneficios' },
