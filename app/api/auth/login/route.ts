@@ -1,5 +1,8 @@
-import { createServerClient } from '@supabase/ssr';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+
+/** Shape of the cookies @supabase/ssr passes to `setAll` (same as its `SetAllCookies` parameter). */
+type SupabaseCookieToSet = { name: string; value: string; options: CookieOptions };
 
 export async function POST(request: NextRequest) {
   let body: { email?: unknown; password?: unknown };
@@ -27,7 +30,7 @@ export async function POST(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(nextCookies) {
+        setAll(nextCookies: SupabaseCookieToSet[]) {
           cookiesToSet.push(...nextCookies);
         },
       },
