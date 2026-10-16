@@ -9,7 +9,7 @@ export default function AccessPendingPage() {
     <main className="flex min-h-screen items-center justify-center bg-[#F6F2E9] px-6 py-16 font-inter text-[#25332D]">
       <div className="w-full max-w-md text-center">
         <Link href="/" aria-label="VORA by Venesoft, inicio" className="mb-12 inline-flex">
-          <VoraLogo />
+          <VoraLogo height={40} />
         </Link>
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-[#F3E2D2]">
           <Clock3 className="h-8 w-8 text-[#A4573A]" />

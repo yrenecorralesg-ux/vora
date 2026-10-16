@@ -83,7 +83,7 @@ export default function LoginPage() {
         <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -left-20 h-96 w-96 rounded-full bg-[#C97857]/20 blur-3xl" />
 
         <Link href="/" aria-label="VORA by Venesoft, inicio" className="relative w-max rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F6F2E9]">
-          <VoraLogo tone="cream" />
+          <VoraLogo tone="cream" height={36} priority />
         </Link>
 
         <div className="relative max-w-md">
@@ -113,7 +113,7 @@ export default function LoginPage() {
         <div className="relative w-full max-w-md">
           <div className="mb-8 flex justify-center lg:hidden">
             <Link href="/" aria-label="VORA by Venesoft, inicio" className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#285C49]">
-              <VoraLogo />
+              <VoraLogo height={44} priority />
             </Link>
           </div>
 
