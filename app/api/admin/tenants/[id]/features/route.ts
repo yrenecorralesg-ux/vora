@@ -127,6 +127,11 @@ export async function POST(
     return NextResponse.json({ error: `Módulos no reconocidos: ${unknownKeys.join(', ')}` }, { status: 400 });
   }
 
+  const premature = features.filter((f) => f.enabled && catalogByKey.get(f.feature_key) !== 'implemented');
+  if (premature.length) {
+    return NextResponse.json({ error: `Módulos todavía no implementados: ${premature.map((f) => f.feature_key).join(', ')}` }, { status: 409 });
+  }
+
   const rows = features.map((f) => {
     const implemented = catalogByKey.get(f.feature_key) === 'implemented';
     return {

@@ -85,8 +85,8 @@ export function CrmSidebar({
     return pathname === resolved || pathname.startsWith(resolved + '/');
   };
 
-  const sidebarBg = isSolee ? '#131126' : primaryColor || '#131126';
-  const activeBg = isSolee ? '#5136db' : secondaryColor || '#5136db';
+  const sidebarBg = isSolee ? '#131126' : primaryColor || '#104735';
+  const activeBg = isSolee ? '#5136db' : secondaryColor || '#21805b';
 
   const sidebarContent = (
     <div className="flex h-full flex-col justify-between overflow-hidden">
@@ -107,7 +107,7 @@ export function CrmSidebar({
               {tenantName}
             </span>
             <span className="mt-1 text-[7px] font-medium tracking-[0.35em] text-white/50 uppercase">
-              CRM & RELACIONES
+              VORA · BUSINESS PLATFORM
             </span>
           </div>
         )}
@@ -135,7 +135,7 @@ export function CrmSidebar({
                 active
                   ? {
                       backgroundColor: activeBg,
-                      boxShadow: '0 4px 14px -1px rgba(81, 54, 219, 0.45)',
+                      boxShadow: '0 4px 14px -1px rgba(20, 100, 69, 0.35)',
                     }
                   : undefined
               }

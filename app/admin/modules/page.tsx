@@ -31,9 +31,12 @@ const CATEGORY_LABELS: Record<string, string> = {
   channel: 'Canales',
   automation: 'Automatizacion',
   analytics: 'Analitica',
+  commerce: 'Comercio y facturacion',
+  finance: 'Finanzas y pagos',
+  fiscal: 'Gestion fiscal',
 };
 
-const CATEGORY_ORDER = ['crm', 'integration', 'channel', 'automation', 'analytics'];
+const CATEGORY_ORDER = ['crm', 'integration', 'channel', 'automation', 'analytics', 'commerce', 'finance', 'fiscal'];
 
 const STATUS_LABELS: Record<ImplementationStatus, string> = {
   implemented: 'Implementado',
@@ -106,7 +109,7 @@ export default async function ModulesPage() {
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Catalogo de modulos e integraciones disponibles en la plataforma
-          EKOSCRM.
+          VORA.
         </p>
       </div>
 

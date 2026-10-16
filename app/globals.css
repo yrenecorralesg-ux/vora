@@ -14,49 +14,35 @@
     --font-jakarta: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-playfair: 'Playfair Display', Georgia, serif;
 
-    /* EKOSCRM Brand Colors */
-    --background: 214 54% 97%;        /* #F5F8FC */
-    --foreground: 217 45% 16%;        /* #16243A */
-    --card: 0 0% 100%;                /* #FFFFFF */
-    --card-foreground: 217 45% 16%;
+    /* VORA brand tokens: tenants can override branding independently. */
+    --background: 145 30% 97%;
+    --foreground: 158 54% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 158 54% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 217 45% 16%;
-
-    /* Navy primary #042071 */
-    --primary: 225 93% 23%;
+    --popover-foreground: 158 54% 12%;
+    --primary: 157 64% 21%;
     --primary-foreground: 0 0% 100%;
-
-    /* Turquoise accent #63DCE5 */
-    --accent: 184 71% 64%;
-    --accent-foreground: 225 93% 15%;
-
-    /* Secondary: lighter navy */
-    --secondary: 225 60% 35%;
-    --secondary-foreground: 0 0% 100%;
-
-    --muted: 213 46% 91%;             /* #DCE6F2 */
-    --muted-foreground: 217 30% 40%;
-
-    /* Cyan #00AFEF for moderate use */
-    --info: 196 100% 47%;
+    --accent: 145 47% 48%;
+    --accent-foreground: 0 0% 100%;
+    --secondary: 152 32% 88%;
+    --secondary-foreground: 158 54% 12%;
+    --muted: 145 23% 92%;
+    --muted-foreground: 156 17% 36%;
+    --info: 175 64% 35%;
     --info-foreground: 0 0% 100%;
-
     --success: 152 60% 42%;
     --success-foreground: 0 0% 100%;
-
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-
-    --border: 213 46% 91%;            /* #DCE6F2 */
-    --input: 213 46% 91%;
-    --ring: 225 93% 23%;
-
-    --chart-1: 225 93% 23%;
-    --chart-2: 184 71% 64%;
-    --chart-3: 196 100% 47%;
+    --border: 148 20% 86%;
+    --input: 148 20% 86%;
+    --ring: 157 64% 21%;
+    --chart-1: 157 64% 21%;
+    --chart-2: 145 47% 48%;
+    --chart-3: 175 64% 35%;
     --chart-4: 152 60% 42%;
     --chart-5: 38 92% 50%;
 

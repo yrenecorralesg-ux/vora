@@ -1,0 +1,14 @@
+
+.env.local
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+.env
+.env.*
+!.env.example
+
+# Supabase CLI local state and migration backups
+supabase/.temp/
+supabase/migrations-backup/

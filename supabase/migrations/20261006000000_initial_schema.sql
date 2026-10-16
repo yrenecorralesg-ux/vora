@@ -628,43 +628,7 @@ INSERT INTO schema_versions (scope, version, name, description) VALUES
   ('platform', '001', 'Platform Core Schema', 'Esquema inicial de Platform DB con tenants, features, memberships, roles, branding, databases, audit y demo requests.')
 ON CONFLICT (scope, version) DO NOTHING;
 
--- ============================================================================
--- 9. BOOTSTRAP SUPER ADMIN
--- ============================================================================
-
-DO $$
-DECLARE
-  v_user_id uuid;
-  v_role_id uuid;
-BEGIN
-  SELECT id INTO v_user_id FROM auth.users WHERE email = 'admin@ekoscrm.com' AND is_sso_user = false LIMIT 1;
-  IF v_user_id IS NULL THEN
-    v_user_id := gen_random_uuid();
-    INSERT INTO auth.users (
-      instance_id, id, aud, role, email, encrypted_password,
-      email_confirmed_at, created_at, updated_at, last_sign_in_at,
-      raw_app_meta_data, raw_user_meta_data, confirmation_token, recovery_token,
-      is_sso_user
-    ) VALUES (
-      '00000000-0000-0000-0000-000000000000',
-      v_user_id,
-      'authenticated',
-      'authenticated',
-      'admin@ekoscrm.com',
-      crypt('EkosAdmin2026!', gen_salt('bf')),
-      now(), now(), now(), null,
-      '{}'::jsonb, '{}'::jsonb, '', '',
-      false
-    );
-  END IF;
-
-  SELECT id INTO v_role_id FROM platform_roles WHERE key = 'super_admin';
-  IF v_role_id IS NOT NULL THEN
-    INSERT INTO platform_user_roles (user_id, role_id)
-    VALUES (v_user_id, v_role_id)
-    ON CONFLICT (user_id, role_id) DO NOTHING;
-  END IF;
-END $$;
+-- Bootstrap de superadministrador deshabilitado.
 
 -- ============================================================================
 -- 10. DEMO TENANTS (SOLEÉ & Empresa Demo)
