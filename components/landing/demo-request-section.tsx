@@ -1,13 +1,14 @@
 'use client';
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowRight, CheckCircle2, Clock3, MessageSquareText, ShieldCheck } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Clock3, Mail, MessageSquareText, ShieldCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { INTEREST_EVENT } from './interest-link';
+import { CONTACT_EMAIL, CONTACT_MAILTO } from './landing-data';
 import { SectionHeading, focusRing } from './landing-ui';
 
 type FormStatus = 'idle' | 'submitting' | 'success' | 'error';
@@ -71,7 +72,16 @@ export function DemoRequestSection() {
             <Point icon={<Clock3 className="h-5 w-5" aria-hidden="true" />}>Te mostramos lo que ya funciona y lo que viene en camino.</Point>
             <Point icon={<ShieldCheck className="h-5 w-5" aria-hidden="true" />}>Usamos tus datos solo para responder a tu solicitud.</Point>
           </ul>
-          <p className="mt-8 text-sm text-[#52675A]">No enviamos un correo automático de confirmación.</p>
+          <div className="mt-8 rounded-2xl bg-white/70 p-5">
+            <p className="text-sm font-semibold text-[#25332D]">¿Prefieres escribirnos para recibir asesoría?</p>
+            <a
+              href={CONTACT_MAILTO}
+              className={cn('mt-2 inline-flex items-center gap-2 rounded-full font-jakarta text-lg font-bold text-[#285C49] underline-offset-4 hover:underline', focusRing)}
+            >
+              <Mail className="h-5 w-5" aria-hidden="true" /> {CONTACT_EMAIL}
+            </a>
+          </div>
+          <p className="mt-4 text-sm text-[#52675A]">No enviamos un correo automático de confirmación.</p>
         </div>
 
         <div className="rounded-[2rem] bg-white p-6 shadow-xl shadow-[#25332D]/10 sm:p-9">
@@ -80,7 +90,8 @@ export function DemoRequestSection() {
               <CheckCircle2 className="mx-auto h-12 w-12 text-[#285C49]" aria-hidden="true" />
               <h3 className="mt-5 font-jakarta text-2xl font-bold text-[#285C49]">Solicitud registrada</h3>
               <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#52675A]">
-                Guardamos tus datos correctamente. El contacto posterior depende del equipo de Venesoft.
+                Guardamos tus datos correctamente. El contacto posterior depende del equipo de Venesoft. Si lo necesitas, escríbenos a{' '}
+                <a href={CONTACT_MAILTO} className="font-semibold text-[#285C49] underline-offset-4 hover:underline">{CONTACT_EMAIL}</a>.
               </p>
               <button type="button" onClick={() => setFormStatus('idle')} className={cn('mt-6 rounded-full px-5 py-2.5 text-sm font-semibold text-[#285C49] hover:bg-[#E6EBDF]', focusRing)}>
                 Enviar otra solicitud

@@ -1,6 +1,6 @@
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { differentiators, landingPlans } from './landing-data';
+import { CONTACT_EMAIL, CONTACT_MAILTO, differentiators, landingPlans } from './landing-data';
 import { InterestLink } from './interest-link';
 import { SectionHeading, focusRing } from './landing-ui';
 
@@ -84,6 +84,8 @@ export function PricingSection() {
 
         <p className="mt-8 max-w-3xl text-sm leading-6 text-[#52675A]">
           Precios propuestos, sujetos a validación antes del lanzamiento comercial. Por ahora no hay cobro en línea ni activación automática de suscripciones; las funciones de cada plan se habilitan según su disponibilidad.
+          Para solicitar información o asesoría sobre los planes, escríbenos a{' '}
+          <a href={CONTACT_MAILTO} className="font-semibold text-[#285C49] underline-offset-4 hover:underline">{CONTACT_EMAIL}</a>.
         </p>
       </div>
     </section>

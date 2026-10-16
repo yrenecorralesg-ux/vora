@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { landingModules } from './landing-data';
+import { CONTACT_EMAIL, CONTACT_MAILTO, landingModules } from './landing-data';
 import { VoraLogo } from './vora-logo';
 
 const footerLink = 'rounded text-[#DCE6D9] transition hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F6F2E9]';
@@ -11,6 +11,7 @@ export function LandingFooter() {
         <div>
           <VoraLogo tone="cream" />
           <p className="mt-4 max-w-xs text-sm leading-6">VORA by Venesoft. Plataforma empresarial modular para vender, organizar y crecer.</p>
+          <a href={CONTACT_MAILTO} className={`mt-4 inline-block font-semibold ${footerLink}`}>{CONTACT_EMAIL}</a>
         </div>
         <nav aria-label="Soluciones">
           <p className="font-jakarta text-sm font-bold text-white">Soluciones</p>
