@@ -25,6 +25,7 @@ DO $$ BEGIN
     SELECT 1 FROM information_schema.columns
     WHERE table_name = 'tenants' AND column_name = 'business_type'
   ) THEN
-    ALTER TABLE tenants ADD COLUMN business_type text;
+    ALTER TABLE public.tenants
+    ADD COLUMN IF NOT EXISTS business_type text;
   END IF;
 END $$;

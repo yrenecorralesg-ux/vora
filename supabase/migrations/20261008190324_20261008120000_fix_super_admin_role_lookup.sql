@@ -21,6 +21,9 @@
 
 DROP POLICY IF EXISTS "pur_select_own_or_admin" ON public.platform_user_roles;
 
+DROP POLICY IF EXISTS "pur_select_own"
+ON public.platform_user_roles;
+
 CREATE POLICY "pur_select_own" ON public.platform_user_roles
 FOR SELECT
 TO authenticated

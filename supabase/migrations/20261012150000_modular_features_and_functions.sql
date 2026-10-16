@@ -8,7 +8,8 @@ BEGIN
     SELECT 1 FROM information_schema.columns 
     WHERE table_name = 'features' AND column_name = 'available_functions'
   ) THEN
-    ALTER TABLE features ADD COLUMN available_functions jsonb DEFAULT '[]'::jsonb;
+    ALTER TABLE public.features
+    ADD COLUMN IF NOT EXISTS available_functions jsonb DEFAULT '[]'::jsonb;
   END IF;
 END $$;
 

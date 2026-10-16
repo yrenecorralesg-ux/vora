@@ -87,6 +87,18 @@ export async function PATCH(
     return NextResponse.json({ error: 'Parámetros inválidos (feature_key, enabled).' }, { status: 400 });
   }
 
+  // A planned module is visible in the catalog but cannot be activated yet.
+  const { data: catalogFeature, error: catalogError } = await service
+    .from('features')
+    .select('implementation_status')
+    .eq('key', feature_key)
+    .maybeSingle();
+  if (catalogError) return NextResponse.json({ error: 'Error al validar el módulo.' }, { status: 500 });
+  if (!catalogFeature) return NextResponse.json({ error: 'Módulo no reconocido.' }, { status: 400 });
+  if (enabled && catalogFeature.implementation_status !== 'implemented') {
+    return NextResponse.json({ error: 'Este módulo todavía está planificado y no puede activarse.' }, { status: 409 });
+  }
+
   const updateData: any = { enabled };
   if (config !== undefined) {
     updateData.config = config;

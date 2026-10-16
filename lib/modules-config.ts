@@ -8,7 +8,7 @@ export interface ModuleFunction {
 export interface ModuleDefinition {
   key: string;
   name: string;
-  category: 'crm' | 'integration' | 'channel' | 'automation' | 'analytics';
+  category: 'crm' | 'integration' | 'channel' | 'automation' | 'analytics' | 'commerce' | 'finance' | 'fiscal';
   description: string;
   href: string;
   functions: ModuleFunction[];
@@ -166,5 +166,35 @@ export const CRM_MODULES_CATALOG: Record<string, ModuleDefinition> = {
       { key: 'electronic_invoicing', name: 'Facturación electrónica automática', description: 'Emisión autorizada de comprobantes fiscales.', defaultEnabled: true },
       { key: 'dian_sync', name: 'Sincronización con DIAN y Siigo', description: 'Validación de NIT, impuestos y consecutivo fiscal.', defaultEnabled: true },
     ],
+  },
+  'commerce.billing': {
+    key: 'commerce.billing', name: 'VORA Billing', category: 'commerce',
+    description: 'Facturación independiente del CRM; documentos y numeración. Requiere implementación y validación fiscal.', href: '/t/[slug]/billing',
+    functions: [],
+  },
+  'commerce.storefront': {
+    key: 'commerce.storefront', name: 'VORA Store', category: 'commerce',
+    description: 'Tienda web multitenant con catálogo público y pedidos.', href: '/t/[slug]/website',
+    functions: [],
+  },
+  'commerce.network': {
+    key: 'commerce.network', name: 'VORA Network', category: 'commerce',
+    description: 'Red de asesoras, catálogos, comisiones y distribución.', href: '/t/[slug]/network',
+    functions: [],
+  },
+  'finance.bank': {
+    key: 'finance.bank', name: 'VORA Bank', category: 'finance',
+    description: 'Importación y conciliación de movimientos bancarios.', href: '/t/[slug]/bank',
+    functions: [],
+  },
+  'finance.pay': {
+    key: 'finance.pay', name: 'VORA Pay', category: 'finance',
+    description: 'Registro y verificación de cobros y comprobantes.', href: '/t/[slug]/pay',
+    functions: [],
+  },
+  'fiscal.venezuela': {
+    key: 'fiscal.venezuela', name: 'VORA Fiscal', category: 'fiscal',
+    description: 'Configuración tributaria venezolana, libros y reportes.', href: '/t/[slug]/fiscal',
+    functions: [],
   },
 };
