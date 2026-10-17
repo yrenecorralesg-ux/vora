@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import {
@@ -63,6 +64,8 @@ export const ALL_CRM_MODULES: CrmNavItem[] = [
 export function CrmSidebar({
   slug,
   tenantName,
+  logoUrl,
+  isPreview,
   primaryColor,
   secondaryColor,
   sidebarBannerUrl,
@@ -92,7 +95,7 @@ export function CrmSidebar({
     <div className="flex h-full flex-col justify-between overflow-hidden">
       {/* Top Header / Text Logo (never replaced with random graphic) */}
       <div className="px-5 pt-6 pb-4 text-center">
-        {isSolee ? (
+        {logoUrl ? <div className="relative mx-auto h-20 w-full rounded-xl bg-white"><Image src={logoUrl} alt={`Logo de ${tenantName}`} fill unoptimized className="object-contain p-2"/></div> : isSolee ? (
           <div className="flex flex-col items-center justify-center">
             <span className="font-serif text-[22px] font-normal tracking-[0.32em] text-white uppercase leading-none">
               SOLEÉ
@@ -118,7 +121,7 @@ export function CrmSidebar({
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
-          const resolved = item.href.replace('[slug]', slug);
+          const resolved = item.href.replace('[slug]', slug) + (isPreview ? '?preview=1' : '');
 
           return (
             <Link

@@ -48,3 +48,11 @@ PostgreSQL aislado: instalar `@electric-sql/pglite` en un directorio temporal, s
 Rutas y middleware: `node scripts/test-core-routes.cjs`. Lint: `npm run lint`.
 
 Validación de esta entrega: 14 pruebas PostgreSQL y 15 pruebas de rutas/middleware aprobadas; TypeScript y build aprobados. Lint sin errores, con cuatro advertencias heredadas sobre imágenes. Se comprobó el rechazo HTTP de accesos anónimos en el servidor local. No se validaron DNS reales, SMTP, bases Dedicated externas ni el recorrido con cuentas reales en producción.
+
+### Directorio de usuarios
+
+Usuarios muestra el correo real de las cuentas vinculadas y las asignaciones pendientes de cuenta. La consulta de Auth se hace solo en servidor, después de validar Super Admin y únicamente por los identificadores de las membresías de la empresa. Una falla temporal de Auth conserva la fila con el aviso de correo no disponible. Las invitaciones vencidas se distinguen de las pendientes; una invitación antigua no duplica un administrador activo. Pruebas: `node scripts/test-tenant-users.cjs`.
+
+### Plantilla en vista previa
+
+El Super Admin puede revisar logo, banners, colores y servicios asignados aunque Core siga pendiente. La vista previa se verifica en servidor, incluso si ese Super Admin también tiene membresía en el cliente. Los enlaces del menú conservan el modo de vista previa; este permite revisar las pantallas de demostración activadas sin aprobar la base, DNS ni acceso operativo del cliente. Un usuario de cliente no puede usar ese modo mediante un parámetro o encabezado. Pruebas: `node scripts/test-tenant-preview.cjs` y `node scripts/test-core-routes.cjs`.
