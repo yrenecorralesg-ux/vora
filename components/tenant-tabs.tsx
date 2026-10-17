@@ -30,6 +30,8 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
+import { TenantUsersPanel } from '@/components/tenant-users-panel';
+import type { TenantUserDisplay } from '@/lib/tenant-users';
 import { CoreServicesPanel } from '@/components/core-services-panel';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -139,6 +141,8 @@ export interface TenantTabsProps {
   domains: TenantDomain[];
   memberships: (TenantMembership & { email?: string | null })[];
   auditLogs: AuditLog[];
+  users: TenantUserDisplay[];
+  userDirectoryError?: string;
   templateName: string | null;
   planName?: string | null;
 }
@@ -196,7 +200,7 @@ export function TenantTabs(props: TenantTabsProps) {
         <BaseDeDatosTab database={database} tenantId={tenant.id} />
       </TabsContent>
       <TabsContent value="usuarios" className="mt-6">
-        <div className="space-y-3"><p className="text-sm text-muted-foreground">Asigna el administrador desde Configuración progresiva. La gestión ampliada de usuarios se completará como siguiente entrega.</p><UsuariosTab memberships={memberships} /></div>
+        <div className="space-y-3"><p className="text-sm text-muted-foreground">Asigna el administrador desde Configuración progresiva. La gestión ampliada de usuarios se completará como siguiente entrega.</p><TenantUsersPanel users={props.users} error={props.userDirectoryError} /></div>
       </TabsContent>
       <TabsContent value="dominios" className="mt-6">
         <DominiosTab domains={domains} />
@@ -1446,84 +1450,6 @@ function TestConnectionButton({ tenantId }: { tenantId: string }) {
 /* -------------------------------------------------------------------------- */
 /*  Usuarios                                                                  */
 /* -------------------------------------------------------------------------- */
-
-function UsuariosTab({
-  memberships,
-}: {
-  memberships: TenantTabsProps['memberships'];
-}) {
-  if (memberships.length === 0) {
-    return (
-      <EmptyCard
-        icon={UsersIcon}
-        title="Sin usuarios asignados"
-        description="Esta empresa no tiene miembros todavía."
-      />
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-base">Miembros de la empresa</CardTitle>
-
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Usuario</TableHead>
-              <TableHead>Rol</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Desde</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {memberships.map((m) => (
-              <TableRow key={m.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase text-muted-foreground">
-                      {(m.email ?? m.auth_user_id).slice(0, 2)}
-                    </span>
-                    <div>
-                      <p className="font-medium">
-                        {m.email ?? 'Sin email'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {m.auth_user_id.slice(0, 8)}…
-                      </p>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary" className="capitalize">
-                    {m.role.replace(/_/g, ' ')}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    className={cn(
-                      'border-transparent',
-                      m.status === 'active'
-                        ? 'bg-success text-success-foreground'
-                        : 'bg-muted text-muted-foreground',
-                    )}
-                  >
-                    {m.status === 'active' ? 'Activo' : 'Inactivo'}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {formatDate(m.created_at)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /*  Dominios                                                                  */
