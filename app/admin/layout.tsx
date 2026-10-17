@@ -20,6 +20,7 @@ const navItems = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/tenants', label: 'Empresas', icon: Building2 },
   { href: '/admin/modules', label: 'Módulos', icon: Layers },
+  { href: '/admin/billing', label: 'Suscripciones y cobros', icon: CreditCard },
   { href: '/admin/plans', label: 'Planes', icon: CreditCard },
   { href: '/admin/users', label: 'Usuarios', icon: Users },
   { href: '/admin/audit', label: 'Auditoría', icon: ScrollText },

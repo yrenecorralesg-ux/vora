@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
+import {
+  getSupabaseServerClient,
+  getSupabaseServiceClient,
+} from '@/lib/supabase-server';
 import { isSuperAdmin } from '@/lib/auth';
 
 /**
@@ -43,11 +46,20 @@ export async function POST(
   const email =
     typeof body?.email === 'string' ? body.email.trim().toLowerCase() : '';
   const role =
-    typeof body?.role === 'string' && body.role.trim() ? body.role.trim() : 'tenant_admin';
+    typeof body?.role === 'string' && body.role.trim()
+      ? body.role.trim()
+      : 'tenant_admin';
 
+  if (role !== 'tenant_admin')
+    return NextResponse.json(
+      { error: 'Este flujo asigna únicamente administradores de empresa.' },
+      { status: 400 },
+    );
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json(
-      { error: 'Se requiere un email valido para el administrador del tenant.' },
+      {
+        error: 'Se requiere un email valido para el administrador del tenant.',
+      },
       { status: 400 },
     );
   }
@@ -61,17 +73,27 @@ export async function POST(
     .eq('id', params.id)
     .maybeSingle();
   if (!tenant) {
-    return NextResponse.json({ error: 'Empresa no encontrada.' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Empresa no encontrada.' },
+      { status: 404 },
+    );
   }
 
   /* Look up the auth user by email via the service client (admin API) */
-  const { data: userList, error: userErr } = await service.auth.admin.listUsers();
-  if (userErr) {
-    console.error('[membership] listUsers error', userErr.message);
+  let authUser: { id: string; email?: string } | undefined;
+  for (let page = 1; ; page++) {
+    const { data: users, error } = await service.auth.admin.listUsers({
+      page,
+      perPage: 1000,
+    });
+    if (error)
+      return NextResponse.json(
+        { error: 'No se pudo consultar la cuenta del administrador.' },
+        { status: 500 },
+      );
+    authUser = users.users.find((u) => (u.email ?? '').toLowerCase() === email);
+    if (authUser || users.users.length < 1000) break;
   }
-  const authUser = (userList?.users ?? []).find(
-    (u) => (u.email ?? '').toLowerCase() === email,
-  );
 
   /* ---------- Case 1: user exists → create membership ---------- */
   if (authUser) {
@@ -93,7 +115,10 @@ export async function POST(
         .maybeSingle();
       if (error) {
         return NextResponse.json(
-          { error: 'No se pudo actualizar la membresia.', detail: error.message },
+          {
+            error: 'No se pudo actualizar la membresia.',
+            detail: error.message,
+          },
           { status: 500 },
         );
       }
@@ -140,7 +165,10 @@ export async function POST(
   /* Simple token: random uuid (opaque). Store a hash. */
   const token = crypto.randomUUID();
   const encoder = new TextEncoder();
-  const tokenHash = await crypto.subtle.digest('SHA-256', encoder.encode(token));
+  const tokenHash = await crypto.subtle.digest(
+    'SHA-256',
+    encoder.encode(token),
+  );
 
   const { data: existingInv } = await service
     .from('tenant_invitations')
@@ -160,7 +188,9 @@ export async function POST(
           .map((b) => b.toString(16).padStart(2, '0'))
           .join(''),
         invited_by: user.id,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         accepted_at: null,
         accepted_by: null,
       })
@@ -180,7 +210,9 @@ export async function POST(
           .map((b) => b.toString(16).padStart(2, '0'))
           .join(''),
         invited_by: user.id,
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+        expires_at: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000,
+        ).toISOString(),
       })
       .select('id, tenant_id, email, role, status')
       .maybeSingle();
@@ -208,6 +240,6 @@ export async function POST(
     status: 'pending',
     pending: true,
     message:
-      'No se encontro una cuenta con ese email. Se creo una invitacion pendiente. Cuando el usuario se registre, se activara la membresia.',
+      'Se registró una invitación pendiente. El envío y aceptación por correo aún no están habilitados; puedes asignar el administrador cuando su cuenta exista.',
   });
 }

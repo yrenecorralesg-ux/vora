@@ -46,9 +46,16 @@ export const STEPS = [
   { key: 'resumen', label: 'Resumen', icon: 'ClipboardCheck' },
 ] as const;
 
-export const ALLOWED_FONTS = ['Inter', 'Poppins', 'Roboto', 'Montserrat', 'Plus Jakarta Sans'] as const;
+export const ALLOWED_FONTS = [
+  'Inter',
+  'Poppins',
+  'Roboto',
+  'Montserrat',
+  'Plus Jakarta Sans',
+] as const;
 
 export const COUNTRIES = [
+  { value: 'VE', label: 'Venezuela' },
   { value: 'CO', label: 'Colombia' },
   { value: 'MX', label: 'Mexico' },
   { value: 'AR', label: 'Argentina' },
@@ -62,6 +69,7 @@ export const COUNTRIES = [
 ];
 
 export const CURRENCIES = [
+  { value: 'VES', label: 'Bolívar (VES)' },
   { value: 'COP', label: 'Peso Colombiano (COP)' },
   { value: 'MXN', label: 'Peso Mexicano (MXN)' },
   { value: 'ARS', label: 'Peso Argentino (ARS)' },
@@ -78,9 +86,17 @@ export const LANGUAGES = [
 ];
 
 export const TIMEZONES = [
-  'America/Bogota', 'America/Mexico_City', 'America/Argentina/Buenos_Aires',
-  'America/Lima', 'America/Santiago', 'America/Guayaquil',
-  'America/Montevideo', 'Europe/Madrid', 'US/Eastern', 'US/Pacific',
+  'America/Caracas',
+  'America/Bogota',
+  'America/Mexico_City',
+  'America/Argentina/Buenos_Aires',
+  'America/Lima',
+  'America/Santiago',
+  'America/Guayaquil',
+  'America/Montevideo',
+  'Europe/Madrid',
+  'US/Eastern',
+  'US/Pacific',
 ];
 
 export const BUSINESS_TYPES = [

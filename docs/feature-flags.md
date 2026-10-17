@@ -1,8 +1,8 @@
-# Feature Flags — EKOSCRM
+# Feature Flags — VORA
 
 ## Visión General
 
-EKOSCRM utiliza un sistema de feature flags por tenant que controla qué módulos están disponibles para cada empresa. El sistema distingue entre el **estado de implementación** del módulo (¿está construido?) y el **estado de configuración** del flag (¿está activado y configurado para este tenant?).
+VORA utiliza un sistema de feature flags por tenant que controla qué módulos están disponibles para cada empresa. El sistema distingue entre el **estado de implementación** del módulo (¿está construido?) y el **estado de configuración** del flag (¿está activado y configurado para este tenant?).
 
 ---
 

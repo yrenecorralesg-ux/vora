@@ -1,8 +1,8 @@
-# Seguridad — EKOSCRM
+# Seguridad — VORA
 
 ## Visión General
 
-EKOSCRM implementa seguridad en múltiples capas: RLS a nivel de base de datos, validación de roles en API routes, middleware de Next.js para protección de rutas, y separación estricta entre claves públicas y privilegiadas.
+VORA implementa seguridad en múltiples capas: RLS a nivel de base de datos, validación de roles en API routes, middleware de Next.js para protección de rutas, y separación estricta entre claves públicas y privilegiadas.
 
 ---
 
@@ -12,7 +12,7 @@ EKOSCRM implementa seguridad en múltiples capas: RLS a nivel de base de datos, 
 
 | Rol | Key | Scope | Descripción |
 |-----|-----|-------|-------------|
-| Super Admin EKOSCRM | `super_admin` | platform | Acceso total al panel de super admin. Crea tenants, asigna branding, gestiona módulos y bases de datos. |
+| Super Admin VORA | `super_admin` | platform | Acceso total al panel de super admin. Crea tenants, asigna branding, gestiona módulos y bases de datos. |
 | Administrador de Tenant | `tenant_admin` | tenant | Admin de una empresa específica. Acceso a su shell CRM y configuración. |
 | Comercial | `comercial` | tenant | Acceso a clientes, ventas y seguimiento. |
 | Atención | `atencion` | tenant | Acceso a clientes y seguimiento. |

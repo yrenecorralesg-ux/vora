@@ -1,8 +1,8 @@
-# Handoff — EKOSCRM Sprint 1
+# Handoff — VORA Sprint 1
 
 ## Resumen
 
-Este documento describe el estado del proyecto EKOSCRM al cierre del Sprint 1: qué está implementado, qué pendiente, qué es mock/demo, y qué viene en los siguientes sprints.
+Este documento describe el estado del proyecto VORA al cierre del Sprint 1: qué está implementado, qué pendiente, qué es mock/demo, y qué viene en los siguientes sprints.
 
 ---
 
@@ -26,7 +26,7 @@ Este documento describe el estado del proyecto EKOSCRM al cierre del Sprint 1: q
 - Email confirmation OFF
 - `AuthProvider` con `onAuthStateChange`
 - Destino según autorización: Super Admin → `/admin`, una membresía → `/t/[slug]`, varias → `/select-tenant`, ninguna → `/access-pending`
-- UI con fondo navy-gradient y logo EKOSCRM
+- UI con fondo navy-gradient y logo VORA
 
 ### Panel de Super Admin (`/admin/*`)
 
@@ -91,7 +91,7 @@ Todas validan sesión + super_admin + registran auditoría. El formulario públi
 - `tenant_branding` con 4 colores, fuente, logo, favicon, banner
 - Inyección como CSS custom properties
 - Vista previa en wizard
-- Identidad EKOSCRM vs identidad del tenant separadas
+- Identidad VORA vs identidad del tenant separadas
 
 ### Base de Datos
 

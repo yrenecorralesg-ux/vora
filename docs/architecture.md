@@ -1,8 +1,10 @@
-# Arquitectura de EKOSCRM
+> Documento histórico. Para el flujo y arquitectura vigentes consulta [VORA Core progresivo](./vora-core-progressive.md). Las descripciones de un Supabase obligatorio por empresa y del asistente de siete pasos ya no aplican.
+
+# Arquitectura de VORA
 
 ## Visión General
 
-EKOSCRM es una plataforma SaaS CRM modular multi-tenant construida sobre Next.js 13.5 (App Router) y Supabase. La arquitectura se basa en un modelo **Platform vs Tenant** donde la plataforma administra la identidad, configuración y provisioning de empresas, y cada tenant opera su propia base de datos Supabase dedicada para sus datos comerciales.
+VORA es una plataforma SaaS CRM modular multi-tenant construida sobre Next.js 13.5 (App Router) y Supabase. La arquitectura se basa en un modelo **Platform vs Tenant** donde la plataforma administra la identidad, configuración y provisioning de empresas, y cada tenant opera su propia base de datos Supabase dedicada para sus datos comerciales.
 
 ---
 

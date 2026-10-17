@@ -1,12 +1,14 @@
-# Branding — EKOSCRM
+> Documento histórico. Para el flujo y arquitectura vigentes consulta [VORA Core progresivo](./vora-core-progressive.md). Las descripciones de un Supabase obligatorio por empresa y del asistente de siete pasos ya no aplican.
+
+# Branding — VORA
 
 ## Visión General
 
-EKOSCRM tiene dos capas de identidad visual: la **identidad global de EKOSCRM** (la plataforma) y el **branding por tenant** (cada empresa). Ambas conviven: la plataforma usa su propia marca en el panel de super admin y la landing page, mientras que cada tenant ve su propia marca en su shell del CRM.
+VORA tiene dos capas de identidad visual: la **identidad global de VORA** (la plataforma) y el **branding por tenant** (cada empresa). Ambas conviven: la plataforma usa su propia marca en el panel de super admin y la landing page, mientras que cada tenant ve su propia marca en su shell del CRM.
 
 ---
 
-## Identidad Global de EKOSCRM
+## Identidad Global de VORA
 
 ### Paleta de colores global
 
@@ -29,15 +31,15 @@ Estos colores están definidos como CSS variables en `tailwind.config.ts` y `glo
 - **Fuente:** Inter (cargada via `next/font/google`)
 - Usada en toda la plataforma: landing, login, panel admin
 
-### Logo EKOSCRM
+### Logo VORA
 
-El componente `EkosLogo` (`components/ekos-logo.tsx`) renderiza el logo de EKOSCRM. Se usa en:
+El componente `EkosLogo` (`components/ekos-logo.tsx`) renderiza el logo de VORA. Se usa en:
 - Header de la landing page
 - Página de login
 - Sidebar del panel de super admin
 - Footer
 
-El logo es siempre el de EKOSCRM, independientemente del contexto. Los tenants no reemplazan el logo de EKOSCRM en el panel admin — solo en su propio shell del CRM.
+El logo es siempre el de VORA, independientemente del contexto. Los tenants no reemplazan el logo de VORA en el panel admin — solo en su propio shell del CRM.
 
 ---
 
@@ -90,7 +92,7 @@ const secondaryColor = branding?.secondary_color ?? '#63DCE5';
 const accentColor = branding?.accent_color ?? '#63DCE5';
 ```
 
-Si el tenant no tiene branding configurado, se usan los defaults de EKOSCRM.
+Si el tenant no tiene branding configurado, se usan los defaults de VORA.
 
 ### 2. Inyección como CSS Custom Properties
 
@@ -175,7 +177,7 @@ La landing page muestra una preview con gradiente verde→verde oscuro.
 
 ```
 ┌─────────────────────────────────────────────┐
-│              Identidad EKOSCRM                │
+│              Identidad VORA                │
 │  (Landing, Login, Panel Super Admin)         │
 │  Colores: #042071, #63DCE5, #00AFEF          │
 │  Logo: EkosLogo                              │
@@ -195,4 +197,4 @@ La landing page muestra una preview con gradiente verde→verde oscuro.
 └───────────────┘     └───────────────┘
 ```
 
-El panel de super admin siempre usa la identidad de EKOSCRM. El CRM del tenant (`/t/[slug]/*`) usa la identidad del tenant. Esto crea una separación visual clara: el operador de EKOSCRM sabe que está en la plataforma, y el cliente del tenant ve su propia marca.
+El panel de super admin siempre usa la identidad de VORA. El CRM del tenant (`/t/[slug]/*`) usa la identidad del tenant. Esto crea una separación visual clara: el operador de VORA sabe que está en la plataforma, y el cliente del tenant ve su propia marca.

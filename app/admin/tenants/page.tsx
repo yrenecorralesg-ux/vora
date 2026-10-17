@@ -48,10 +48,8 @@ export default async function TenantsListPage() {
     slug: t.slug,
     commercial_status: t.commercial_status,
     technical_status: t.technical_status,
-    template_name:
-      t.business_templates?.name ?? null,
-    connection_status:
-      t.tenant_databases?.[0]?.connection_status ?? null,
+    template_name: t.business_templates?.name ?? null,
+    connection_status: t.tenant_databases?.[0]?.connection_status ?? null,
     branding_primary: t.tenant_branding?.[0]?.primary_color ?? null,
     branding_logo_url: t.tenant_branding?.[0]?.logo_url ?? null,
   }));
@@ -70,7 +68,7 @@ export default async function TenantsListPage() {
                 Panel Super Admin
               </h1>
               <p className="text-xs text-muted-foreground">
-                EKOSCRM · {user.email}
+                VORA · {user.email}
               </p>
             </div>
           </div>

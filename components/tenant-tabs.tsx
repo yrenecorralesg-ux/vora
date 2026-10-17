@@ -30,6 +30,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 
+import { CoreServicesPanel } from '@/components/core-services-panel';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -189,13 +190,13 @@ export function TenantTabs(props: TenantTabsProps) {
         <BrandingTab branding={branding} tenant={tenant} />
       </TabsContent>
       <TabsContent value="modulos" className="mt-6">
-        <ModulosTab features={features} tenantId={tenant.id} />
+        <CoreServicesPanel tenantId={tenant.id} />
       </TabsContent>
       <TabsContent value="basededatos" className="mt-6">
         <BaseDeDatosTab database={database} tenantId={tenant.id} />
       </TabsContent>
       <TabsContent value="usuarios" className="mt-6">
-        <UsuariosTab memberships={memberships} />
+        <div className="space-y-3"><p className="text-sm text-muted-foreground">Asigna el administrador desde Configuración progresiva. La gestión ampliada de usuarios se completará como siguiente entrega.</p><UsuariosTab memberships={memberships} /></div>
       </TabsContent>
       <TabsContent value="dominios" className="mt-6">
         <DominiosTab domains={domains} />
@@ -553,6 +554,7 @@ function EmpresaTab({ tenant }: { tenant: Tenant }) {
   const [form, setForm] = React.useState({
     commercial_name: tenant.commercial_name,
     legal_name: tenant.legal_name ?? '',
+    tax_id: tenant.tax_id ?? '',
     slug: tenant.slug,
     country: tenant.country ?? '',
     currency: tenant.currency,
@@ -573,7 +575,7 @@ function EmpresaTab({ tenant }: { tenant: Tenant }) {
       const res = await fetch(`/api/admin/tenants/${tenant.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify(Object.fromEntries(Object.entries(form).filter(([key]) => key !== 'slug'))),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -615,9 +617,11 @@ function EmpresaTab({ tenant }: { tenant: Tenant }) {
               }
             />
           </Field>
-          <Field label="Slug" required>
+          <Field label="RIF"><Input value={form.tax_id} maxLength={40} onChange={(e)=>setForm(s=>({...s,tax_id:e.target.value}))}/></Field>
+          <Field label="Subdominio reservado" required>
             <Input
               required
+              disabled
               value={form.slug}
               onChange={(e) => setForm((s) => ({ ...s, slug: e.target.value }))}
             />
@@ -1079,7 +1083,7 @@ function BrandingTab({
         <Button asChild variant="outline">
           <Link href={`/t/${tenant.slug}?preview=1`} target="_blank">
             <ExternalLink className="mr-2 h-4 w-4" />
-            Abrir CRM real en nueva pestaña
+            Abrir portal empresarial
           </Link>
         </Button>
       </div>
@@ -1319,7 +1323,7 @@ function BaseDeDatosTab({
       <EmptyCard
         icon={DatabaseIcon}
         title="Sin base de datos configurada"
-        description="Esta empresa aún no tiene un proyecto Supabase asociado."
+        description="Configura Shared o Dedicated desde el apartado Configuración progresiva de esta página."
       />
     );
   }
@@ -1331,7 +1335,7 @@ function BaseDeDatosTab({
           <div>
             <CardTitle className="text-base">Conexión de base de datos</CardTitle>
             <CardDescription>
-              Proyecto Supabase dedicado para los datos de esta empresa.
+              Configuración técnica de la empresa. Puedes completarla o verificarla desde el panel superior.
             </CardDescription>
           </div>
           <ConnectionInline status={database.connection_status} large />
@@ -1462,10 +1466,7 @@ function UsuariosTab({
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">Miembros de la empresa</CardTitle>
-        <Button size="sm" variant="outline">
-          <Plus className="mr-2 h-4 w-4" />
-          Invitar usuario
-        </Button>
+
       </CardHeader>
       <CardContent className="p-0">
         <Table>
@@ -1543,10 +1544,7 @@ function DominiosTab({ domains }: { domains: TenantDomain[] }) {
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="text-base">Dominios</CardTitle>
-        <Button size="sm" variant="outline">
-          <Plus className="mr-2 h-4 w-4" />
-          Añadir dominio
-        </Button>
+
       </CardHeader>
       <CardContent className="p-0">
         <Table>

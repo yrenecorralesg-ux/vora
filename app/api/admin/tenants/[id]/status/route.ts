@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
+import {
+  getSupabaseServerClient,
+  getSupabaseServiceClient,
+} from '@/lib/supabase-server';
 import { isSuperAdmin } from '@/lib/auth';
 
-const ALLOWED_COMMERCIAL = ['trial', 'active', 'suspended', 'cancelled'] as const;
+const ALLOWED_COMMERCIAL = [
+  'trial',
+  'active',
+  'suspended',
+  'cancelled',
+] as const;
 const ALLOWED_TECHNICAL = ['pending_setup', 'ready', 'error'] as const;
 
 type CommercialStatus = (typeof ALLOWED_COMMERCIAL)[number];
@@ -39,13 +47,25 @@ export async function PATCH(
     );
   }
 
+  if (body?.technical_status === 'ready')
+    return NextResponse.json(
+      {
+        error:
+          'Valida primero plan, administrador y base de datos desde Configuración progresiva.',
+      },
+      { status: 409 },
+    );
   const patch: Record<string, unknown> = {};
   const actionLabel: string[] = [];
 
   if (typeof body?.commercial_status === 'string') {
-    if (!ALLOWED_COMMERCIAL.includes(body.commercial_status as CommercialStatus)) {
+    if (
+      !ALLOWED_COMMERCIAL.includes(body.commercial_status as CommercialStatus)
+    ) {
       return NextResponse.json(
-        { error: `commercial_status invalido. Permitidos: ${ALLOWED_COMMERCIAL.join(', ')}.` },
+        {
+          error: `commercial_status invalido. Permitidos: ${ALLOWED_COMMERCIAL.join(', ')}.`,
+        },
         { status: 400 },
       );
     }
@@ -56,7 +76,9 @@ export async function PATCH(
   if (typeof body?.technical_status === 'string') {
     if (!ALLOWED_TECHNICAL.includes(body.technical_status as TechnicalStatus)) {
       return NextResponse.json(
-        { error: `technical_status invalido. Permitidos: ${ALLOWED_TECHNICAL.join(', ')}.` },
+        {
+          error: `technical_status invalido. Permitidos: ${ALLOWED_TECHNICAL.join(', ')}.`,
+        },
         { status: 400 },
       );
     }
@@ -87,7 +109,10 @@ export async function PATCH(
     );
   }
   if (!updated) {
-    return NextResponse.json({ error: 'Empresa no encontrada.' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Empresa no encontrada.' },
+      { status: 404 },
+    );
   }
 
   await service.from('platform_audit_logs').insert({

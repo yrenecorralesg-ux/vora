@@ -1,176 +1,67 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
-import { isSuperAdmin } from '@/lib/auth';
-
-/**
- * POST /api/admin/tenants
- * Creates a new tenant (company) row.
- * - Validates the session and the super_admin role.
- * - Prevents duplicate slug.
- * - New tenants always start as commercial_status = 'trial' and
- *   technical_status = 'pending_setup' (incomplete setup stays pending).
- * - Records an audit log entry.
- */
+import { requireSuperAdmin } from '@/lib/auth';
+import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { validTenantSlug } from '@/lib/core-config';
+import { z } from 'zod';
+const schema = z.object({
+  commercial_name: z.string().trim().min(1).max(200),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .refine(validTenantSlug, 'Subdominio inválido o reservado.'),
+  infrastructure_mode: z.enum(['shared', 'dedicated']).default('shared'),
+  legal_name: z.string().trim().max(200).optional(),
+  tax_id: z.string().trim().max(40).optional(),
+});
 export async function POST(req: Request) {
-  let body: any;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: 'Cuerpo de la solicitud invalido.' }, { status: 400 });
-  }
-
-  /* ----------------------------- session ------------------------------ */
-  const supabase = getSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
-  }
-
-  const admin = await isSuperAdmin(user.id);
-  if (!admin) {
+  if (!(await requireSuperAdmin()))
     return NextResponse.json(
-      { error: 'Permisos insuficientes. Se requiere rol super_admin.' },
+      { error: 'Acceso exclusivo para Super Admin.' },
       { status: 403 },
     );
-  }
-
-  /* ------------------------------ input ------------------------------- */
-  const commercial_name = typeof body?.commercial_name === 'string' ? body.commercial_name.trim() : '';
-  const slug = typeof body?.slug === 'string' ? body.slug.trim().toLowerCase() : '';
-  const legal_name =
-    typeof body?.legal_name === 'string' && body.legal_name.trim()
-      ? body.legal_name.trim()
-      : null;
-  const country =
-    typeof body?.country === 'string' && body.country.trim() ? body.country.trim() : null;
-  const currency =
-    typeof body?.currency === 'string' && body.currency.trim() ? body.currency.trim() : 'COP';
-  const language =
-    typeof body?.language === 'string' && body.language.trim() ? body.language.trim() : 'es';
-  const timezone =
-    typeof body?.timezone === 'string' && body.timezone.trim()
-      ? body.timezone.trim()
-      : 'America/Bogota';
-  const business_type =
-    typeof body?.business_type === 'string' && body.business_type.trim()
-      ? body.business_type.trim()
-      : null;
-  const business_template_id =
-    typeof body?.business_template_id === 'string' && body.business_template_id.trim()
-      ? body.business_template_id.trim()
-      : null;
-
-  if (!commercial_name) {
-    return NextResponse.json({ error: 'El nombre comercial es obligatorio.' }, { status: 400 });
-  }
-  if (!slug || !/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/.test(slug)) {
+  const parsed = schema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success)
+    return NextResponse.json(
+      { error: parsed.error.issues[0].message },
+      { status: 400 },
+    );
+  const d = parsed.data;
+  const { data, error } = await getSupabaseServerClient().rpc(
+    'vora_create_tenant',
+    {
+      p_name: d.commercial_name,
+      p_slug: d.slug,
+      p_mode: d.infrastructure_mode,
+      p_legal: d.legal_name ?? null,
+      p_tax_id: d.tax_id ?? null,
+    },
+  );
+  if (error)
     return NextResponse.json(
       {
         error:
-          'El slug es obligatorio y debe contener solo minusculas, numeros y guiones (inicio/fin alfanumerico).',
+          error.code === '23505'
+            ? 'Ese subdominio ya está reservado.'
+            : 'No se pudo crear la empresa. Verifica que la migración de Core esté instalada.',
       },
-      { status: 400 },
+      { status: error.code === '23505' ? 409 : 500 },
     );
-  }
-
-  /* ------------------------ duplicate slug check ---------------------- */
-  const service = getSupabaseServiceClient();
-  const { data: existing } = await service
-    .from('tenants')
-    .select('id')
-    .eq('slug', slug)
-    .maybeSingle();
-  if (existing) {
-    return NextResponse.json(
-      { error: `Ya existe una empresa con el slug "${slug}". Elige otro.` },
-      { status: 409 },
-    );
-  }
-
-  /* ------------------------------ create ------------------------------ */
-  const { data: tenant, error } = await service
-    .from('tenants')
-    .insert({
-      commercial_name,
-      legal_name,
-      slug,
-      country,
-      currency,
-      language,
-      timezone,
-      business_type,
-      business_template_id,
-      commercial_status: 'trial',
-      technical_status: 'pending_setup',
-      wizard_step: 1,
-      wizard_completed: false,
-    })
-    .select('id, slug, commercial_name')
-    .single();
-
-  if (error) {
-    console.error('[api/admin/tenants] insert error', error.message);
-    return NextResponse.json(
-      { error: 'No se pudo crear la empresa.', detail: error.message },
-      { status: 500 },
-    );
-  }
-
-  /* ------------------------------ audit ------------------------------- */
-  await service.from('platform_audit_logs').insert({
-    actor_id: user.id,
-    tenant_id: tenant.id,
-    action: 'tenant.create',
-    resource: 'tenants',
-    resource_id: tenant.id,
-    details: {
-      commercial_name: tenant.commercial_name,
-      slug: tenant.slug,
-      business_type,
-      business_template_id,
-    },
-  });
-
-  return NextResponse.json({ tenant }, { status: 201 });
+  return NextResponse.json({ tenant: data }, { status: 201 });
 }
-
-/**
- * GET /api/admin/tenants
- * Returns a lightweight list of tenants for admin tooling.
- */
 export async function GET() {
-  const supabase = getSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
-  }
-
-  const admin = await isSuperAdmin(user.id);
-  if (!admin) {
+  if (!(await requireSuperAdmin()))
     return NextResponse.json(
-      { error: 'Permisos insuficientes. Se requiere rol super_admin.' },
+      { error: 'Permisos insuficientes.' },
       { status: 403 },
     );
-  }
-
-  const service = getSupabaseServiceClient();
-  const { data, error } = await service
+  const { data, error } = await getSupabaseServerClient()
     .from('tenants')
     .select(
-      'id, commercial_name, slug, commercial_status, technical_status, created_at',
+      'id,commercial_name,slug,commercial_status,technical_status,created_at',
     )
     .order('created_at', { ascending: false });
-
-  if (error) {
-    return NextResponse.json(
-      { error: 'Error al listar empresas.', detail: error.message },
-      { status: 500 },
-    );
-  }
-
-  return NextResponse.json({ tenants: data ?? [] });
+  return error
+    ? NextResponse.json({ error: 'Error al listar empresas.' }, { status: 500 })
+    : NextResponse.json({ tenants: data });
 }

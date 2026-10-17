@@ -1,8 +1,10 @@
-# Onboarding — EKOSCRM
+> Documento histórico. Para el flujo y arquitectura vigentes consulta [VORA Core progresivo](./vora-core-progressive.md). Las descripciones de un Supabase obligatorio por empresa y del asistente de siete pasos ya no aplican.
+
+# Onboarding — VORA
 
 ## Visión General
 
-El onboarding de un nuevo tenant en EKOSCRM tiene dos fases: el **wizard guiado** (registrar la empresa y asociar un proyecto Supabase existente) y el **bootstrap externo** del proyecto tenant (secreto server-only y función health check). El wizard no crea proyectos Supabase automáticamente.
+El onboarding de un nuevo tenant en VORA tiene dos fases: el **wizard guiado** (registrar la empresa y asociar un proyecto Supabase existente) y el **bootstrap externo** del proyecto tenant (secreto server-only y función health check). El wizard no crea proyectos Supabase automáticamente.
 
 ---
 

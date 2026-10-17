@@ -1,8 +1,10 @@
-# Multi-Tenancy — EKOSCRM
+> Documento histórico. Para el flujo y arquitectura vigentes consulta [VORA Core progresivo](./vora-core-progressive.md). Las descripciones de un Supabase obligatorio por empresa y del asistente de siete pasos ya no aplican.
+
+# Multi-Tenancy — VORA
 
 ## Modelo de Aislamiento
 
-EKOSCRM utiliza un modelo de **base de datos por tenant** (database-per-tenant). Cada empresa (tenant) recibe su propio proyecto Supabase con su propia base de datos PostgreSQL, completamente aislada de otros tenants y de la Platform DB.
+VORA utiliza un modelo de **base de datos por tenant** (database-per-tenant). Cada empresa (tenant) recibe su propio proyecto Supabase con su propia base de datos PostgreSQL, completamente aislada de otros tenants y de la Platform DB.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -189,7 +191,7 @@ Supabase Auth gestiona la sesión mediante la cookie `sb-access-token` (JWT). El
 
 La tabla `tenant_domains` existe y soporta:
 
-- `domain_type`: `subdomain` (ej. `cliente.ekoscrm.app`) o `custom` (ej. `crm.cliente.com`)
+- `domain_type`: `subdomain` (ej. `cliente.vora.venesoftca.com`) o `custom` (ej. `crm.cliente.com`)
 - `verification_status`: `pending`, `verified`, `failed`
 - `is_primary`: marca el dominio principal
 
@@ -201,4 +203,4 @@ Se planea un middleware que:
 1. Detecte el host de la request
 2. Si el host coincide con un `hostname` en `tenant_domains`, resuelva el tenant
 3. Sirva el CRM del tenant en el dominio personalizado
-4. Si no coincide, sirva la landing page de EKOSCRM
+4. Si no coincide, sirva la landing page de VORA

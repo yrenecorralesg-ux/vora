@@ -1,8 +1,8 @@
-# Variables de Entorno — EKOSCRM
+# Variables de Entorno — VORA
 
 ## Visión General
 
-EKOSCRM utiliza variables de entorno para configurar la conexión a la Platform DB de Supabase y las conexiones a las Tenant DBs. Es crítico distinguir entre variables **públicas** (accesibles en el navegador) y **privadas** (solo servidor).
+VORA utiliza variables de entorno para configurar la conexión a la Platform DB de Supabase y las conexiones a las Tenant DBs. Es crítico distinguir entre variables **públicas** (accesibles en el navegador) y **privadas** (solo servidor).
 
 ---
 

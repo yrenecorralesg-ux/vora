@@ -81,7 +81,7 @@ export function CaptureView({
                 src={
                   isSolee
                     ? '/solee/qr_feria.webp'
-                    : `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://ekoscrm.app/t/${slug}/registro`
+                    : `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=https://vora.venesoftca.com/t/${slug}/registro`
                 }
                 alt="QR Feria"
                 className="h-40 w-40 rounded-lg object-contain"
