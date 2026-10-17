@@ -162,7 +162,7 @@ export function StepAdmin({
             <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-warning" />
             <div className="space-y-2 text-sm">
               <p className="font-medium text-foreground">Estado pendiente</p>
-              <p className="text-muted-foreground">Si el email no tiene una cuenta en EKOSCRM, se creara una invitacion con estado <Badge className="border-transparent bg-warning/15 text-warning">pendiente</Badge>.</p>
+              <p className="text-muted-foreground">Si el email no tiene una cuenta en VORA, se creara una invitacion con estado <Badge className="border-transparent bg-warning/15 text-warning">pendiente</Badge>.</p>
             </div>
           </div>
         </div>

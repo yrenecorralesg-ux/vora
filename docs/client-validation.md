@@ -1,4 +1,4 @@
-# Validación con el Cliente — EKOSCRM
+# Validación con el Cliente — VORA
 
 ## Visión General
 
@@ -215,7 +215,7 @@ El módulo tiene objeciones mayores que requieren cambios sustanciales.
 
 ### Staging
 
-- URL: `staging.ekoscrm.app` o `<branch>.vercel.app`
+- URL: `staging.vora.venesoftca.com` o `<branch>.vercel.app`
 - Supabase de staging (separado de producción)
 - Datos seed + datos de prueba
 - El cliente accede con sus credenciales

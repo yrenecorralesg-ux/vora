@@ -4,20 +4,13 @@ import { ArrowLeft, ShieldCheck, Building2 } from 'lucide-react';
 
 import { requireSuperAdmin } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { CoreSetupPanel } from '@/components/core-setup-panel';
 import { TenantTabs } from '@/components/tenant-tabs';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import type {
-  CommercialStatus,
-  TechnicalStatus,
-} from '@/lib/types';
+import type { CommercialStatus, TechnicalStatus } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -69,6 +62,7 @@ export default async function TenantDetailPage({
         id,
         commercial_name,
         legal_name,
+        tax_id,
         slug,
         commercial_status,
         technical_status,
@@ -180,7 +174,7 @@ export default async function TenantDetailPage({
                 Panel Super Admin
               </h1>
               <p className="text-xs text-muted-foreground">
-                EKOSCRM · {user.email}
+                VORA · {user.email}
               </p>
             </div>
           </div>
@@ -217,7 +211,8 @@ export default async function TenantDetailPage({
               <div
                 className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg text-base font-bold text-white"
                 style={{
-                  backgroundColor: branding?.primary_color ?? 'hsl(225 93% 23%)',
+                  backgroundColor:
+                    branding?.primary_color ?? 'hsl(225 93% 23%)',
                 }}
               >
                 {tenant.commercial_name.slice(0, 2).toUpperCase()}
@@ -236,18 +231,30 @@ export default async function TenantDetailPage({
                   <Badge
                     className={cn(
                       'border-transparent',
-                      COMMERCIAL_BADGE[tenant.commercial_status as CommercialStatus],
+                      COMMERCIAL_BADGE[
+                        tenant.commercial_status as CommercialStatus
+                      ],
                     )}
                   >
-                    {COMMERCIAL_LABEL[tenant.commercial_status as CommercialStatus]}
+                    {
+                      COMMERCIAL_LABEL[
+                        tenant.commercial_status as CommercialStatus
+                      ]
+                    }
                   </Badge>
                   <Badge
                     className={cn(
                       'border-transparent',
-                      TECHNICAL_BADGE[tenant.technical_status as TechnicalStatus],
+                      TECHNICAL_BADGE[
+                        tenant.technical_status as TechnicalStatus
+                      ],
                     )}
                   >
-                    {TECHNICAL_LABEL[tenant.technical_status as TechnicalStatus]}
+                    {
+                      TECHNICAL_LABEL[
+                        tenant.technical_status as TechnicalStatus
+                      ]
+                    }
                   </Badge>
                 </div>
               </div>
@@ -255,12 +262,14 @@ export default async function TenantDetailPage({
           </div>
         </div>
 
+        <CoreSetupPanel tenantId={tenant.id} slug={tenant.slug} />
         {/* Tabs */}
         <TenantTabs
           tenant={{
             id: tenant.id,
             commercial_name: tenant.commercial_name,
             legal_name: tenant.legal_name,
+            tax_id: tenant.tax_id,
             slug: tenant.slug,
             commercial_status: tenant.commercial_status,
             technical_status: tenant.technical_status,

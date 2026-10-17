@@ -1,8 +1,8 @@
-# Despliegue — EKOSCRM
+# Despliegue — VORA
 
 ## Visión General
 
-EKOSCRM se despliega como una aplicación Next.js sobre Vercel (recomendado) o Netlify, con Supabase como backend. El despliegue incluye la aplicación web y la configuración de variables de entorno para la Platform DB y las Tenant DBs.
+VORA se despliega como una aplicación Next.js sobre Vercel (recomendado) o Netlify, con Supabase como backend. El despliegue incluye la aplicación web y la configuración de variables de entorno para la Platform DB y las Tenant DBs.
 
 ---
 
@@ -11,7 +11,7 @@ EKOSCRM se despliega como una aplicación Next.js sobre Vercel (recomendado) o N
 ```
 ┌──────────────────────────────────────────────────┐
 │                  Vercel / Netlify                 │
-│            (Next.js App — EKOSCRM)                │
+│            (Next.js App — VORA)                │
 │                                                  │
 │  env vars:                                       │
 │  • NEXT_PUBLIC_SUPABASE_URL                      │
@@ -66,8 +66,8 @@ No se requiere configuración adicional de build. Vercel usa Next.js 13.5 con Ap
 
 ### Dominios
 
-- **Dominio principal:** `ekoscrm.app` (ejemplo)
-- **Subdominios por tenant:** `<slug>.ekoscrm.app` (futuro — Sprint 1 usa `/t/[slug]`)
+- **Dominio principal:** `vora.venesoftca.com` (ejemplo)
+- **Subdominios por tenant:** `<slug>.vora.venesoftca.com` (futuro — Sprint 1 usa `/t/[slug]`)
 - **Staging:** `<branch>.vercel.app` (auto-generado por Vercel)
 
 ---
@@ -123,7 +123,7 @@ Por cada nuevo tenant:
 
 | Aspecto | Configuración |
 |---------|--------------|
-| URL | `<branch>.vercel.app` o `staging.ekoscrm.app` |
+| URL | `<branch>.vercel.app` o `staging.vora.venesoftca.com` |
 | Supabase | Proyecto Supabase de staging (separado de producción) |
 | Datos | Seed data + tenants de prueba |
 | Auth | Email confirmation OFF |
@@ -133,7 +133,7 @@ Por cada nuevo tenant:
 
 | Aspecto | Configuración |
 |---------|--------------|
-| URL | `ekoscrm.app` (dominio principal) |
+| URL | `vora.venesoftca.com` (dominio principal) |
 | Supabase | Proyecto Supabase de producción |
 | Datos | Tenants reales |
 | Auth | Email confirmation OFF (Sprint 1) |
@@ -151,7 +151,7 @@ Por cada nuevo tenant:
 | `www` | CNAME | `cname.vercel-dns.com` |
 | `*` | CNAME | `cname.vercel-dns.com` (para subdominios de tenants) |
 
-> El wildcard `*` permite futuros subdominios por tenant (`solee.ekoscrm.app`).
+> El wildcard `*` permite futuros subdominios por tenant (`solee.vora.venesoftca.com`).
 
 ### Configuración para Netlify
 
@@ -164,7 +164,7 @@ Por cada nuevo tenant:
 
 Cuando se implemente `tenant_domains`, los clientes podrán usar dominios propios (`crm.cliente.com`). Esto requerirá:
 
-1. El cliente añade un CNAME apuntando a `ekoscrm.app`
+1. El cliente añade un CNAME apuntando a `vora.venesoftca.com`
 2. El super admin registra el dominio en `tenant_domains`
 3. El middleware resuelve el tenant por hostname
 4. Verificación DNS automática
@@ -206,7 +206,7 @@ vercel --prod
 
 ### Vercel
 
-1. Ir al dashboard de Vercel → proyecto EKOSCRM → Deployments
+1. Ir al dashboard de Vercel → proyecto VORA → Deployments
 2. Encontrar el último deployment estable
 3. Click en "..." → "Instant Rollback"
 4. Confirmar

@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
+import {
+  getSupabaseServerClient,
+  getSupabaseServiceClient,
+} from '@/lib/supabase-server';
 import { isSuperAdmin } from '@/lib/auth';
 
 /**
@@ -64,7 +67,10 @@ export async function GET(
     );
   }
   if (!tenant) {
-    return NextResponse.json({ error: 'Empresa no encontrada.' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Empresa no encontrada.' },
+      { status: 404 },
+    );
   }
 
   return NextResponse.json({ tenant });
@@ -113,7 +119,7 @@ export async function PATCH(
     'timezone',
     'business_type',
     'business_template_id',
-    'plan_id',
+    'tax_id',
     'wizard_step',
     'wizard_completed',
   ];
@@ -121,33 +127,19 @@ export async function PATCH(
     if (body?.[f] !== undefined) allowed[f] = body[f];
   }
 
-  /* slug can be changed but must remain unique */
-  if (typeof body?.slug === 'string' && body.slug.trim()) {
-    const newSlug = body.slug.trim().toLowerCase();
-    if (!/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/.test(newSlug)) {
-      return NextResponse.json(
-        { error: 'Slug invalido: solo minusculas, numeros y guiones.' },
-        { status: 400 },
-      );
-    }
-    const service = getSupabaseServiceClient();
-    const { data: dup } = await service
-      .from('tenants')
-      .select('id')
-      .eq('slug', newSlug)
-      .neq('id', params.id)
-      .maybeSingle();
-    if (dup) {
-      return NextResponse.json(
-        { error: `El slug "${newSlug}" ya esta en uso.` },
-        { status: 409 },
-      );
-    }
-    allowed.slug = newSlug;
-  }
-
+  if (body?.slug !== undefined)
+    return NextResponse.json(
+      {
+        error:
+          'El subdominio se reserva al crear la empresa y no puede modificarse desde este formulario.',
+      },
+      { status: 409 },
+    );
   if (Object.keys(allowed).length === 0) {
-    return NextResponse.json({ error: 'No hay campos para actualizar.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'No hay campos para actualizar.' },
+      { status: 400 },
+    );
   }
 
   const service = getSupabaseServiceClient();
@@ -166,7 +158,10 @@ export async function PATCH(
     );
   }
   if (!updated) {
-    return NextResponse.json({ error: 'Empresa no encontrada.' }, { status: 404 });
+    return NextResponse.json(
+      { error: 'Empresa no encontrada.' },
+      { status: 404 },
+    );
   }
 
   await service.from('platform_audit_logs').insert({

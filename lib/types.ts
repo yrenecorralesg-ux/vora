@@ -1,9 +1,16 @@
 export type CommercialStatus = 'trial' | 'active' | 'suspended' | 'cancelled';
 export type TechnicalStatus = 'pending_setup' | 'ready' | 'error';
-export type ConnectionStatus = 'not_configured' | 'checking' | 'connected' | 'error';
+export type ConnectionStatus =
+  'not_configured' | 'checking' | 'connected' | 'error';
 export type ImplementationStatus = 'implemented' | 'planned' | 'unavailable';
-export type FeatureConfigState = 'enabled' | 'pending_config' | 'configured' | 'operational';
-export type ReleaseStatus = 'planned' | 'in_development' | 'released_for_testing' | 'accepted' | 'accepted_with_pending';
+export type FeatureConfigState =
+  'enabled' | 'pending_config' | 'configured' | 'operational';
+export type ReleaseStatus =
+  | 'planned'
+  | 'in_development'
+  | 'released_for_testing'
+  | 'accepted'
+  | 'accepted_with_pending';
 export type DomainType = 'subdomain' | 'custom';
 export type DomainVerification = 'pending' | 'verified' | 'failed';
 
@@ -37,6 +44,7 @@ export interface Tenant {
   id: string;
   commercial_name: string;
   legal_name: string | null;
+  tax_id?: string | null;
   slug: string;
   commercial_status: CommercialStatus;
   technical_status: TechnicalStatus;

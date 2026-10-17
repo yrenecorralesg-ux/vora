@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Ban, ShieldAlert } from 'lucide-react';
 
@@ -63,7 +64,10 @@ export default async function TenantCrmLayout({
     .maybeSingle();
 
   if (tenantErr) {
-    console.error('[t/[slug]/layout] error al resolver tenant', tenantErr.message);
+    console.error(
+      '[t/[slug]/layout] error al resolver tenant',
+      tenantErr.message,
+    );
   }
 
   // Tenant inexistente -> lo tratamos como sin acceso.
@@ -94,15 +98,23 @@ export default async function TenantCrmLayout({
   /* 4. Branding ----------------------------------------------------------- */
   const { data: branding } = await supabase
     .from('tenant_branding')
-    .select('primary_color, secondary_color, accent_color, logo_url, banner_url, font_family')
+    .select(
+      'primary_color, secondary_color, accent_color, logo_url, banner_url, font_family',
+    )
     .eq('tenant_id', tenant.id)
     .maybeSingle();
 
   const isSolee = tenant.slug === 'solee';
-  const primaryColor = branding?.primary_color ?? (isSolee ? '#1a102f' : '#042071');
-  const secondaryColor = branding?.secondary_color ?? (isSolee ? '#7c3aed' : '#63DCE5');
-  const accentColor = branding?.accent_color ?? (isSolee ? '#a855f7' : '#63DCE5');
-  const logoUrl = branding?.logo_url && !branding.logo_url.includes('logo.webp') ? branding.logo_url : null;
+  const primaryColor =
+    branding?.primary_color ?? (isSolee ? '#1a102f' : '#285C49');
+  const secondaryColor =
+    branding?.secondary_color ?? (isSolee ? '#7c3aed' : '#A9BEA5');
+  const accentColor =
+    branding?.accent_color ?? (isSolee ? '#a855f7' : '#C97857');
+  const logoUrl =
+    branding?.logo_url && !branding.logo_url.includes('logo.webp')
+      ? branding.logo_url
+      : null;
 
   let headerBannerUrl: string | null = null;
   let sidebarBannerUrl: string | null = null;
@@ -117,9 +129,18 @@ export default async function TenantCrmLayout({
   }
 
   /* 5. Tenant suspendido (no super admin en preview) ---------------------- */
-  const isSuspended = tenant.commercial_status === 'suspended' || tenant.commercial_status === 'cancelled';
-  if (isSuspended && !isPreview) {
-    return <SuspendedPage tenantName={tenant.commercial_name} primaryColor={primaryColor} />;
+  const isSuspended =
+    tenant.commercial_status === 'suspended' ||
+    tenant.commercial_status === 'cancelled';
+  const isSubscription =
+    headers().get('x-vora-path') === `/t/${params.slug}/subscription`;
+  if (isSuspended && !isPreview && !isSubscription) {
+    return (
+      <SuspendedPage
+        tenantName={tenant.commercial_name}
+        primaryColor={primaryColor}
+      />
+    );
   }
 
   /* 6. Features habilitadas ---------------------------------------------- */
@@ -165,7 +186,24 @@ export default async function TenantCrmLayout({
         />
 
         <div className="flex min-h-screen flex-1 flex-col overflow-y-auto">
-          <main className="flex-1 p-4 sm:p-5 lg:p-6">{children}</main>
+          <main className="flex-1 p-4 sm:p-5 lg:p-6">
+            {(admin || ['tenant_admin', 'admin'].includes(userRole)) && (
+              <a
+                href={`/t/${tenant.slug}/subscription`}
+                className="mb-4 inline-block text-sm underline"
+              >
+                Suscripción y Pago Móvil
+              </a>
+            )}
+            {!isSubscription && (
+              <p className="mb-4 rounded-lg border bg-[#F6F2E9] p-3 text-sm">
+                Las vistas comerciales heredadas contienen datos de
+                demostración. La configuración y los cobros de Core utilizan los
+                datos guardados de la empresa.
+              </p>
+            )}
+            {children}
+          </main>
         </div>
       </div>
     </div>
@@ -218,7 +256,7 @@ function SuspendedPage({
         <h1 className="text-xl font-bold">Cuenta suspendida</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           La cuenta de <strong>{tenantName}</strong> se encuentra suspendida.
-          Para reactivarla, contacta al equipo de soporte de EKOSCRM.
+          Para reactivarla, contacta al equipo de soporte de VORA.
         </p>
         <a
           href="/login"

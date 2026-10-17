@@ -1,8 +1,8 @@
-# Migraciones — EKOSCRM
+# Migraciones — VORA
 
 ## Visión General
 
-EKOSCRM gestiona dos niveles de esquema: el de la **Platform DB** (central, gestionada por Supabase MCP / CLI) y el de las **Tenant DBs** (una por empresa, con su propio ciclo de versiones). El versionamiento se registra en las tablas `schema_versions` y `migration_runs`.
+VORA gestiona dos niveles de esquema: el de la **Platform DB** (central, gestionada por Supabase MCP / CLI) y el de las **Tenant DBs** (una por empresa, con su propio ciclo de versiones). El versionamiento se registra en las tablas `schema_versions` y `migration_runs`.
 
 ---
 

@@ -1,8 +1,10 @@
-# Base de Datos — EKOSCRM
+> Documento histórico. Para el flujo y arquitectura vigentes consulta [VORA Core progresivo](./vora-core-progressive.md). Las descripciones de un Supabase obligatorio por empresa y del asistente de siete pasos ya no aplican.
+
+# Base de Datos — VORA
 
 ## Visión General
 
-EKOSCRM utiliza un modelo de **dos niveles de bases de datos**:
+VORA utiliza un modelo de **dos niveles de bases de datos**:
 
 1. **Platform DB** — Un único proyecto Supabase central con 18 tablas que almacenan metadatos de administración, identidad, configuración y provisioning de tenants.
 2. **Tenant DB** — Un proyecto Supabase dedicado por cada empresa tenant, para almacenar sus datos comerciales (CRM). En Sprint 1 estas bases de datos no tienen esquema aplicado; el shell del CRM usa datos demo estáticos.

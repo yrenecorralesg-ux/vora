@@ -44,7 +44,7 @@ export function StepEmpresa({
         <div className="space-y-2">
           <Label htmlFor="slug">Slug (identificador unico) <span className="text-destructive">*</span></Label>
           <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">ekoscrm.app/</div>
+            <div className="flex items-center rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">vora.venesoftca.com/</div>
             <Input id="slug" value={data.slug} onChange={(e) => { update('slug', e.target.value.toLowerCase()); update('slugTouched', true); }} placeholder="mi-empresa" className="flex-1" />
             {checkingSlug && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             {!checkingSlug && slugAvailable === true && data.slug && <CheckCircle2 className="h-4 w-4 text-success" />}
@@ -214,7 +214,7 @@ export function StepBranding({
           <Label className="text-sm font-medium">Vista previa</Label>
           <div className="overflow-hidden rounded-lg border" style={{ fontFamily: getFontFamily(data.font_family) }}>
             <div className="flex items-center justify-between px-5 py-4 text-white" style={{ backgroundColor: data.login_background_color }}>
-              <span className="text-lg font-bold">EKOSCRM</span>
+              <span className="text-lg font-bold">VORA</span>
               <span className="rounded px-2 py-0.5 text-xs font-medium" style={{ backgroundColor: data.accent_color, color: '#fff' }}>{data.commercial_name || 'Mi Empresa'}</span>
             </div>
             <div className="space-y-3 bg-card p-5">
@@ -231,7 +231,7 @@ export function StepBranding({
               </div>
             </div>
           </div>
-          <p className="text-xs text-muted-foreground">Asi se veran los colores del tenant en la interfaz de EKOSCRM.</p>
+          <p className="text-xs text-muted-foreground">Asi se veran los colores del tenant en la interfaz de VORA.</p>
         </div>
       </CardContent>
     </>

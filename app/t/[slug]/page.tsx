@@ -27,6 +27,28 @@ export default async function TenantDashboardPage({
 }: {
   params: { slug: string };
 }) {
+  const core = getSupabaseServerClient();
+  const { data: profile } = await core
+    .from('tenants')
+    .select('id,commercial_name,technical_status')
+    .eq('slug', params.slug)
+    .maybeSingle();
+  if (profile?.technical_status !== 'ready')
+    return (
+      <div className="mx-auto max-w-2xl rounded-2xl border bg-white p-8">
+        <h1 className="text-2xl font-bold">
+          {profile?.commercial_name ?? 'VORA'}
+        </h1>
+        <p className="mt-3">
+          Tu espacio empresarial está creado. Estamos preparando los servicios
+          contratados.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Cada configuración se completa de forma independiente desde VORA Core.
+          Los módulos estarán disponibles después de su validación.
+        </p>
+      </div>
+    );
   await requireTenantFeature(params.slug, 'crm.dashboard');
 
   const supabase = getSupabaseServerClient();
@@ -124,8 +146,10 @@ export default async function TenantDashboardPage({
               alt=""
               className="h-full w-full object-cover object-right"
               style={{
-                maskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.15) 15%, black 45%)',
-                WebkitMaskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.15) 15%, black 45%)',
+                maskImage:
+                  'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.15) 15%, black 45%)',
+                WebkitMaskImage:
+                  'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.15) 15%, black 45%)',
               }}
             />
           </div>
@@ -135,7 +159,9 @@ export default async function TenantDashboardPage({
         <div className="absolute right-4 sm:right-6 top-4 z-20">
           <div className="flex items-center gap-1.5 rounded-full border border-white/90 bg-white/90 px-3.5 py-1.5 shadow-sm backdrop-blur transition-all hover:bg-white cursor-pointer">
             <Sparkles className="h-3.5 w-3.5 text-[#5136db]" />
-            <span className="text-[11.5px] font-semibold text-slate-800">Asesora</span>
+            <span className="text-[11.5px] font-semibold text-slate-800">
+              Asesora
+            </span>
             <ChevronDown className="h-3 w-3 text-slate-400" />
           </div>
         </div>
@@ -149,7 +175,8 @@ export default async function TenantDashboardPage({
             Cada aroma cuenta una historia
           </h1>
           <p className="text-xs sm:text-[13px] font-normal text-[#6b7280]">
-            Ventas y relaciones reunidas desde ferias, Shopify, web y atención directa.
+            Ventas y relaciones reunidas desde ferias, Shopify, web y atención
+            directa.
           </p>
         </div>
       </div>
@@ -167,7 +194,9 @@ export default async function TenantDashboardPage({
                 <Icon className="h-5 w-5 stroke-[2.2]" />
               </div>
               <div className="min-w-0">
-                <p className="text-[11px] font-medium text-[#6b7280] leading-none">{card.title}</p>
+                <p className="text-[11px] font-medium text-[#6b7280] leading-none">
+                  {card.title}
+                </p>
                 <p className="text-[22px] sm:text-[24px] font-black tracking-tight text-[#111827] leading-tight my-0.5">
                   {card.value}
                 </p>
@@ -188,7 +217,9 @@ export default async function TenantDashboardPage({
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#eeecfc] text-[#5136db]">
               <BarChart2 className="h-4 w-4 stroke-[2.2]" />
             </div>
-            <h2 className="text-base sm:text-[17px] font-bold text-[#111827]">Ventas por canal</h2>
+            <h2 className="text-base sm:text-[17px] font-bold text-[#111827]">
+              Ventas por canal
+            </h2>
           </div>
 
           <div className="space-y-3.5">
@@ -207,7 +238,8 @@ export default async function TenantDashboardPage({
                       className="h-full rounded-full transition-all duration-700"
                       style={{
                         width: `${c.pct}%`,
-                        background: 'linear-gradient(90deg, #5136db 0%, #7d64f6 100%)',
+                        background:
+                          'linear-gradient(90deg, #5136db 0%, #7d64f6 100%)',
                       }}
                     />
                   </div>
@@ -226,7 +258,9 @@ export default async function TenantDashboardPage({
             <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#eeecfc] text-[#5136db]">
               <Lightbulb className="h-4 w-4 stroke-[2.2]" />
             </div>
-            <h2 className="text-base sm:text-[17px] font-bold text-[#111827]">Acciones recomendadas</h2>
+            <h2 className="text-base sm:text-[17px] font-bold text-[#111827]">
+              Acciones recomendadas
+            </h2>
           </div>
 
           <div className="space-y-2.5">

@@ -1,6 +1,6 @@
-# EKOSCRM
+# VORA by Venesoft
 
-Plataforma CRM modular multi-tenant de EKOS Solutions. Cada empresa opera con su propia marca, módulos y base de datos dedicada.
+Ecosistema empresarial SaaS modular multitenant de Venesoft. Cada empresa opera con su propia marca y servicios contratados, sobre Shared o Dedicated.
 
 > **Sprint 1 — Starter funcional:** Landing, autenticación, panel de super admin, wizard de creación de tenants, shell del CRM con datos demo, feature flags y branding.
 
@@ -58,7 +58,7 @@ Plataforma CRM modular multi-tenant de EKOS Solutions. Cada empresa opera con su
 │       └── predictive/             # Placeholder
 ├── components/
 │   ├── auth-provider.tsx           # Contexto de auth (client)
-│   ├── ekos-logo.tsx               # Logo EKOSCRM
+│   ├── ekos-logo.tsx               # Compatibilidad con el logo VORA
 │   ├── crm-sidebar.tsx             # Sidebar del CRM con branding
 │   ├── tenant-tabs.tsx             # Tabs del detalle de tenant
 │   ├── tenants-table.tsx           # Tabla de listado de tenants
@@ -271,3 +271,8 @@ Ver `docs/handoff.md` para el estado completo y próximos sprints.
 | `docs/deployment.md` | Vercel, Supabase, staging, DNS, rollback |
 | `docs/handoff.md` | Estado del proyecto, pendientes, próximos sprints |
 | `docs/client-validation.md` | Liberación por módulo, feedback, aceptación |
+
+
+## Core progresivo
+
+El flujo vigente, la migración requerida y las pruebas se describen en [VORA Core progresivo](docs/vora-core-progressive.md).
