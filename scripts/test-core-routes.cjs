@@ -64,8 +64,9 @@ async function main() {
     assert.equal((await middleware(new NextRequest('https://otra.pepito.vora.venesoftca.com/'))).status,404);
   });
   await test('client cannot forge the subscription path header',async()=>{
-    const r=await middleware(new NextRequest('https://vora.venesoftca.com/t/pepito/products',{headers:{'x-vora-path':'/t/pepito/subscription'}}));
+    const r=await middleware(new NextRequest('https://vora.venesoftca.com/t/pepito/products',{headers:{'x-vora-path':'/t/pepito/subscription','x-vora-preview':'1'}}));
     assert.equal(r.headers.get('x-middleware-request-x-vora-path'),'/t/pepito/products');
+    assert.equal(r.headers.get('x-middleware-request-x-vora-preview'),'0');
   });
   await test('domain challenge is reachable before login',async()=>{
     const r=await middleware(new NextRequest('https://pepito.vora.venesoftca.com/api/tenant-domain-check'));

@@ -3,6 +3,12 @@ import Link from 'next/link';
 import { ArrowLeft, ShieldCheck, Building2 } from 'lucide-react';
 
 import { requireSuperAdmin } from '@/lib/auth';
+import {
+  resolveTenantUsers,
+  type TenantInvitationSummary,
+} from '@/lib/tenant-users';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
+import type { TenantMembership } from '@/lib/types';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { CoreSetupPanel } from '@/components/core-setup-panel';
 import { TenantTabs } from '@/components/tenant-tabs';
@@ -93,9 +99,10 @@ export default async function TenantDetailPage({
     { data: branding },
     { data: dbRows },
     { data: domains },
-    { data: memberships },
+    { data: memberships, error: membershipsError },
     { data: features },
     { data: auditLogs },
+    { data: invitations, error: invitationsError },
   ] = await Promise.all([
     supabase
       .from('tenant_branding')
@@ -139,13 +146,26 @@ export default async function TenantDetailPage({
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false })
       .limit(50),
+    supabase
+      .from('tenant_invitations')
+      .select('id,email,role,status,created_at,expires_at')
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false }),
   ]);
 
-  /* Reshape memberships to include email from auth users (best-effort) ------ */
-  const membershipsWithEmail = (memberships ?? []).map((m: any) => ({
-    ...m,
-    email: null,
-  }));
+  const service = getSupabaseServiceClient();
+  const tenantUsers = await resolveTenantUsers(
+    (memberships ?? []) as TenantMembership[],
+    (invitations ?? []) as TenantInvitationSummary[],
+    async (id) => {
+      const { data, error } = await service.auth.admin.getUserById(id);
+      return error ? null : (data.user?.email ?? null);
+    },
+  );
+  const userDirectoryError =
+    membershipsError || invitationsError
+      ? 'No se pudieron cargar todos los usuarios. Recarga la página para reintentar.'
+      : undefined;
 
   /* Reshape features to flatten the joined feature name/category ------------ */
   const featuresFlat = (features ?? []).map((f: any) => ({
@@ -288,7 +308,9 @@ export default async function TenantDetailPage({
           features={featuresFlat as any}
           database={dbRows as any}
           domains={(domains ?? []) as any}
-          memberships={membershipsWithEmail as any}
+          memberships={(memberships ?? []) as TenantMembership[]}
+          users={tenantUsers}
+          userDirectoryError={userDirectoryError}
           auditLogs={(auditLogs ?? []) as any}
           templateName={(tenant.business_templates as any)?.name ?? null}
           planName={(tenant.plans as any)?.name ?? null}

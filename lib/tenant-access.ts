@@ -1,3 +1,4 @@
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { isSuperAdmin, requireSession } from '@/lib/auth';
@@ -29,9 +30,11 @@ export async function requireTenantFeature(
     if (!membership) redirect('/access-pending');
   }
 
+  const preview = admin && headers().get('x-vora-preview') === '1';
   if (
-    tenant.technical_status !== 'ready' ||
-    ['suspended', 'cancelled'].includes(tenant.commercial_status)
+    !preview &&
+    (tenant.technical_status !== 'ready' ||
+      ['suspended', 'cancelled'].includes(tenant.commercial_status))
   )
     redirect(`/t/${slug}`);
   const { data: feature } = await supabase

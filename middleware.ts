@@ -38,6 +38,10 @@ export async function middleware(request: NextRequest) {
   }
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-vora-path', pathname);
+  requestHeaders.set(
+    'x-vora-preview',
+    request.nextUrl.searchParams.get('preview') === '1' ? '1' : '0',
+  );
   const destination = request.nextUrl.clone();
   destination.pathname = pathname;
   const makeResponse = () =>

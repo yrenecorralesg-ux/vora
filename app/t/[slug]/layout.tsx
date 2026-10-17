@@ -5,6 +5,7 @@ import { Ban, ShieldAlert } from 'lucide-react';
 import { requireSession, isSuperAdmin } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { CrmSidebar } from '@/components/crm-sidebar';
+import { canPreviewTenant } from '@/lib/tenant-preview';
 import { getFontFamily } from '@/lib/fonts';
 
 export const dynamic = 'force-dynamic';
@@ -88,7 +89,11 @@ export default async function TenantCrmLayout({
   ]);
 
   const hasMembership = !!membership;
-  const isPreview = admin && !hasMembership;
+  const isPreview = canPreviewTenant(
+    admin,
+    headers().get('x-vora-preview') === '1',
+    hasMembership,
+  );
 
   // Sin membresia ni super admin en vista previa -> sin acceso.
   if (!hasMembership && !admin) {
@@ -111,10 +116,7 @@ export default async function TenantCrmLayout({
     branding?.secondary_color ?? (isSolee ? '#7c3aed' : '#A9BEA5');
   const accentColor =
     branding?.accent_color ?? (isSolee ? '#a855f7' : '#C97857');
-  const logoUrl =
-    branding?.logo_url && !branding.logo_url.includes('logo.webp')
-      ? branding.logo_url
-      : null;
+  const logoUrl = branding?.logo_url ?? null;
 
   let headerBannerUrl: string | null = null;
   let sidebarBannerUrl: string | null = null;
@@ -185,8 +187,21 @@ export default async function TenantCrmLayout({
           isPreview={isPreview}
         />
 
-        <div className="flex min-h-screen flex-1 flex-col overflow-y-auto">
-          <main className="flex-1 p-4 sm:p-5 lg:p-6">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-y-auto">
+          <main className="flex-1 p-4 pt-16 sm:p-5 sm:pt-16 md:pt-5 lg:p-6">
+            {isPreview && (
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-white p-3 text-sm">
+                <span>
+                  Vista previa del Super Admin · {tenant.commercial_name} · Módulos heredados en demostración
+                </span>
+                <a
+                  href={`/admin/tenants/${tenant.id}`}
+                  className="font-semibold underline"
+                >
+                  Volver a configurar
+                </a>
+              </div>
+            )}
             {(admin || ['tenant_admin', 'admin'].includes(userRole)) && (
               <a
                 href={`/t/${tenant.slug}/subscription`}
@@ -195,7 +210,7 @@ export default async function TenantCrmLayout({
                 Suscripción y Pago Móvil
               </a>
             )}
-            {!isSubscription && (
+            {!isSubscription && !isPreview && (
               <p className="mb-4 rounded-lg border bg-[#F6F2E9] p-3 text-sm">
                 Las vistas comerciales heredadas contienen datos de
                 demostración. La configuración y los cobros de Core utilizan los
