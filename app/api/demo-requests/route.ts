@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
+import { notifyDemoRequest } from '@/lib/demo-request-mail';
+
+export const runtime = 'nodejs';
 
 const demoRequestSchema = z.object({
   full_name: z.string().trim().min(2).max(120),
@@ -29,16 +32,21 @@ export async function POST(request: Request) {
   }
 
   const service = getSupabaseServiceClient();
-  const { error } = await service.from('demo_requests').insert({
+  const { data, error } = await service.from('demo_requests').insert({
     full_name: parsed.data.full_name,
     email: parsed.data.email.toLowerCase(),
     company: parsed.data.company || null,
     phone: parsed.data.phone || null,
     interest: parsed.data.interest || null,
     consent: true,
-  });
-  if (error) {
+  }).select('id').single();
+  if (error || !data) {
     return NextResponse.json({ error: 'No pudimos registrar la solicitud.' }, { status: 500 });
   }
-  return NextResponse.json({ ok: true }, { status: 201 });
+  const notification = await notifyDemoRequest(parsed.data, data.id);
+  if (notification !== 'accepted') {
+    console.error('demo_request_notification', { id: data.id, status: notification });
+  }
+  // Persistence succeeds independently of SMTP. Avoid inviting duplicate submissions.
+  return NextResponse.json({ ok: true, notification }, { status: 201 });
 }

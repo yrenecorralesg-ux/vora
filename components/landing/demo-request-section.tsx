@@ -18,6 +18,7 @@ const emptyForm = { full_name: '', email: '', company: '', phone: '', interest: 
 /** Demo request form. Posts to the existing /api/demo-requests endpoint (same payload and honeypot as before). */
 export function DemoRequestSection() {
   const [formStatus, setFormStatus] = useState<FormStatus>('idle');
+  const [mailPending, setMailPending] = useState(false);
   const [formData, setFormData] = useState(emptyForm);
   const autoInterest = useRef('');
 
@@ -49,6 +50,8 @@ export function DemoRequestSection() {
       });
       setFormStatus(response.ok ? 'success' : 'error');
       if (response.ok) {
+        const result = await response.json();
+        setMailPending(result.notification !== 'accepted');
         setFormData(emptyForm);
         autoInterest.current = '';
       }
@@ -89,6 +92,7 @@ export function DemoRequestSection() {
             <div role="status" className="py-12 text-center">
               <CheckCircle2 className="mx-auto h-12 w-12 text-[#285C49]" aria-hidden="true" />
               <h3 className="mt-5 font-jakarta text-2xl font-bold text-[#285C49]">Solicitud registrada</h3>
+              {mailPending && <p role="status" className="mt-3 text-sm text-[#8A4528]">Tu solicitud está guardada, pero no pudimos enviar el aviso por correo. No necesitas enviarla de nuevo. Puedes contactarnos directamente en {CONTACT_EMAIL}.</p>}
               <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-[#52675A]">
                 Guardamos tus datos correctamente. El contacto posterior depende del equipo de Venesoft. Si lo necesitas, escríbenos a{' '}
                 <a href={CONTACT_MAILTO} className="font-semibold text-[#285C49] underline-offset-4 hover:underline">{CONTACT_EMAIL}</a>.
