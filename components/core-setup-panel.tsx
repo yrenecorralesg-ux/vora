@@ -34,6 +34,7 @@ interface Setup {
     email: string;
     status: string;
     expires_at: string;
+    email_status?: string;
   }[];
   subscription: { status: string } | null;
 }
@@ -296,15 +297,15 @@ export function CoreSetupPanel({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
-            <Button disabled={busy}>Asignar administrador</Button>
+            <Button disabled={busy}>Invitar o reenviar acceso</Button>
             <p className="text-xs text-muted-foreground">
-              Si aún no tiene cuenta, se registra como pendiente. El envío y
-              aceptación de invitaciones requiere completar el servicio de
-              correo.
+              Envía un enlace de un solo uso. El cliente confirma su correo y
+              establece contraseña para activar su acceso. Para reenviar, ingresa
+              el mismo correo. Las cuentas ya vinculadas conservan su acceso.
             </p>
             {data.invitations.map((i) => (
               <p className="text-xs" key={i.id}>
-                {i.email} · {i.status}
+                {i.email} · {i.status} · {i.email_status === 'accepted' ? 'Correo enviado al proveedor' : i.email_status === 'failed' || i.email_status === 'not_configured' ? 'Correo pendiente de reenvío' : 'Sin envío registrado'}
               </p>
             ))}
           </form>

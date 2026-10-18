@@ -23,6 +23,7 @@ export async function middleware(request: NextRequest) {
   if (
     slug &&
     !pathname.startsWith('/api/') &&
+    !pathname.startsWith('/auth/') &&
     pathname !== '/login' &&
     pathname !== '/access-pending' &&
     pathname !== '/select-tenant'

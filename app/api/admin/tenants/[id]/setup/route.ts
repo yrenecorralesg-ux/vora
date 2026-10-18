@@ -55,7 +55,7 @@ export async function GET(
       .eq('tenant_id', params.id),
     db
       .from('tenant_invitations')
-      .select('id,email,status,expires_at')
+      .select('id,email,status,expires_at,email_status,email_sent_at')
       .eq('tenant_id', params.id),
     db
       .from('tenant_subscriptions')
