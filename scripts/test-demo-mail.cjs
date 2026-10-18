@@ -4,37 +4,31 @@ const assert = require('node:assert/strict');
 const ts = require('typescript');
 const sent = [];
 let fail = false;
-let closed = 0;
+let responseOk = true;
 const env = {};
 function load(file, mocks) {
   const code = ts.transpileModule(fs.readFileSync(file, 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
   }).outputText;
   const mod = { exports: {} };
-  vm.runInNewContext(`(function(require,module,exports){${code}\n})`, { process: { env }, console: { error() {} } })(
+  vm.runInNewContext(`(function(require,module,exports){${code}\n})`, { process: { env }, console: { error() {} }, AbortController, setTimeout, clearTimeout, fetch: async (url, options) => { assert.equal(url, 'https://api.resend.com/emails'); if (fail) throw new Error('private error'); sent.push({ ...JSON.parse(options.body), headers: options.headers }); return { ok: responseOk, json: async () => ({ id: 'provider-id' }) }; } })(
     name => { if (!(name in mocks)) throw new Error(name); return mocks[name]; }, mod, mod.exports);
   return mod.exports;
 }
-const mail = load('lib/demo-request-mail.ts', {
-  nodemailer: { createTransport(config) {
-    assert.equal(config.host, 'smtp.gmail.com');
-    assert.equal(config.secure, true);
-    return { async sendMail(message) { if (fail) throw new Error('private error'); sent.push(message); return { accepted: ['info@venesoftca.com'] }; }, close() { closed++; } };
-  } },
-});
+const mail = load('lib/demo-request-mail.ts', {});
 const applicant = { full_name: 'Prueba', email: 'applicant@example.test', consent: true, interest: '<script>test</script>' };
 async function main() {
   assert.equal(await mail.notifyDemoRequest(applicant, 'id-1'), 'not_configured');
-  env.GMAIL_SMTP_USER = 'sender@example.test'; env.GMAIL_SMTP_APP_PASSWORD = 'test credential';
+  env.DEMO_REQUEST_FROM = 'VORA <avisos@notificaciones.example.test>'; env.RESEND_API_KEY = 'test-key';
   assert.equal(await mail.notifyDemoRequest(applicant, 'id-1'), 'accepted');
-  assert.equal(sent[0].to, 'info@venesoftca.com');
-  assert.equal(sent[0].from.address, env.GMAIL_SMTP_USER);
-  assert.equal(sent[0].replyTo.address, applicant.email);
+  assert.equal(sent[0].to.join(','), 'info@venesoftca.com');
+  assert.equal(sent[0].from, env.DEMO_REQUEST_FROM);
+  assert.equal(sent[0].reply_to, applicant.email); assert.equal(sent[0].headers['Idempotency-Key'], 'demo-request/id-1');
   assert.ok(sent[0].text.includes(applicant.interest));
   assert.equal(sent[0].html, undefined);
   fail = true;
   assert.equal(await mail.notifyDemoRequest(applicant, 'id-2'), 'failed');
-  assert.equal(closed, 2);
+  fail = false; responseOk = false; assert.equal(await mail.notifyDemoRequest(applicant, 'id-3'), 'failed');
   let stored = 0, notices = 0, dbFails = false;
   const route = load('app/api/demo-requests/route.ts', {
     'next/server': { NextResponse: { json: (body, init = {}) => ({ body, status: init.status || 200 }) } },
@@ -51,6 +45,6 @@ async function main() {
   dbFails = true;
   assert.equal((await route.POST(request(applicant))).status, 500);
   assert.equal(notices, 1);
-  console.log('PASS: Gmail configuration, fixed recipient, reply-to, plain text, SMTP failure, persistence before send, invalid input and database failure.');
+  console.log('PASS: Resend configuration, fixed recipient, reply-to, plain text, provider and network failure, persistence before send, invalid input and database failure.');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
