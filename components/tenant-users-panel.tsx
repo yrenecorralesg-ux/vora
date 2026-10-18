@@ -22,7 +22,7 @@ export function TenantUsersPanel({
   const labels: Record<string, string> = {
     active: 'Activo',
     inactive: 'Inactivo',
-    pending: 'Pendiente de cuenta',
+    pending: 'Pendiente de aceptación',
     expired: 'Invitación vencida',
   };
   return (
@@ -60,8 +60,8 @@ export function TenantUsersPanel({
                       </p>
                       {user.kind === 'invitation' ? (
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Asignación registrada; cuenta pendiente. No se ha
-                          enviado correo.
+                          Acceso pendiente de aceptación. Puedes reenviar el
+                          enlace desde Configuración progresiva.
                         </p>
                       ) : (
                         <p className="mt-1 text-xs text-muted-foreground">
