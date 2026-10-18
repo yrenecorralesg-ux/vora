@@ -25,6 +25,8 @@ export function TenantDashboardPreview({
   secondary,
   accent,
   modules,
+  canConfigure = false,
+  preview = false,
 }: {
   name: string;
   tenantId: string;
@@ -34,6 +36,8 @@ export function TenantDashboardPreview({
   secondary: string;
   accent: string;
   modules: PreviewModule[];
+  canConfigure?: boolean;
+  preview?: boolean;
 }) {
   const active = modules.filter((m) => m.enabled).length;
   const stats = [
@@ -88,14 +92,14 @@ export function TenantDashboardPreview({
               Tus servicios, tu equipo y tu operación, en un solo lugar.
             </p>
           </div>
-          <Link
+          {canConfigure && <Link
             href={`/admin/tenants/${tenantId}`}
             className="inline-flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-semibold"
             style={{ color: primary }}
           >
             <Settings2 className="h-4 w-4" />
             Configurar empresa
-          </Link>
+          </Link>}
         </div>
       </section>
       <div className="grid gap-4 sm:grid-cols-3">
@@ -143,7 +147,7 @@ export function TenantDashboardPreview({
                 </p>
                 <p className="mt-4 text-xs text-slate-500">
                   {module.enabled
-                    ? 'Disponible en el menú de vista previa.'
+                    ? preview ? 'Disponible en el menú de vista previa.' : 'Disponible en el menú de tu empresa.'
                     : 'Se habilitará cuando termine su implementación y configuración.'}
                 </p>
               </article>
@@ -151,8 +155,7 @@ export function TenantDashboardPreview({
           </div>
         ) : (
           <p className="text-sm text-slate-600">
-            Asigna los servicios desde la configuración de la empresa para
-            verlos en esta plantilla.
+            {canConfigure ? 'Asigna los servicios desde la configuración de la empresa para verlos aquí.' : 'Tu empresa aún no tiene servicios asignados. Contacta a Venesoft para configurarlos.'}
           </p>
         )}
       </section>
@@ -162,9 +165,7 @@ export function TenantDashboardPreview({
           style={{ color: primary }}
         />
         <p>
-          Esta vista usa la marca y los servicios guardados. DNS, base de datos
-          y acceso del cliente conservan sus propias validaciones; la vista
-          previa no los activa.
+          {preview ? 'Esta vista usa la marca y los servicios guardados. DNS, base de datos y acceso del cliente conservan sus propias validaciones; la vista previa no los activa.' : 'Este inicio muestra la configuración de tu empresa. Las pantallas comerciales todavía contienen demostraciones; sus cifras no corresponden a tu operación.'}
         </p>
       </div>
     </div>
