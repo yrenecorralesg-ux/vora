@@ -22,7 +22,7 @@ export function TenantUsersPanel({
   const labels: Record<string, string> = {
     active: 'Activo',
     inactive: 'Inactivo',
-    pending: 'Pendiente de cuenta',
+    pending: 'Pendiente de aceptación',
     expired: 'Invitación vencida',
   };
   return (
