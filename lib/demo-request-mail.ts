@@ -1,5 +1,3 @@
-import nodemailer from 'nodemailer';
-
 type DemoRequest = {
   full_name: string;
   email: string;
@@ -28,35 +26,35 @@ export function demoRequestMessage(data: DemoRequest, id: string) {
 }
 
 export async function notifyDemoRequest(data: DemoRequest, id: string) {
-  const user = process.env.GMAIL_SMTP_USER;
-  const pass = process.env.GMAIL_SMTP_APP_PASSWORD?.replace(/\s/g, '');
-  if (!user || !pass) return 'not_configured' as const;
-
-  const transport = nodemailer.createTransport({
-    host: 'smtp.gmail.com',
-    port: 465,
-    secure: true,
-    auth: { user, pass },
-    connectionTimeout: 8000,
-    greetingTimeout: 8000,
-    socketTimeout: 10000,
-    tls: { minVersion: 'TLSv1.2' },
-  });
+  const key = process.env.RESEND_API_KEY;
+  const from = process.env.DEMO_REQUEST_FROM;
+  if (!key || !from) return 'not_configured' as const;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
   try {
-    const result = await transport.sendMail({
-      from: { name: 'VORA · Venesoft', address: user },
-      to: 'info@venesoftca.com',
-      replyTo: { name: data.full_name, address: data.email },
-      ...demoRequestMessage(data, id),
-      // A fixed sender and destination prevent the public form becoming an open relay.
-      disableFileAccess: true,
-      disableUrlAccess: true,
+    const response = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Idempotency-Key': `demo-request/${id}`,
+      },
+      body: JSON.stringify({
+        from,
+        to: ['info@venesoftca.com'],
+        reply_to: data.email,
+        ...demoRequestMessage(data, id),
+      }),
+      cache: 'no-store',
     });
-    return result.accepted.length > 0 ? 'accepted' as const : 'failed' as const;
+    if (!response.ok) return 'failed' as const;
+    const result = await response.json();
+    return typeof result.id === 'string' && result.id.length > 0 ? 'accepted' as const : 'failed' as const;
   } catch {
-    // Never log SMTP credentials, submitted personal data, or provider error bodies.
+    // Never log credentials, submitted personal data, or provider error bodies.
     return 'failed' as const;
   } finally {
-    transport.close();
+    clearTimeout(timeout);
   }
 }
