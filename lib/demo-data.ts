@@ -528,3 +528,20 @@ export const campaignStatusLabel: Record<DemoCampaign['estado'], string> = {
   pausada: 'Pausada',
   finalizada: 'Finalizada',
 };
+
+
+/* --------------------------- VORA POS [mock] ------------------------------ */
+
+export {
+  MOCK_TENANT_ID as posMockTenantId,
+  MOCK_EXCHANGE_RATE as posMockExchangeRate,
+  MOCK_BRANCHES as posMockBranches,
+  MOCK_REGISTERS as posMockRegisters,
+  MOCK_USERS as posMockUsers,
+  MOCK_CUSTOMERS as posMockCustomers,
+  MOCK_PRODUCTS as posMockProducts,
+  MOCK_SETTINGS as posMockSettings,
+  MOCK_ACTIVE_SHIFT as posMockActiveShift,
+  MOCK_SALES_HISTORY as posMockSalesHistory,
+  MOCK_RETURNS_HISTORY as posMockReturnsHistory,
+} from './pos-demo-data';

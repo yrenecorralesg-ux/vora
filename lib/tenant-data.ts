@@ -69,3 +69,44 @@ export async function resolveTenantData(
     }),
   };
 }
+
+
+export async function resolvePosTenantData(slug: string): Promise<{
+  tenantId: string;
+  isMock: boolean;
+  client?: SupabaseClient;
+}> {
+  const session = getSupabaseServerClient();
+  const user = await requireSession(session);
+  const { data: t } = await session
+    .from('tenants')
+    .select('id,infrastructure_mode,commercial_status,technical_status')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (!t || slug === 'test1') {
+    return {
+      tenantId: t?.id ?? 't0000000-0000-0000-0000-000000000001',
+      isMock: true,
+    };
+  }
+
+  const { data: db } = await getSupabaseServiceClient()
+    .from('tenant_databases')
+    .select('project_ref,supabase_url,secret_ref,connection_status')
+    .eq('tenant_id', t.id)
+    .maybeSingle();
+
+  if (db?.connection_status !== 'connected') {
+    return {
+      tenantId: t.id,
+      isMock: true,
+    };
+  }
+
+  return {
+    tenantId: t.id,
+    isMock: false,
+    client: session,
+  };
+}

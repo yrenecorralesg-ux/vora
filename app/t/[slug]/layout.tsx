@@ -162,6 +162,23 @@ export default async function TenantCrmLayout({
 
   const userRole = membership?.role ?? (admin ? 'super_admin' : 'member');
 
+  const isPos = headers().get('x-vora-path')?.startsWith(`/t/${params.slug}/pos`);
+  if (isPos) {
+    return (
+      <div
+        className="min-h-screen bg-[#F6F2E9]"
+        style={{
+          '--crm-primary': primaryColor,
+          '--crm-secondary': secondaryColor,
+          '--crm-accent': accentColor,
+          fontFamily: getFontFamily(branding?.font_family),
+        } as React.CSSProperties}
+      >
+        {children}
+      </div>
+    );
+  }
+
   /* 7. Render ------------------------------------------------------------- */
   const wrapperStyle = {
     '--crm-primary': primaryColor,
@@ -189,20 +206,7 @@ export default async function TenantCrmLayout({
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-y-auto">
           <main className="flex-1 p-4 pt-16 sm:p-5 sm:pt-16 md:pt-5 lg:p-6">
-            {isPreview && (
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border bg-white p-3 text-sm">
-                <span>
-                  Vista previa del Super Admin · {tenant.commercial_name} · Módulos heredados en demostración
-                </span>
-                <a
-                  href={`/admin/tenants/${tenant.id}`}
-                  className="font-semibold underline"
-                >
-                  Volver a configurar
-                </a>
-              </div>
-            )}
-            {(admin || ['tenant_admin', 'admin'].includes(userRole)) && (
+                        {(admin || ['tenant_admin', 'admin'].includes(userRole)) && (
               <a
                 href={`/t/${tenant.slug}/subscription`}
                 className="mb-4 inline-block text-sm underline"
@@ -210,14 +214,7 @@ export default async function TenantCrmLayout({
                 Suscripción y Pago Móvil
               </a>
             )}
-            {!isSubscription && !isPreview && (
-              <p className="mb-4 rounded-lg border bg-[#F6F2E9] p-3 text-sm">
-                Las vistas comerciales heredadas contienen datos de
-                demostración. La configuración y los cobros de Core utilizan los
-                datos guardados de la empresa.
-              </p>
-            )}
-            {children}
+                        {children}
           </main>
         </div>
       </div>

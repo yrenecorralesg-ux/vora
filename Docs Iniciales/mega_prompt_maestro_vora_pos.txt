@@ -1,0 +1,585 @@
+================================================================================
+MEGA PROMPT MAESTRO DE INGENIERÍA Y DISEÑO: MÓDULO VORA POS (commerce.pos)
+ALINEADO 100% AL REPOSITORIO REAL (NEXT.JS APP ROUTER + SUPABASE UNIFIED SCHEMA)
+================================================================================
+
+1. ROL Y CONTEXTO ARQUITECTÓNICO DEL REPOSITORIO VORA
+--------------------------------------------------------------------------------
+Actúa como Arquitecto de Software Principal y Desarrollador Full-Stack Senior
+especializado en el ecosistema real de VORA (`yrenecorralesg-ux/vora`), construido
+sobre Next.js App Router (`./app`), TypeScript, Tailwind CSS, componentes base en
+`./components/ui/*` y Supabase PostgreSQL 15+ con Row Level Security (RLS),
+funciones transaccionales `SECURITY DEFINER` (`vora_*`) y bloqueo explícito de
+privilegios (`REVOKE ALL` / `GRANT`).
+
+Tu objetivo es desarrollar e integrar de punta a punta el módulo "VORA POS"
+(`feature_key = 'commerce.pos'`) para operar puntos de venta presenciales online
+multitenant y multisede en Venezuela (bimoneda USD/VES, pagos mixtos, múltiples
+cajeros y turnos, trazabilidad de inventario, devoluciones, comprobantes internos
+PDF e interfaz desacoplada con The Factory HKA), siguiendo el flujo operativo
+ágil de Fiskal POS y respetando de forma estricta la estructura de archivos y el
+esquema SQL unificado existente en el repositorio.
+
+2. REGLAS INNEGOCIABLES DE INTERFAZ, DISEÑO Y DATOS (CUMPLIMIENTO ESTRICTO)
+--------------------------------------------------------------------------------
+El incumplimiento de cualquiera de estas 4 reglas invalida la implementación:
+
+2.1. PROHIBICIÓN ABSOLUTA DE ÍCONOS Y EMOJIS:
+- Queda estrictamente prohibido renderizar íconos gráficos en cualquier vista,
+  barra lateral, cabecera, modal, botón, tarjeta, badge o documento PDF del POS.
+- NO importes ni utilices `lucide-react`, `@heroicons/react`, `FontAwesome`, ni
+  etiquetas `<svg>` decorativas o iconográficas en los componentes del módulo.
+- Queda prohibido el uso de emojis o símbolos pictográficos Unicode en toda la
+  interfaz, textos de estado, alertas toast (`sonner`/`use-toast`), semillas SQL
+  y comentarios de código.
+- Toda la jerarquía visual y diferenciación de estados debe construirse mediante
+  tipografía (`Inter`), pesos tipográficos, bordes, espaciado, badges textuales
+  en mayúsculas con tracking amplio y la paleta de colores oficial de VORA.
+
+2.2. PROHIBICIÓN ABSOLUTA DE ETIQUETAS GENÉRICAS:
+- Prohibido usar textos vagos o genéricos como: "Enviar", "Aceptar", "Guardar",
+  "Cancelar", "Acción", "Botón", "Datos", "Información", "Detalle", "Item 1",
+  "Producto A", "Usuario", "OK" o "Error".
+- Toda etiqueta de campo, columna de tabla, título de panel y botón debe usar
+  vocabulario técnico, comercial, contable y fiscal exacto del dominio VORA POS:
+  * "Confirmar apertura de turno en caja" (en lugar de "Aceptar")
+  * "Incorporar declaración de Pago Móvil" (en lugar de "Guardar")
+  * "Confirmar recepción de efectivo y vuelto" (en lugar de "Enviar")
+  * "Solicitar autorización de reverso a supervisor" (en lugar de "Continuar")
+  * "Vaciar líneas de venta actual" (en lugar de "Borrar")
+  * "Ejecutar arqueo y cierre definitivo de turno" (en lugar de "Cerrar")
+
+2.3. ADHERENCIA ESTRICTA A LA PALETA DE COLORES REAL DEL PROYECTO VORA:
+Debes respetar los tokens cromáticos de `tenant_branding` del esquema SQL y las
+maquetas oficiales de VORA POS para el piloto `test1`:
+- Verde Primario VORA (`tenant_branding.primary_color`): `#285C49`
+- Verde Bosque Profundo POS (Sidebar lateral y cabeceras operativas): `#144D37`
+- Verde Esmeralda de Acción Primaria (Botones "Proceder al cobro", "Confirmar
+  venta", pestañas activas): `#1E6B4E` (hover `#16523B`, texto `#FFFFFF`)
+- Verde Salvia Secundario (`tenant_branding.secondary_color`): `#A9BEA5`
+- Verde Estado Activo ("Turno Abierto", "PDF Disponible", "Cobro Verificado"):
+  Fondo `#DCFCE7`, borde `#86EFAC`, texto `#14532D`
+- Fondo Base / Lienzo Operativo (`tenant_branding.login_background_color`):
+  Crema cálido VORA `#F6F2E9` / `#F6F5F0`
+- Terracota de Acento VORA (`tenant_branding.accent_color`): `#C97857`
+- Superficie de Destaque Financiero ("Total en caja", "Arqueo", "Panel QR"):
+  Ámbar suave `#FDF2E2` con borde `#F5CBA7`
+- Superficie de Paneles, Catálogo y Carrito: Blanco `#FFFFFF`, borde `#DCE3DF`
+- Tipografía Principal: Carbón profundo `#111827`
+- Tipografía Secundaria y Metadatos (SKU, RIF, fechas): Gris verdoso `#52635A`
+- Alerta / Estado Pendiente ("Pendiente de verificación", "Por revisar HKA",
+  "Abono parcial"): Fondo `#FEF3C7`, borde `#FDE68A`, texto `#92400E`
+- Crítico / Cierre / Reverso ("Cerrar turno de caja", "Anular venta", faltante
+  de caja): Borde `#C83E3B`, texto `#B91C1C`, fondo `#FEF2F2`
+
+2.4. DECLARACIÓN Y MARCAJE OBLIGATORIO `[mock]` EN DATOS Y ADAPTADORES DEMO:
+- Siempre que se utilicen datos semilla en SQL, datos de respaldo en
+  `./lib/demo-data.ts` o `./lib/tenant-preview.ts`, tasas de cambio de prueba o
+  respuestas simuladas de proveedores externos (The Factory HKA o Cashea), debes
+  declararlo explícitamente y concatenar la etiqueta literal `[mock]` en cada
+  nombre, referencia o estado simulado.
+- Ejemplos obligatorios:
+  * Tenant piloto en `tenants`: `commercial_name = 'test1 [mock]'`, `slug = 'test1'`
+  * Sede principal: `'Sede Principal Caracas [mock]'`
+  * Cajas: `'Caja 01 - Mostrador Principal [mock]'`, `'Caja 02 - Autoservicio [mock]'`
+  * Usuarios de prueba: `'María C. [mock]'` (Cajera), `'Luis P. [mock]'` (Cajero),
+    `'Carlos R. [mock]'` (Supervisor)
+  * Clientes demo: `'Ana López [mock]'`, `'Carlos Pérez [mock]'`
+  * Productos demo: `'Camiseta Básica CMB-001 [mock]'`, `'Pantalón Jean JE-032 [mock]'`
+  * Tasa BCV en modo demo: `'Tasa BCV Oficial 36,500000 VES/USD [mock]'`
+  * Adaptador HKA sin credenciales productivas: `'Sandbox The Factory HKA [mock]'`
+
+3. INTEGRACIÓN EXACTA CON LA ESTRUCTURA DE ARCHIVOS DEL REPOSITORIO
+--------------------------------------------------------------------------------
+No inventes arquitecturas paralelas. Integra el módulo sobre las carpetas reales:
+
+3.1. Base de Datos y Migraciones (`./supabase/migrations/`):
+- Crea la nueva migración secuencial:
+  `./supabase/migrations/20261019000000_vora_pos_module.sql`
+- Registra la versión en `schema_versions` (`scope = 'platform'`, `version = '008'`,
+  `name = 'VORA POS Module & Transactional RPCs'`).
+
+3.2. Catálogo de Módulos y Configuración (`./lib/`):
+- `./lib/modules-config.ts` y `./lib/core-config.ts`: Registra el módulo
+  `commerce.pos` ("VORA POS — Punto de Venta") junto a los módulos existentes
+  (`commerce.billing`, `commerce.storefront`, `commerce.network`, `finance.bank`,
+  `finance.pay`, `fiscal.venezuela`), definiendo sus subfunciones granulares en
+  `available_functions`.
+- `./lib/types.ts`: Agrega las interfaces TypeScript tipadas para las entidades
+  de VORA POS (`PosRegister`, `PosShift`, `PosCashMovement`, `PosSale`,
+  `PosSaleLine`, `PosSalePayment`, `PosAuthorization`, `PosSaleReturn`,
+  `PosCommercialDocument`, `PosFiscalIntegration`, `PosFiscalRequest`,
+  `FiscalProviderInterface`).
+- `./lib/tenant-access.ts` y `./lib/auth.ts`: Extiende los validadores de acceso
+  para verificar pertenencia activa en `tenant_memberships`, asignación de sede/
+  caja y validación server-side de los 10 permisos granulares `pos.*`.
+- `./lib/demo-data.ts` y `./lib/tenant-data.ts`: Incorpora el estado inicial y
+  los conectores de datos para el tenant `test1 [mock]` (con soporte reactivo
+  completo cuando la base de datos del tenant esté en `connection_status =
+  'not_configured'` usando datos marcados con `[mock]`, y persistencia real en
+  Supabase cuando esté conectada).
+
+3.3. Rutas en Next.js App Router (`./app/t/[slug]/` y `./app/api/t/`):
+- Ruta principal del espacio de trabajo del tenant: `./app/t/[slug]/...`
+- Ruta dedicada del módulo POS: `./app/t/[slug]/pos/page.tsx` (o pestaña activa
+  dentro del workspace de `./app/t/[slug]` controlada por `tenant-tabs.tsx` y
+  `crm-sidebar.tsx` cuando `commerce.pos` está habilitado en `tenant_features`).
+- Endpoints de API protegidos en servidor (`./app/api/t/[slug]/pos/...`):
+  * `./app/api/t/[slug]/pos/shifts/route.ts` (Apertura, movimientos y cierre)
+  * `./app/api/t/[slug]/pos/sales/route.ts` (Confirmación atómica e idempotente)
+  * `./app/api/t/[slug]/pos/payments/route.ts` (Registro y verificación de pagos)
+  * `./app/api/t/[slug]/pos/returns/route.ts` (Anulaciones y devoluciones)
+  * `./app/api/t/[slug]/pos/authorizations/route.ts` (Aprobación de supervisor)
+  * `./app/api/t/[slug]/pos/documents/[saleId]/route.ts` (PDF interno NO FISCAL)
+  * `./app/api/t/[slug]/pos/fiscal/route.ts` (Adaptador `FiscalProvider` HKA)
+  * `./app/api/t/[slug]/pos/settings/route.ts` (Configuración POS y cajas)
+
+4. ESQUEMA SQL, REUTILIZACIÓN DE TABLAS CORE Y FUNCIONES RPC (`SECURITY DEFINER`)
+--------------------------------------------------------------------------------
+4.1. Entidades Existentes que DEBEN Reutilizarse (Prohibido Duplicarlas):
+- `tenants`: Fuente única de empresa (`id`, `slug`, `commercial_name`,
+  `legal_name`, `tax_id`, `currency`, `timezone`).
+- `tenant_branding`: Fuente de colores y marca por tenant.
+- `features` y `tenant_features`: Control de activación del módulo `commerce.pos`
+  y sus subfunciones en `config->'functions'`.
+- `platform_roles`, `tenant_memberships` y `role_permissions`:
+  * Inserta en `platform_roles` (`scope = 'tenant'`):
+    - `pos_cashier` ('Cajero POS')
+    - `pos_supervisor` ('Supervisor de Caja POS')
+    - `pos_store_admin` ('Administrador de Tienda POS')
+    - `pos_auditor` ('Auditor / Contador POS')
+  * Inserta en `role_permissions` (`scope = 'tenant'`) los 10 permisos oficiales
+    asignados según la matriz de roles:
+    - `pos.sales.create` (`pos_cashier`, `pos_supervisor`, `pos_store_admin`, `tenant_admin`)
+    - `pos.payments.register` (`pos_cashier`, `pos_supervisor`, `pos_store_admin`, `tenant_admin`)
+    - `pos.cash.open` (`pos_cashier`, `pos_supervisor`, `pos_store_admin`, `tenant_admin`)
+    - `pos.cash.close` (`pos_cashier`, `pos_supervisor`, `pos_store_admin`, `tenant_admin`)
+    - `pos.sales.discount.override` (`pos_supervisor`, `pos_store_admin`, `tenant_admin`)
+    - `pos.sales.void` (`pos_supervisor`, `pos_store_admin`, `tenant_admin`)
+    - `pos.refunds.approve` (`pos_supervisor`, `pos_store_admin`, `tenant_admin`)
+    - `pos.reports.view` (`pos_supervisor`, `pos_store_admin`, `pos_auditor`, `tenant_admin`)
+    - `pos.settings.manage` (`pos_store_admin`, `tenant_admin`)
+    - `pos.fiscal.issue` (`pos_store_admin`, `tenant_admin`)
+- `platform_exchange_rates`: Fuente base para consultar `ves_per_usd` vigente y
+  congelar el `exchange_rate_snapshot` inmutable en cada venta y pago.
+- `platform_audit_logs`: Bitácora central donde también se reflejan eventos
+  críticos del tenant junto con la tabla detallada `pos_audit_events`.
+
+4.2. Nuevas Tablas del Módulo VORA POS (Con RLS y `REVOKE/GRANT` explícito):
+Diseña las siguientes tablas en la migración SQL, todas con `tenant_id uuid NOT
+NULL REFERENCES tenants(id) ON DELETE CASCADE`:
+1. `tenant_branches` (Sedes operativas del tenant):
+   `id`, `tenant_id`, `code`, `name`, `fiscal_address`, `phone`, `timezone`,
+   `is_primary`, `status`, `created_at`, `updated_at`.
+2. `pos_registers` (Cajas físicas o lógicas por sede):
+   `id`, `tenant_id`, `branch_id REFERENCES tenant_branches(id)`, `code`, `name`,
+   `status` ('active' | 'inactive' | 'maintenance'), `created_at`, `updated_at`,
+   `UNIQUE(tenant_id, branch_id, code)`.
+3. `pos_register_assignments` (Asignación de cajeros a cajas):
+   `id`, `tenant_id`, `branch_id`, `register_id REFERENCES pos_registers(id)`,
+   `auth_user_id uuid NOT NULL`, `cashier_display_name text`, `valid_from`,
+   `valid_until`, `is_active boolean DEFAULT true`.
+4. `pos_shifts` (Turnos de caja):
+   `id`, `tenant_id`, `branch_id`, `register_id REFERENCES pos_registers(id)`,
+   `cashier_user_id uuid NOT NULL`, `cashier_name_snapshot text`, `status`
+   ('abierto' | 'cerrado'), `opened_at timestamptz DEFAULT now()`,
+   `closed_at timestamptz`, `opening_amount_usd numeric(18,2) NOT NULL DEFAULT 0`,
+   `opening_amount_ves numeric(18,2) NOT NULL DEFAULT 0`,
+   `expected_totals jsonb DEFAULT '{}'::jsonb`,
+   `declared_totals jsonb DEFAULT '{}'::jsonb`,
+   `differences_totals jsonb DEFAULT '{}'::jsonb`,
+   `opening_notes text`, `closing_justification text`, `closed_by uuid`.
+   *Índice único obligatorio*:
+   `CREATE UNIQUE INDEX one_open_shift_per_register ON pos_shifts(register_id) WHERE status = 'abierto';`
+5. `pos_cash_movements` (Movimientos manuales de caja durante el turno):
+   `id`, `tenant_id`, `branch_id`, `shift_id REFERENCES pos_shifts(id)`,
+   `movement_type` ('ingreso_efectivo' | 'retiro_efectivo' | 'ajuste_caja' |
+   'cambio_saldo_inicial'), `currency` ('USD' | 'VES'),
+   `amount numeric(18,2) NOT NULL CHECK (amount > 0)`, `reason text NOT NULL`,
+   `performed_by uuid NOT NULL`, `authorization_id uuid`, `created_at timestamptz`.
+6. `pos_products` y `pos_customers` (Contratos de catálogo/inventario y clientes
+   del tenant sincronizados con `crm.products` y `crm.customers`):
+   - `pos_products`: `id`, `tenant_id`, `branch_id`, `sku`, `barcode`, `name`,
+     `category`, `is_service boolean DEFAULT false`, `price_usd numeric(18,4)`,
+     `tax_rate_percent numeric(5,2) DEFAULT 16.00`, `stock_quantity numeric(18,3)`,
+     `status`, `UNIQUE(tenant_id, branch_id, sku)`.
+   - `pos_customers`: `id`, `tenant_id`, `document_type` ('V'|'E'|'J'|'G'|'P'),
+     `document_number`, `legal_name`, `phone`, `email`, `fiscal_address`,
+     `customer_tier` ('frecuente'|'nuevo'|'consumidor_final'),
+     `total_purchases_count int DEFAULT 0`, `total_purchases_usd numeric(18,2) DEFAULT 0`,
+     `last_purchase_at timestamptz`, `UNIQUE(tenant_id, document_type, document_number)`.
+7. `pos_authorizations` (Aprobaciones auditadas de Supervisor):
+   `id`, `tenant_id`, `branch_id`, `shift_id`, `sale_id`, `operation_type`
+   ('discount_override' | 'sale_void' | 'sale_return' | 'cash_movement'),
+   `requested_by uuid NOT NULL`, `approved_by uuid NOT NULL`,
+   `approver_name_snapshot text`, `reason text NOT NULL`,
+   `limit_snapshot jsonb NOT NULL`, `created_at timestamptz DEFAULT now()`.
+8. `pos_sales` y `pos_sale_lines` (Cabecera y líneas de venta):
+   - `pos_sales`: `id`, `tenant_id`, `branch_id`, `shift_id REFERENCES pos_shifts(id)`,
+     `register_id`, `cashier_user_id`, `customer_id REFERENCES pos_customers(id)`,
+     `sale_number text NOT NULL`, `commercial_status` ('borrador' | 'confirmada' |
+     'anulada' | 'parcialmente_devuelta' | 'devuelta'), `payment_status`
+     ('pendiente' | 'parcial' | 'pagada' | 'reversada'), `currency text DEFAULT 'USD'`,
+     `exchange_rate_snapshot numeric(18,6) NOT NULL CHECK (exchange_rate_snapshot > 0)`,
+     `subtotal_usd numeric(18,2)`, `discount_total_usd numeric(18,2)`,
+     `tax_total_usd numeric(18,2)`, `total_usd numeric(18,2)`,
+     `total_ves numeric(18,2)`, `paid_total_usd numeric(18,2)`,
+     `paid_total_ves numeric(18,2)`, `balance_due_usd numeric(18,2)`,
+     `balance_due_ves numeric(18,2)`, `notes text`,
+     `discount_authorization_id uuid REFERENCES pos_authorizations(id)`,
+     `idempotency_key text NOT NULL`, `correlation_id text NOT NULL`,
+     `confirmed_at timestamptz`, `created_at timestamptz DEFAULT now()`,
+     `UNIQUE(tenant_id, sale_number)`, `UNIQUE(tenant_id, idempotency_key)`.
+   - `pos_sale_lines`: `id`, `tenant_id`, `sale_id REFERENCES pos_sales(id) ON DELETE RESTRICT`,
+     `product_id REFERENCES pos_products(id)`, `sku_snapshot text`,
+     `name_snapshot text`, `is_service boolean`, `quantity numeric(18,3) CHECK (quantity > 0)`,
+     `returned_quantity numeric(18,3) DEFAULT 0`, `unit_price_usd numeric(18,4)`,
+     `discount_percent numeric(5,2) DEFAULT 0`, `discount_amount_usd numeric(18,2) DEFAULT 0`,
+     `tax_rate_percent numeric(5,2)`, `tax_amount_usd numeric(18,2)`,
+     `line_subtotal_usd numeric(18,2)`, `line_total_usd numeric(18,2)`.
+9. `pos_sale_payments` (Cobros y abonos por venta):
+   `id`, `tenant_id`, `branch_id`, `sale_id REFERENCES pos_sales(id) ON DELETE RESTRICT`,
+   `shift_id REFERENCES pos_shifts(id)`, `method` ('efectivo' | 'pago_movil' |
+   'tarjeta' | 'cashea'), `currency` ('USD' | 'VES'),
+   `amount_received numeric(18,2) NOT NULL`, `amount_applied numeric(18,2) NOT NULL`,
+   `change_amount numeric(18,2) NOT NULL DEFAULT 0`, `change_currency` ('USD' | 'VES'),
+   `exchange_rate_snapshot numeric(18,6) NOT NULL`, `reference_number text`,
+   `bank_code text`, `bank_name text`, `payer_phone text`, `payer_document text`,
+   `terminal_id text`, `card_last4 text CHECK (card_last4 IS NULL OR card_last4 ~ '^[0-9]{4}$')`,
+   `approval_code text`, `cashea_operation_id text`,
+   `cashea_merchant_amount numeric(18,2)`, `provider_status` ('registrado' |
+   'pendiente_verificacion' | 'verificado' | 'conciliado' | 'rechazado' | 'revertido'),
+   `verified_by uuid`, `verified_at timestamptz`, `created_at timestamptz DEFAULT now()`.
+10. `pos_sale_returns` y `pos_return_lines` (Devoluciones y anulaciones):
+    `id`, `tenant_id`, `branch_id`, `original_sale_id REFERENCES pos_sales(id)`,
+    `shift_id REFERENCES pos_shifts(id)`, `return_number text NOT NULL`,
+    `return_type` ('anulacion_total' | 'devolucion_parcial' | 'devolucion_total'),
+    `reason text NOT NULL`, `notes text`, `requested_by uuid NOT NULL`,
+    `approved_by uuid NOT NULL`, `authorization_id uuid REFERENCES pos_authorizations(id)`,
+    `refund_method` ('efectivo_usd' | 'efectivo_ves' | 'reverso_electronico' | 'nota_credito_interna'),
+    `total_refunded_usd numeric(18,2)`, `total_refunded_ves numeric(18,2)`,
+    `stock_reversal_reference text`, `financial_reversal_reference text`,
+    `created_at timestamptz DEFAULT now()`.
+11. `pos_commercial_documents`, `pos_fiscal_integrations` y `pos_fiscal_requests`:
+    - `pos_commercial_documents`: `id`, `tenant_id`, `sale_id UNIQUE`,
+      `document_kind` ('comprobante_interno'), `internal_number text NOT NULL`,
+      `pdf_path text`, `status` ('generado'), `created_at timestamptz`.
+    - `pos_fiscal_integrations`: `id`, `tenant_id UNIQUE`, `provider text DEFAULT 'HKA'`,
+      `environment` ('sandbox' | 'production'), `enabled boolean DEFAULT false`,
+      `company_rif text`, `company_legal_name text`, `fiscal_address text`,
+      `secret_reference text`, `legal_status` ('sin_configurar' | 'sandbox_verificado' | 'productivo_activo'),
+      `last_checked_at timestamptz`, `updated_at timestamptz`.
+    - `pos_fiscal_requests`: `id`, `tenant_id`, `sale_id`, `idempotency_key UNIQUE`,
+      `request_hash text`, `provider_reference text`, `fiscal_invoice_number text`,
+      `fiscal_control_number text`, `status` ('no_solicitado' | 'pendiente' |
+      'emitido' | 'rechazado' | 'error' | 'por_revisar'), `error_code text`,
+      `response_summary jsonb`, `created_at timestamptz`, `updated_at timestamptz`.
+12. `pos_settings` y `pos_inventory_kardex` (Configuración por sede y kardex):
+    - `pos_settings`: `id`, `tenant_id`, `branch_id UNIQUE`, `active_methods text[]`,
+      `max_cashier_discount_percent numeric(5,2) DEFAULT 5.00`,
+      `allow_partial_payments boolean DEFAULT true`,
+      `cross_currency_change_enabled boolean DEFAULT true`,
+      `internal_doc_prefix text DEFAULT 'COMP-INT-'`, `next_internal_seq int DEFAULT 1`,
+      `next_sale_seq int DEFAULT 1259`, `active_exchange_rate numeric(18,6) DEFAULT 36.500000`,
+      `updated_by uuid`, `updated_at timestamptz`.
+    - `pos_inventory_kardex`: `id`, `tenant_id`, `branch_id`, `product_id`,
+      `movement_type` ('venta_pos' | 'reverso_devolucion' | 'ajuste_inicial'),
+      `reference_id uuid`, `quantity_delta numeric(18,3)`, `stock_before numeric(18,3)`,
+      `stock_after numeric(18,3)`, `actor_id uuid`, `created_at timestamptz`.
+
+4.3. Funciones Transaccionales RPC (`SECURITY DEFINER`) Obligatorias:
+Siguiendo el estándar de `vora_create_tenant` y `vora_review_payment` del esquema
+actual, implementa en SQL estas funciones atómicas con `SET search_path = public, pg_temp`:
+1. `public.vora_pos_has_permission(p_tenant uuid, p_permission text) RETURNS boolean`:
+   Verifica si el usuario autenticado (`auth.uid()`) es `vora_is_super_admin()` o
+   tiene membresía activa en `tenant_memberships` cuyo `role` posee `p_permission`
+   en `role_permissions`.
+2. `public.vora_pos_open_shift(...) RETURNS jsonb`:
+   Valida `pos.cash.open`, bloquea la fila de `pos_registers` (`FOR UPDATE`),
+   verifica que no exista otro turno `abierto` en esa caja, inserta en
+   `pos_shifts` con `now()` del servidor y registra en `platform_audit_logs`.
+3. `public.vora_pos_confirm_sale(p_payload jsonb) RETURNS jsonb`:
+   - Idempotencia primero: Busca `pos_sales` por `(tenant_id, idempotency_key)`.
+     Si ya existe, retorna el objeto existente sin volver a cobrar ni descontar.
+   - Valida `pos.sales.create` y que el `shift_id` esté `abierto`.
+   - Si alguna línea tiene descuento > `max_cashier_discount_percent`, verifica
+     que exista un `discount_authorization_id` válido en `pos_authorizations`.
+   - Recorre cada línea inventariable (`is_service = false`), ejecuta
+     `SELECT * FROM pos_products WHERE id = ... FOR UPDATE`, verifica que
+     `stock_quantity >= quantity` (si no, lanza `RAISE EXCEPTION 'Existencia insuficiente en almacén para SKU %'`),
+     descuenta el stock e inserta el movimiento en `pos_inventory_kardex`.
+   - Inserta `pos_sales`, `pos_sale_lines`, `pos_sale_payments`, genera el
+     registro en `pos_commercial_documents` con numeración correlativa y registra
+     en `platform_audit_logs` con `correlation_id`.
+4. `public.vora_pos_process_return(p_payload jsonb) RETURNS jsonb`:
+   Valida `pos.refunds.approve` o `pos.sales.void`, bloquea la venta original
+   (`FOR UPDATE`), verifica que las cantidades a devolver no excedan lo comprado
+   menos devoluciones previas, reintegra el stock a `pos_products`, inserta en
+   `pos_inventory_kardex`, crea `pos_sale_returns` y `pos_return_lines`, y
+   actualiza `pos_sales.commercial_status` a `'parcialmente_devuelta'`,
+   `'devuelta'` o `'anulada'` (prohibido hacer `DELETE` de ventas).
+5. `public.vora_pos_close_shift(p_shift_id uuid, p_declared jsonb, p_justification text) RETURNS jsonb`:
+   Valida `pos.cash.close`, bloquea `pos_shifts` (`FOR UPDATE`), verifica que no
+   existan ventas en estado `'borrador'` en ese turno, calcula los montos
+   esperados exactos sumando `opening_amount` + cobros en `pos_sale_payments` +
+   ingresos en `pos_cash_movements` - retiros - devoluciones en efectivo, calcula
+   las diferencias contra `p_declared`, exige `length(trim(p_justification)) >= 5`
+   si existe diferencia distinta de cero, y sella el turno como `'cerrado'`.
+
+5. ESPECIFICACIÓN DETALLADA DE LAS 18 VISTAS (`POS-01` A `POS-18`)
+--------------------------------------------------------------------------------
+Implementa la experiencia completa dentro del workspace del tenant (`test1 [mock]`),
+incluyendo un selector interactivo de contexto en la barra superior que permita
+al evaluador alternar en vivo entre:
+- Tenant: `test1 [mock]` (Venezuela, USD/VES) vs `empresa-demo [mock]` (para
+  probar aislamiento multitenant estricto).
+- Sede: `Sede Principal Caracas [mock]` vs `Sucursal Valencia [mock]`.
+- Rol / Usuario activo: `María C. [mock] (Cajera - Caja 01)`, `Luis P. [mock]
+  (Cajero - Caja 02)`, `Carlos R. [mock] (Supervisor de Sede)` y
+  `Admin General test1 [mock] (Administrador de Tienda/Tenant)`.
+
+[POS-01] INICIO DE CAJA (PANEL DE ACCESO RÁPIDO Y ESTADO OPERATIVO):
+- Encabezado con nombre comercial del tenant (`test1 [mock]`), sede activa,
+  cajero autenticado, estado textual del turno (`TURNO ABIERTO EN CAJA 01` en
+  verde `#DCFCE7` o `SIN TURNO ACTIVO` en ámbar `#FEF3C7`) y tasa BCV vigente.
+- Cuatro bloques de acción tipográfica de alto contraste (sin íconos):
+  1. "Iniciar nueva operación de venta" (navega a POS-03/04 si hay turno abierto;
+     si no hay turno, bloquea y redirige a POS-02).
+  2. "Apertura y control de turno de caja" (navega a POS-02 / POS-15).
+  3. "Catálogo y existencias de sede" (navega al listado de stock en POS-03).
+  4. "Directorio fiscal de clientes" (abre POS-05).
+- Bloque "Resumen operativo del turno / día actual" con 3 tarjetas financieras:
+  * "Ventas netas confirmadas hoy" (Total USD, equivalente VES y número de ventas)
+  * "Unidades físicas comercializadas" (Total de unidades descontadas de almacén)
+  * "Ticket promedio por operación" (Monto promedio y variación porcentual)
+
+[POS-02] APERTURA DE CAJA Y TURNO:
+- Formulario de inicio de turno con validación de concurrencia por caja.
+- Elementos: Selector de caja asignada (`Caja 01 - Mostrador Principal [mock]`,
+  `Caja 02 - Autoservicio [mock]`), Fecha y hora oficial del servidor, Cajero
+  responsable, Monto inicial en Efectivo USD (`0,00`), Monto inicial en Efectivo
+  VES (`0,00`), Observaciones de apertura y botón primario "Confirmar apertura
+  de turno en caja".
+- Regla de negocio: Si otro cajero ya tiene un turno abierto en la caja elegida,
+  bloquea la acción mostrando: "La caja seleccionada ya posee un turno abierto
+  por otro operador. No se permiten dos turnos simultáneos en la misma caja".
+
+[POS-03] NUEVA VENTA / CATÁLOGO Y [POS-04] CARRITO Y CONDICIONES (PANTALLA DIVIDIDA):
+- En escritorio, renderiza el layout de caja rápida de dos columnas en una misma
+  vista: Columna Izquierda (65% ancho) para `POS-03 Catálogo` y Columna Derecha
+  fija (35% ancho) para `POS-04 Carrito y Condiciones`. En resolución tablet,
+  permite conmutar entre ambas con barra inferior fija de resumen.
+- Elementos de `POS-03 Catálogo`:
+  * Buscador instantáneo por Nombre, código SKU o código de barras (con atajo de
+    teclado y botón "Simular lectura de código de barras [mock]").
+  * Filtros de categoría por etiquetas tipográficas: "Todas las categorías",
+    "Ropa", "Calzado", "Accesorios", "Perfumería", "Hogar", "Servicios".
+  * Cuadrícula de productos donde cada tarjeta muestra: Categoría, Nombre del
+    artículo, SKU, etiqueta de naturaleza ("PRODUCTO FÍSICO" o "SERVICIO NO
+    INVENTARIABLE"), stock disponible en la sede actual (`Existencia: X und.`),
+    precio unitario en USD y equivalente en VES, y botón "Agregar al carrito".
+  * Regla: Bloquea productos físicos con stock `0` o cantidades mayores al stock
+    disponible; los servicios nunca descuentan inventario.
+- Elementos de `POS-04 Carrito y Condiciones`:
+  * Cabecera con botón "Seleccionar o registrar cliente (POS-05)" y botón
+    "Añadir nota comercial a la venta".
+  * Lista de líneas seleccionadas con controles numéricos `-` / `+`, entrada
+    directa de cantidad, porcentaje de descuento de línea, alícuota IVA (`16%`,
+    `8%` o `Exento`), subtotal en USD/VES y botón textual "Quitar línea".
+  * Control de Descuento Excepcional: Si el descuento supera el umbral del cajero
+    configurado en POS-17 (`5%`), despliega el panel de "Autorización de
+    Supervisor en Caliente", exigiendo seleccionar o autenticar al Supervisor
+    (`Carlos R. [mock]`), ingresar credencial/PIN de aprobación y motivo. Al
+    aprobar, registra el evento en `pos_authorizations` sin cerrar la sesión de
+    la cajera.
+  * Desglose financiero con precisión decimal: Subtotal USD/VES, Descuento
+    autorizado USD/VES, Impuesto IVA USD/VES, Tasa histórica congelada
+    (`exchange_rate_snapshot`) y **Total a Cobrar en USD y VES**.
+  * Botones inferiores: "Vaciar líneas de venta actual" y botón primario
+    destacado "Proceder al registro de cobro (POS-06)".
+
+[POS-05] SELECCIÓN Y REGISTRO RÁPIDO DE CLIENTES:
+- Modal o vista dedicada con buscador por nombre, Cédula/RIF, teléfono o email
+  filtrado estrictamente por `tenant_id`.
+- Listado izquierdo con Nombre/Razón Social, Documento (`V-`, `J-`, `E-`, `G-`),
+  Teléfono y clasificación (`Frecuente` / `Nuevo`).
+- Panel derecho "Ficha del cliente seleccionado": Datos fiscales completos,
+  métrica de "Historial de compras en sede" (cantidad de compras, monto acumulado
+  y fecha de última compra), botón "Editar datos fiscales" y botón primario
+  "Usar este cliente en la venta actual".
+- Incluye formulario "Registrar nuevo cliente fiscal" y opción rápida "Asociar a
+  Consumidor Final" (validando que si la emisión fiscal HKA está activa en POS-18,
+  el cliente posea RIF/Cédula y Razón Social válidos).
+
+[POS-06] COBRAR Y ORQUESTACIÓN DE PAGOS MIXTOS:
+- Permite liquidar la venta combinando múltiples pagos en distintas monedas y
+  métodos dentro de la misma operación, o registrar ventas con abono parcial
+  según la política activa en POS-17.
+- Cabecera de saldos dinámicos en USD y VES:
+  * "Total general de la venta"
+  * "Total abonado en pagos registrados"
+  * "Saldo pendiente por cobrar"
+  * "Vuelto total por entregar al cliente"
+- Pestañas tipográficas de métodos de pago (parametrizados desde POS-17):
+  * `POS-10 Efectivo (USD / VES)`
+  * `POS-07 Pago Móvil (VES)`
+  * `POS-08 Tarjeta — Punto Externo (VES)`
+  * `POS-09 Cashea (Convenio [mock])`
+  *(Nota: Zelle queda explícitamente excluido del MVP según el alcance).*
+- Tabla de "Pagos aplicados a esta operación" con método, moneda, monto recibido,
+  monto aplicado, vuelto, tasa snapshot, referencia bancaria/lote, estado
+  (`registrado`, `pendiente_verificacion`, `verificado`) y botón "Remover pago".
+
+[POS-07] PAGO MÓVIL (DECLARACIÓN MANUAL SIN CONFIRMACIÓN SIMULADA):
+- Muestra aviso normativo: "Registro manual — No confirma recepción bancaria
+  automática".
+- Presenta recuadro tipográfico de "Datos de Pago Móvil del comercio e
+  identificador QR de cobro" (Banco receptor, Teléfono, RIF).
+- Campos: Banco receptor, Teléfono pagador (`0414 / 0424 / 0412 / 0416 / 0426`),
+  Cédula/RIF del pagador, Número de referencia (mínimo 4 dígitos), Fecha/hora,
+  Monto en VES, Evidencia/observación opcional y Estado inicial (`registrado` |
+  `pendiente_verificacion` | `verificado` si tiene permiso).
+- Botón: "Incorporar declaración de Pago Móvil".
+
+[POS-08] PAGO CON TARJETA (TERMINAL EXTERNA):
+- Muestra aviso de seguridad PCI: "Punto de venta externo — Prohibido ingresar o
+  almacenar número completo de tarjeta (PAN) o código CVV".
+- Campos: Banco adquirente, Identificador de terminal externa (`TERM-01 [mock]`),
+  Tipo de tarjeta (`Débito` / `Crédito`), Últimos 4 dígitos (opcional, bloqueado
+  a máximo 4 dígitos), Número de aprobación / referencia de voucher (obligatorio),
+  Monto en VES y Fecha/hora.
+- Botón: "Incorporar cobro de terminal externa".
+
+[POS-09] PAGO CON CASHEA (REGISTRO CONDICIONADO A CONVENIO):
+- Muestra aviso contractual: "Operación sujeta a condiciones del proveedor — No
+  asumir aprobación sin respaldo".
+- Campos: Identificador externo de operación Cashea, Monto financiado/aplicado a
+  la venta, Monto neto liquidable al comercio, Referencia de confirmación y
+  Estado de verificación (`pendiente_verificacion` | `verificado`).
+- Botón: "Guardar registro de operación Cashea".
+
+[POS-10] PAGO EN EFECTIVO Y CÁLCULO DE VUELTO MULTIMONEDA:
+- Cabecera con "Saldo por cubrir", "Monto físico recibido" y "Vuelto calculado".
+- Campos: Moneda recibida (`USD` o `VES`), Tasa histórica aplicada, Importe
+  recibido del cliente, Importe aplicado a la venta, Moneda de entrega del vuelto
+  (`USD`, `VES` o mixto con conversión exacta a la tasa snapshot) y desglose
+  opcional de billetes.
+- Botón: "Confirmar recepción de efectivo".
+
+[POS-11] VENTA CONFIRMADA (EJECUCIÓN ATÓMICA E IDEMPOTENTE):
+- Botón de disparo desde POS-06: "Confirmar venta definitiva (Idempotency Key)".
+- Incluye botón de prueba técnica: "Simular doble clic / reintento concurrente
+  con misma Idempotency Key [mock]" que demuestra en pantalla que el backend
+  retorna la misma venta `VTA-XXXXXXX` sin duplicar cobros ni descontar dos veces
+  el inventario.
+- Vista de resultado confirmado: Número único de venta (`VTA-0001258`), fecha y
+  hora del servidor, cajero, sede, cliente, total USD/VES, lista de pagos y
+  botones de acción: "Ver e imprimir Comprobante Interno PDF (POS-12)", "Enviar
+  comprobante por canal digital" e "Iniciar nueva venta".
+
+[POS-12] DOCUMENTOS Y FACTURACIÓN FISCAL (ADAPTADOR HKA):
+- Muestra el estado documental de la venta seleccionada: Número de venta, Estado
+  del Comprobante Interno (`Generado y disponible`) y Estado de Emisión Fiscal
+  HKA (`no_solicitado` | `pendiente` | `emitido` | `rechazado` | `error` |
+  `por_revisar`).
+- Renderiza en pantalla (y permite imprimir mediante diálogo del navegador o
+  descargar) el **Comprobante Interno PDF** con identidad del tenant, RIF, sede,
+  cajero, cliente, tabla de ítems, base imponible, IVA, total en USD, total en
+  VES, tasa BCV aplicada y el rótulo obligatorio en bloque visible:
+  `"COMPROBANTE INTERNO — NO VÁLIDO COMO FACTURA FISCAL"`.
+- Panel del Adaptador `FiscalProvider` (The Factory HKA):
+  * Si la integración HKA está en estado `sin_configurar`, bloquea la emisión
+    fiscal mostrando que solo rige el comprobante interno no fiscal.
+  * Si está habilitada en Sandbox `[mock]`, permite ejecutar:
+    - "Solicitar emisión fiscal a The Factory HKA (`issueDocument`)"
+    - "Simular Timeout de red con proveedor HKA [mock]" (pasa el estado a
+      `por_revisar` sin inventar número fiscal)
+    - "Consultar estado previo por Idempotency Key antes de reintentar
+      (`getDocumentStatus`)" (garantizando cero doble emisión fiscal).
+
+[POS-13] HISTORIAL DE VENTAS Y AUDITORÍA:
+- Filtros combinables: Rango de fechas, Caja, Cajero (restringido al propio
+  cajero si el rol activo es `Cajero`), Estado comercial (`confirmada`,
+  `parcialmente_devuelta`, `devuelta`, `anulada`), Estado de cobro (`pagada`,
+  `parcial`) y Método de pago.
+- Tabla detallada con Número de venta, Fecha/hora, Caja/Turno, Cajero, Cliente,
+  Total USD/VES, Saldo pendiente, Estado comercial, Estado fiscal y acciones:
+  "Ver documento y auditoría (POS-12)" e "Iniciar devolución o anulación (POS-14)".
+
+[POS-14] ANULACIONES Y DEVOLUCIONES TRAZABLES:
+- Carga una venta confirmada desde POS-13 o mediante buscador por número
+  (`VTA-XXXXXXX`).
+- Permite seleccionar líneas y cantidades específicas a devolver (validando que
+  no supere la cantidad disponible por devolver) o seleccionar "Anulación total
+  de la operación".
+- Exige: Motivo obligatorio, Observaciones, Método de reintegro financiero y
+  **Aprobación autenticada de Supervisor** (`pos.sales.void` o
+  `pos.refunds.approve`).
+- Al ejecutar el reverso: Actualiza el estado de la venta original sin borrarla,
+  crea el registro en `pos_sale_returns`, devuelve las unidades físicas al stock
+  de `pos_products`, registra la entrada en `pos_inventory_kardex`, ajusta el
+  efectivo/saldo del turno actual para `POS-15` y registra el evento de auditoría.
+
+[POS-15] MOVIMIENTOS DE CAJA Y CIERRE INMUTABLE DE TURNO:
+- Sección 1: "Movimientos manuales de caja durante el turno" (Ingresos de
+  efectivo, Retiros de efectivo a bóveda, Ajustes de caja y Cambio de saldo
+  inicial), restringidos a Supervisor / Administrador con motivo obligatorio y
+  registro en `pos_cash_movements`.
+- Sección 2: "Arqueo y cierre de turno":
+  * Muestra el **Saldo Esperado según Sistema** desglosado por moneda (USD/VES) y
+    por método de pago (`Efectivo USD`, `Efectivo VES`, `Pago Móvil VES`,
+    `Tarjeta VES`, `Cashea`).
+  * Permite al cajero ingresar el **Monto Físico Declarado** para cada cubeta.
+  * Calcula en vivo la columna **Diferencia de Arqueo (`Declarado - Esperado`)**.
+  * Si cualquier diferencia es distinta de `0,00`, exige completar el campo
+    "Justificación detallada de diferencia de arqueo" antes de habilitar el botón
+    "Confirmar y sellar cierre inmutable de turno".
+  * Regla: Impide cerrar si existen carritos en borrador. Una vez cerrado, el
+    turno no admite ediciones ni nuevas ventas asociadas.
+
+[POS-16] REPORTES OPERATIVOS POS:
+- Tarjetas superiores con métricas derivadas de las transacciones reales del
+  estado: "Ventas netas consolidadas", "Operaciones netas", "Ticket promedio",
+  "Unidades vendidas" y "Total devoluciones".
+- Gráfico tipográfico/estructural de barras de "Ventas por franja horaria (08:00
+  a 20:00)" y barras de distribución porcentual de "Ingresos por método de pago".
+- Cuatro subreportes tabulares con botón "Exportar datos para conciliación con
+  VORA Finance (CSV/JSON)":
+  1. Reporte de cierres de caja y diferencias de arqueo
+  2. Reporte de turnos abiertos y cerrados
+  3. Reporte de ventas y movimientos por cajero
+  4. Reporte comparativo por caja y sede
+
+[POS-17] CONFIGURACIÓN OPERATIVA POS (POR TENANT Y SEDE):
+- Protegido por el permiso `pos.settings.manage`.
+- Permite crear y activar/inactivar cajas (`pos_registers`), asignar cajeros a
+  cajas (`pos_register_assignments`), activar o desactivar métodos de pago
+  (`Efectivo`, `Pago Móvil`, `Tarjeta`, `Cashea`, manteniendo `Zelle` marcado
+  como `Excluido del alcance MVP`), configurar el porcentaje límite de descuento
+  de cajero (`5%`), habilitar o bloquear ventas con abono parcial, actualizar la
+  tasa de cambio operativa (`VES/USD`) y definir el prefijo de comprobantes
+  internos. Cada cambio guarda versión en la bitácora de auditoría.
+
+[POS-18] CONFIGURACIÓN FISCAL Y CONECTOR THE FACTORY HKA:
+- Protegido por el permiso `pos.fiscal.issue`.
+- Permite configurar Razón Social, RIF, Dirección Fiscal de la sede, Ambiente
+  (`Pruebas / Sandbox [mock]` vs `Producción`), Referencia de secreto en servidor
+  (`secret_reference`, sin exponer jamás claves privadas en el cliente) y Estado
+  de habilitación contractual.
+- Incluye botón "Ejecutar prueba de conexión con adaptador FiscalProvider
+  (`validateConfiguration`)" y bitácora de respuestas del proveedor.
+
+6. ENTREGABLES ESPERADOS AL EJECUTAR ESTE PROMPT
+--------------------------------------------------------------------------------
+1. Migración SQL completa (`./supabase/migrations/20261019000000_vora_pos_module.sql`)
+   con tablas, índices de concurrencia, políticas RLS basadas en
+   `tenant_memberships`, privilegios `REVOKE/GRANT`, funciones RPC `vora_pos_*` y
+   semillas completas para el tenant piloto `test1 [mock]`.
+2. Actualización de `./lib/modules-config.ts`, `./lib/types.ts` y `./lib/demo-data.ts`
+   incorporando `commerce.pos`, los 10 permisos granulares y los datos iniciales
+   etiquetados rigurosamente con `[mock]`.
+3. Implementación completa e interactiva de las 18 vistas (`POS-01` a `POS-18`)
+   conectadas entre sí en tiempo real, cumpliendo al 100% la prohibición de
+   íconos y emojis, el uso exclusivo de etiquetas específicas del dominio y la
+   paleta de colores oficial de VORA POS.
+================================================================================

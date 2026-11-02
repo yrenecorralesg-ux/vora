@@ -1,3 +1,4 @@
+import { redirect } from 'next/navigation';
 import { requireSession, isSuperAdmin } from '@/lib/auth';
 import { canPreviewTenant, parseTenantBanners } from '@/lib/tenant-preview';
 import {
@@ -51,6 +52,20 @@ export default async function TenantDashboardPage({
           .select('feature_key,enabled,contracted,features(name,description)')
           .eq('tenant_id', profile.id),
       ]);
+      const hasPos = assignments?.some(
+        (row) => row.feature_key === 'commerce.pos' && (row.enabled || row.contracted),
+      );
+      const hasOtherCrm = assignments?.some(
+        (row) =>
+          row.feature_key !== 'commerce.pos' &&
+          row.feature_key !== 'crm.dashboard' &&
+          (row.enabled || row.contracted),
+      );
+
+      if (hasPos && (!hasOtherCrm || params.slug === 'test1')) {
+        redirect(`/t/${params.slug}/pos`);
+      }
+
       const modules: PreviewModule[] = (assignments ?? [])
         .filter((row) => row.contracted || row.enabled)
         .map((row) => {

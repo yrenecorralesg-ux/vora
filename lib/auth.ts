@@ -67,3 +67,35 @@ export async function getUserMemberships(
   if (error) return [];
   return data ?? [];
 }
+
+
+export async function checkPosPermission(
+  userId: string,
+  tenantId: string,
+  permission: string,
+  supabase: SupabaseClient = getSupabaseServerClient(),
+): Promise<boolean> {
+  const admin = await isSuperAdmin(userId, supabase);
+  if (admin) return true;
+
+  const { data: membership } = await supabase
+    .from('tenant_memberships')
+    .select('role')
+    .eq('tenant_id', tenantId)
+    .eq('auth_user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!membership) return false;
+  if (membership.role === 'tenant_admin') return true;
+
+  const { data: perm } = await supabase
+    .from('role_permissions')
+    .select('id')
+    .eq('role_key', membership.role)
+    .eq('permission', permission)
+    .eq('scope', 'tenant')
+    .maybeSingle();
+
+  return !!perm;
+}

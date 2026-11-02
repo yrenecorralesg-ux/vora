@@ -45,7 +45,10 @@ export interface CrmSidebarProps {
   isPreview: boolean;
 }
 
+const PosBadgeIcon = () => <span className="font-mono text-[10px] font-bold">POS</span>;
+
 export const ALL_CRM_MODULES: CrmNavItem[] = [
+  { featureKey: 'commerce.pos', label: 'VORA POS', href: '/t/[slug]/pos', icon: PosBadgeIcon },
   { featureKey: 'crm.dashboard', label: 'Resumen', href: '/t/[slug]', icon: LayoutDashboard },
   { featureKey: 'crm.customers', label: 'Clientes', href: '/t/[slug]/customers', icon: Users },
   { featureKey: 'capture.fairs', label: 'Captura en feria', href: '/t/[slug]/capture', icon: Store },
@@ -121,7 +124,7 @@ export function CrmSidebar({
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.href);
-          const resolved = item.href.replace('[slug]', slug) + (isPreview ? '?preview=1' : '');
+          const resolved = item.href.replace('[slug]', slug) + '';
 
           return (
             <Link
