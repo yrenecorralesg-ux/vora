@@ -118,6 +118,10 @@ interface PosContextType {
   // Barcode quick scan
   scanBarcode: (code: string) => boolean;
 
+  // Exchange Rate (BCV / DolarApi)
+  refreshExchangeRate: (customUrl?: string) => Promise<{ ok: boolean; rate?: number; error?: string }>;
+  isFetchingExchangeRate: boolean;
+
   // Notification Toast Message (Pure Typography)
   notification: { title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null;
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
@@ -155,6 +159,10 @@ export function PosProvider({
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [offlineQueueCount, setOfflineQueueCount] = useState<number>(0);
 
+  // Tasa de cambio BCV / API
+  const [exchangeRate, setExchangeRate] = useState<number>(posStore.settings.active_exchange_rate);
+  const [isFetchingExchangeRate, setIsFetchingExchangeRate] = useState<boolean>(false);
+
   const activeBranch = posStore.branches.find((b) => b.id === activeBranchId) ?? posStore.branches[0];
   const activeUser = MOCK_USERS.find((u) => u.id === activeUserId) ?? MOCK_USERS[0];
   const activeRegister = posStore.registers.find((r) => r.id === activeRegisterId) ?? posStore.registers[0];
@@ -173,6 +181,63 @@ export function PosProvider({
   };
 
   const clearNotification = () => setNotification(null);
+
+  const refreshExchangeRate = async (customUrl?: string): Promise<{ ok: boolean; rate?: number; error?: string }> => {
+    setIsFetchingExchangeRate(true);
+    try {
+      const urlParam = customUrl ? `?url=${encodeURIComponent(customUrl)}` : '';
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/exchange-rate${urlParam}`, {
+        cache: 'no-store',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Error al consultar la tasa oficial');
+      }
+
+      const newRate = Number(data.rate);
+      posStore.settings.active_exchange_rate = newRate;
+      posStore.settings.last_exchange_rate_fetch = data.timestamp || new Date().toISOString();
+      if (data.source) {
+        posStore.settings.exchange_rate_source = data.source;
+      }
+      if (customUrl) {
+        posStore.settings.exchange_rate_api_url = customUrl;
+      }
+      setExchangeRate(newRate);
+
+      // Sincronizar en segundo plano
+      fetch(`/api/t/${activeTenantSlug}/pos/exchange-rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rate: newRate,
+          source: data.source,
+          url: customUrl || posStore.settings.exchange_rate_api_url,
+          auto_fetch: posStore.settings.auto_fetch_exchange_rate,
+        }),
+      }).catch(() => {});
+
+      showNotification(
+        'Tasa BCV sincronizada',
+        `Tasa oficial actualizada: ${newRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} VES/USD (${data.source || 'dolarapi'}).`,
+        'success',
+      );
+      return { ok: true, rate: newRate };
+    } catch (err: any) {
+      const msg = err.message || 'No se pudo conectar con la API de tasa';
+      showNotification('Error al sincronizar tasa', msg, 'critical');
+      return { ok: false, error: msg };
+    } finally {
+      setIsFetchingExchangeRate(false);
+    }
+  };
+
+  // Auto-sincronización de tasa BCV al inicializar
+  useEffect(() => {
+    if (posStore.settings.auto_fetch_exchange_rate !== false) {
+      refreshExchangeRate();
+    }
+  }, []);
 
   // Cart operations
   const addToCart = (product: PosProduct, quantity = 1) => {
@@ -459,7 +524,9 @@ export function PosProvider({
         navigateTo,
         activeShift,
         refreshActiveShift,
-        exchangeRate: posStore.settings.active_exchange_rate,
+        exchangeRate,
+        refreshExchangeRate,
+        isFetchingExchangeRate,
         settings: posStore.settings,
         branches: posStore.branches,
         registers: posStore.registers,

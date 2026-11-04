@@ -180,7 +180,7 @@ export function PosView16Reports() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Cabecera Estilo Mockup PDF: Título y Controles */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>

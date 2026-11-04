@@ -34,7 +34,7 @@ function PosModuleContent() {
         {/* Lienzo Operativo Central */}
         <main
           className={`flex-1 px-6 pb-8 lg:px-8 lg:pb-8 print:p-0 print:m-0 ${
-            currentView === 'POS-01' ? 'pt-6 lg:pt-8' : 'pt-2 lg:pt-2'
+            currentView === 'POS-01' ? 'pt-6 lg:pt-8' : 'pt-1.5 lg:pt-2'
           }`}
         >
           <div className="mx-auto max-w-7xl print:max-w-none print:w-full">

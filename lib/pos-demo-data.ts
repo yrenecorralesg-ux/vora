@@ -323,6 +323,10 @@ export const MOCK_SETTINGS: PosSettings = {
   next_internal_seq: 4,
   next_sale_seq: 1262,
   active_exchange_rate: MOCK_EXCHANGE_RATE,
+  exchange_rate_api_url: 'https://ve.dolarapi.com/v1/dolares/oficial',
+  auto_fetch_exchange_rate: true,
+  last_exchange_rate_fetch: null,
+  exchange_rate_source: 'BCV Oficial (dolarapi)',
   updated_by: 'u0000000-0000-0000-0000-000000000004',
   updated_at: '2026-10-19T08:00:00Z',
 };

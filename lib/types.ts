@@ -488,6 +488,10 @@ export interface PosSettings {
   next_internal_seq: number;
   next_sale_seq: number;
   active_exchange_rate: number;
+  exchange_rate_api_url?: string;
+  auto_fetch_exchange_rate?: boolean;
+  last_exchange_rate_fetch?: string | null;
+  exchange_rate_source?: string | null;
   updated_by: string | null;
   updated_at: string;
 }
