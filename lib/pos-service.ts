@@ -43,6 +43,7 @@ import type {
   PosAuditEvent,
 } from './types';
 import { TheFactoryHkaProvider } from './pos-hka-provider';
+import { casheaProvider, CasheaPosProvider } from './pos-cashea-provider';
 
 // Estado global en memoria para reactividad completa en modo demo / preview
 class PosInMemoryStore {
@@ -635,4 +636,5 @@ class PosInMemoryStore {
 // Instancia única (Singleton) en memoria
 export const posStore = new PosInMemoryStore();
 export const hkaProvider = new TheFactoryHkaProvider(posStore.fiscalIntegration);
+export { casheaProvider, CasheaPosProvider };
 

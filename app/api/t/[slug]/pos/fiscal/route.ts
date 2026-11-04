@@ -21,7 +21,7 @@ export async function POST(
 
     if (action === 'validate') {
       const res = await hkaProvider.validateConfiguration(posStore.fiscalIntegration);
-      return NextResponse.json({ ok: res.valid, message: res.message });
+      return NextResponse.json({ ok: res.valid, message: res.message, data: res.data });
     }
 
     if (action === 'issue') {
@@ -31,7 +31,7 @@ export async function POST(
       }
 
       const res = await hkaProvider.issueDocument(sale, body.idempotency_key || `idemp-hka-${sale.id}`);
-      
+
       // Actualizar registro fiscal en la venta
       sale.fiscal_request = {
         id: `fr-${Date.now()}`,
@@ -45,15 +45,20 @@ export async function POST(
         status: res.status,
         error_code: res.errorCode ?? null,
         response_summary: {
-          provider: 'The Factory HKA [mock]',
+          provider: 'The Factory HKA (SENIAT)',
           status: res.status,
           message: res.message,
+          rawResponse: res.rawResponse ?? null,
         },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      return NextResponse.json({ ok: res.success, result: res, fiscal_request: sale.fiscal_request });
+      return NextResponse.json({
+        ok: res.success,
+        result: res,
+        fiscal_request: sale.fiscal_request,
+      });
     }
 
     if (action === 'simulate_timeout') {
@@ -73,7 +78,7 @@ export async function POST(
           status: 'por_revisar',
           error_code: res.errorCode,
           response_summary: {
-            provider: 'The Factory HKA [mock]',
+            provider: 'The Factory HKA (SENIAT)',
             status: 'por_revisar',
             message: res.message,
           },
@@ -86,8 +91,17 @@ export async function POST(
     }
 
     if (action === 'status') {
-      const res = await hkaProvider.getDocumentStatus(body.sale_id, body.idempotency_key);
+      const res = await hkaProvider.getDocumentStatus(
+        body.sale_id,
+        body.idempotency_key,
+        body.numero_documento,
+      );
       return NextResponse.json({ ok: true, result: res });
+    }
+
+    if (action === 'cancel') {
+      const res = await hkaProvider.cancelDocument(body.numero_documento, body.motivo);
+      return NextResponse.json({ ok: res.success, result: res });
     }
 
     return NextResponse.json({ ok: false, error: 'Acción fiscal no reconocida' }, { status: 400 });
@@ -95,4 +109,3 @@ export async function POST(
     return NextResponse.json({ ok: false, error: err.message || 'Error en servidor' }, { status: 500 });
   }
 }
-

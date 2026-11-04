@@ -12,3 +12,6 @@ next-env.d.ts
 # Supabase CLI local state and migration backups
 supabase/.temp/
 supabase/migrations-backup/
+
+# Credenciales locales
+credenciales*.txt

@@ -27,27 +27,31 @@ export function PosView12DocumentPdf() {
     setFiscalLoading(true);
     setProviderMessage(null);
 
-    const res = await hkaProvider.issueDocument(fiscalSale, `idemp-hka-${fiscalSale.id}`);
-    fiscalSale.fiscal_request = {
-      id: `fr-${Date.now()}`,
-      tenant_id: fiscalSale.tenant_id,
-      sale_id: fiscalSale.id,
-      idempotency_key: `idemp-hka-${fiscalSale.id}`,
-      request_hash: `hash-${Date.now()}`,
-      provider_reference: res.providerReference ?? null,
-      fiscal_invoice_number: res.fiscalInvoiceNumber ?? null,
-      fiscal_control_number: res.fiscalControlNumber ?? null,
-      status: res.status,
-      error_code: res.errorCode ?? null,
-      response_summary: { provider: 'The Factory HKA [mock]', status: res.status, message: res.message },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+    try {
+      const res = await fetch('/api/t/test1/pos/fiscal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'issue',
+          sale_id: fiscalSale.id,
+          idempotency_key: `idemp-hka-${fiscalSale.id}`,
+        }),
+      });
 
-    setFiscalSale({ ...fiscalSale });
-    setProviderMessage(res.message);
-    setFiscalLoading(false);
-    showNotification('Respuesta fiscal', res.message, res.success ? 'success' : 'critical');
+      const data = await res.json();
+      if (data.fiscal_request) {
+        fiscalSale.fiscal_request = data.fiscal_request;
+      }
+
+      setFiscalSale({ ...fiscalSale });
+      setProviderMessage(data.result?.message || data.error || 'Respuesta fiscal recibida.');
+      showNotification('The Factory HKA', data.result?.message || data.error, data.ok ? 'success' : 'critical');
+    } catch (err: any) {
+      setProviderMessage(`Error de red: ${err.message}`);
+      showNotification('The Factory HKA', err.message, 'critical');
+    } finally {
+      setFiscalLoading(false);
+    }
   };
 
   // Simular Timeout de Red HKA
@@ -55,27 +59,27 @@ export function PosView12DocumentPdf() {
     setFiscalLoading(true);
     setProviderMessage(null);
 
-    const res = await hkaProvider.simulateTimeout();
-    fiscalSale.fiscal_request = {
-      id: `fr-${Date.now()}`,
-      tenant_id: fiscalSale.tenant_id,
-      sale_id: fiscalSale.id,
-      idempotency_key: `idemp-hka-${fiscalSale.id}`,
-      request_hash: `hash-timeout-${Date.now()}`,
-      provider_reference: null,
-      fiscal_invoice_number: null,
-      fiscal_control_number: null,
-      status: 'por_revisar',
-      error_code: 'HKA_HTTP_TIMEOUT',
-      response_summary: { error: res.message },
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    setFiscalSale({ ...fiscalSale });
-    setProviderMessage(res.message);
-    setFiscalLoading(false);
-    showNotification('Timeout simulado', res.message, 'alert');
+    try {
+      const res = await fetch('/api/t/test1/pos/fiscal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'simulate_timeout',
+          sale_id: fiscalSale.id,
+        }),
+      });
+      const data = await res.json();
+      if (data.fiscal_request) {
+        fiscalSale.fiscal_request = data.fiscal_request;
+      }
+      setFiscalSale({ ...fiscalSale });
+      setProviderMessage(data.result?.message || 'Timeout simulado');
+      showNotification('Timeout HKA', data.result?.message || 'Estado marcado como por revisar', 'alert');
+    } catch (err: any) {
+      setProviderMessage(`Error: ${err.message}`);
+    } finally {
+      setFiscalLoading(false);
+    }
   };
 
   // Consultar Estado por Idempotencia
@@ -83,17 +87,31 @@ export function PosView12DocumentPdf() {
     setFiscalLoading(true);
     setProviderMessage(null);
 
-    const res = await hkaProvider.getDocumentStatus(fiscalSale.id, `idemp-hka-${fiscalSale.id}`);
-    if (fiscalSale.fiscal_request) {
-      fiscalSale.fiscal_request.status = res.status;
-      if (res.fiscalInvoiceNumber) fiscalSale.fiscal_request.fiscal_invoice_number = res.fiscalInvoiceNumber;
-      if (res.fiscalControlNumber) fiscalSale.fiscal_request.fiscal_control_number = res.fiscalControlNumber;
+    try {
+      const res = await fetch('/api/t/test1/pos/fiscal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'status',
+          sale_id: fiscalSale.id,
+          idempotency_key: `idemp-hka-${fiscalSale.id}`,
+          numero_documento: fiscalSale.fiscal_request?.fiscal_invoice_number || '1',
+        }),
+      });
+      const data = await res.json();
+      if (fiscalSale.fiscal_request && data.result) {
+        fiscalSale.fiscal_request.status = data.result.status;
+        if (data.result.fiscalInvoiceNumber) fiscalSale.fiscal_request.fiscal_invoice_number = data.result.fiscalInvoiceNumber;
+        if (data.result.fiscalControlNumber) fiscalSale.fiscal_request.fiscal_control_number = data.result.fiscalControlNumber;
+      }
+      setFiscalSale({ ...fiscalSale });
+      setProviderMessage(data.result?.message || 'Estado verificado');
+      showNotification('Consulta de estado HKA', data.result?.message || 'Estado actualizado', 'success');
+    } catch (err: any) {
+      setProviderMessage(`Error: ${err.message}`);
+    } finally {
+      setFiscalLoading(false);
     }
-
-    setFiscalSale({ ...fiscalSale });
-    setProviderMessage(res.message);
-    setFiscalLoading(false);
-    showNotification('Consulta de estado', res.message, 'success');
   };
 
   return (

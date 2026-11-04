@@ -113,6 +113,48 @@ export function PosView06Checkout() {
   const [casheaAmountUsd, setCasheaAmountUsd] = useState<string>(balanceDueUsd.toFixed(2));
   const [casheaMerchantAmountUsd, setCasheaMerchantAmountUsd] = useState<string>((balanceDueUsd * 0.95).toFixed(2));
   const [casheaOpId, setCasheaOpId] = useState(`CSH-${Date.now().toString().slice(-6)}`);
+  const [casheaCustomerDoc, setCasheaCustomerDoc] = useState<string>(selectedCustomer?.document_number || '');
+  const [casheaIntent, setCasheaIntent] = useState<any | null>(null);
+  const [generatingCashea, setGeneratingCashea] = useState(false);
+
+  const handleGenerateCasheaIntent = async () => {
+    const amount = parseFloat(casheaAmountUsd);
+    if (isNaN(amount) || amount < 25) {
+      showNotification('Monto inválido', 'Cashea exige un monto mínimo de $25.00 USD.', 'critical');
+      return;
+    }
+    if (!casheaCustomerDoc.trim()) {
+      showNotification('Cédula requerida', 'Ingrese la cédula del cliente para generar la orden en Cashea.', 'critical');
+      return;
+    }
+
+    setGeneratingCashea(true);
+    try {
+      const res = await fetch('/api/t/test1/pos/cashea', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_intent',
+          amountUsd: amount,
+          customerDocument: casheaCustomerDoc.trim(),
+          saleId: `sale-${Date.now()}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.intent) {
+        setCasheaIntent(data.intent);
+        setCasheaOpId(data.intent.operationId);
+        setCasheaMerchantAmountUsd(data.intent.merchantPayoutUsd.toString());
+        showNotification('Orden Cashea creada', data.message, 'success');
+      } else {
+        showNotification('Error Cashea', data.message || 'No se pudo crear orden', 'critical');
+      }
+    } catch (err: any) {
+      showNotification('Error Cashea', err.message, 'critical');
+    } finally {
+      setGeneratingCashea(false);
+    }
+  };
 
   // Agregar Efectivo
   const handleAddCash = (e: React.FormEvent) => {
@@ -612,43 +654,123 @@ export function PosView06Checkout() {
 
             {/* Panel: Cashea */}
             {activeTab === 'cashea' && (
-              <form onSubmit={handleAddCashea} className="mt-5 space-y-4">
+              <div className="mt-5 space-y-4">
+                {/* Badge de Terminal Oficial */}
+                <div className="flex items-center justify-between rounded-2xl border border-[#FEF3C7] bg-[#FFFBEB] p-3 text-xs">
+                  <div className="flex items-center gap-2">
+                    <CasheaIcon className="h-4 w-4 shrink-0" />
+                    <div>
+                      <span className="font-bold text-[#92400E]">Stunt Riders Av Principal Dalla Costa 1</span>
+                      <p className="text-[10px] text-[#B45309] font-mono">UUID: e9f8cc2a-1458-4f19-bf22-27462a5b6fe4</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full bg-[#10B981] px-2 py-0.5 text-[10px] font-bold text-white">
+                    Caja Activa
+                  </span>
+                </div>
+
+                {parseFloat(casheaAmountUsd) < 25 && (
+                  <div className="rounded-2xl border border-[#FDE68A] bg-[#FEF3C7] p-3 text-xs text-[#92400E]">
+                    ⚠️ El monto mínimo financiable con Cashea es de <strong>$25.00 USD</strong>.
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
-                      ID de operación Cashea
+                      Cédula / Documento del Cliente
                     </label>
                     <input
                       type="text"
                       required
-                      value={casheaOpId}
-                      onChange={(e) => setCasheaOpId(e.target.value)}
+                      placeholder="Ej: 18492041"
+                      value={casheaCustomerDoc}
+                      onChange={(e) => setCasheaCustomerDoc(e.target.value)}
                       className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-bold"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
-                      Monto autorizado Cashea (USD)
+                      Monto a Financiar (USD)
                     </label>
                     <input
                       type="number"
                       step="0.01"
+                      min="25"
                       required
                       value={casheaAmountUsd}
-                      onChange={(e) => setCasheaAmountUsd(e.target.value)}
+                      onChange={(e) => {
+                        setCasheaAmountUsd(e.target.value);
+                        setCasheaMerchantAmountUsd((parseFloat(e.target.value || '0') * 0.95).toFixed(2));
+                      }}
                       className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-bold"
                     />
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  className="w-full rounded-2xl bg-[#1E6B4E] py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-[#16523B]"
-                >
-                  Guardar registro de operación Cashea
-                </button>
-              </form>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={generatingCashea || parseFloat(casheaAmountUsd) < 25 || !casheaCustomerDoc.trim()}
+                    onClick={handleGenerateCasheaIntent}
+                    className="flex-1 rounded-2xl border border-[#111827] bg-[#111827] py-3 text-xs font-bold uppercase tracking-wider text-white hover:bg-[#1E293B] disabled:opacity-40"
+                  >
+                    {generatingCashea ? 'Generando orden...' : '1. Generar Cobro QR Cashea'}
+                  </button>
+                </div>
+
+                {/* Si se generó la intención QR */}
+                {casheaIntent && (
+                  <div className="rounded-2xl border border-[#86EFAC] bg-[#F0FDF4] p-4 text-xs space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-[#14532D]">
+                        Orden generada: {casheaIntent.operationId}
+                      </span>
+                      <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-[10px] font-bold text-[#15803D]">
+                        Escaneo de cliente
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-4 bg-white p-3 rounded-xl border border-[#DCFCE7]">
+                      <div className="h-20 w-20 bg-[#111827] rounded-lg flex flex-col items-center justify-center text-white text-[10px] text-center p-1 shrink-0">
+                        <QrCode className="h-10 w-10 text-[#FFD200]" />
+                        <span>Escaneo App</span>
+                      </div>
+                      <div className="text-[11px] space-y-1">
+                        <p className="text-[#111827] font-semibold">Cliente: {casheaIntent.customerDocument}</p>
+                        <p className="text-[#111827] font-bold">Total financiado: ${casheaIntent.amountUsd.toFixed(2)} USD</p>
+                        <p className="text-[#52635A]">Liquidación a comercio (95%): ${casheaIntent.merchantPayoutUsd.toFixed(2)} USD</p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const amount = parseFloat(casheaAmountUsd);
+                        setAppliedPayments([
+                          ...appliedPayments,
+                          {
+                            method: 'cashea',
+                            currency: 'USD',
+                            amountReceived: amount,
+                            amountApplied: amount,
+                            changeAmount: 0,
+                            casheaOperationId: casheaIntent.operationId,
+                            casheaMerchantAmount: casheaIntent.merchantPayoutUsd,
+                            providerStatus: 'verificado',
+                          },
+                        ]);
+                        setCasheaIntent(null);
+                        showNotification('Pago Cashea Verificado', `Operación ${casheaIntent.operationId} confirmada en mostrador.`, 'success');
+                      }}
+                      className="w-full rounded-xl bg-[#1E6B4E] py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-[#16523B]"
+                    >
+                      2. Confirmar Aprobación del Cliente
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
