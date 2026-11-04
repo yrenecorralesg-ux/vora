@@ -48,6 +48,7 @@ export function PosView0304SaleCart() {
     deleteParkedSale,
     isOnline,
     scanBarcode,
+    isFuncActive,
   } = usePos();
 
   // Filtros de Catálogo
@@ -195,17 +196,19 @@ export function PosView0304SaleCart() {
                 Limpiar
               </button>
             )}
-            <div className="flex items-center border-l border-[#DCE3DF] pl-2 pr-1">
-              <button
-                type="button"
-                onClick={() => setShowBarcodeModal(true)}
-                title="Lector manual o pistola USB"
-                className="flex h-8 items-center gap-1.5 rounded-xl bg-[#F6F5F0] px-2.5 text-xs font-semibold text-[#52635A] hover:bg-[#DCE3DF]"
-              >
-                <ScanLine className="h-4 w-4" />
-                <span className="hidden sm:inline text-[11px]">Escanear</span>
-              </button>
-            </div>
+            {isFuncActive('pos_scanner') && (
+              <div className="flex items-center border-l border-[#DCE3DF] pl-2 pr-1">
+                <button
+                  type="button"
+                  onClick={() => setShowBarcodeModal(true)}
+                  title="Lector manual o pistola USB"
+                  className="flex h-8 items-center gap-1.5 rounded-xl bg-[#F6F5F0] px-2.5 text-xs font-semibold text-[#52635A] hover:bg-[#DCE3DF]"
+                >
+                  <ScanLine className="h-4 w-4" />
+                  <span className="hidden sm:inline text-[11px]">Escanear</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Pastillas de Categorías Redondeadas */}
@@ -298,19 +301,21 @@ export function PosView0304SaleCart() {
                 <div className="flex items-center gap-2">
                   <h3 className="text-lg font-bold text-[#111827]">Venta actual</h3>
                   {/* Botón de Ventas en Espera / Multiticket */}
-                  <button
-                    type="button"
-                    onClick={() => setShowParkedModal(true)}
-                    className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold transition ${
-                      parkedSales.length > 0
-                        ? 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] hover:bg-[#FDE68A]'
-                        : 'bg-[#F6F5F0] text-[#52635A] hover:bg-[#DCE3DF]'
-                    }`}
-                    title="Ventas pausadas en espera"
-                  >
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>En Espera ({parkedSales.length})</span>
-                  </button>
+                  {isFuncActive('pos_multiticket') && (
+                    <button
+                      type="button"
+                      onClick={() => setShowParkedModal(true)}
+                      className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                        parkedSales.length > 0
+                          ? 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] hover:bg-[#FDE68A]'
+                          : 'bg-[#F6F5F0] text-[#52635A] hover:bg-[#DCE3DF]'
+                      }`}
+                      title="Ventas pausadas en espera"
+                    >
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>En Espera ({parkedSales.length})</span>
+                    </button>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -502,16 +507,18 @@ export function PosView0304SaleCart() {
                   Limpiar
                 </button>
 
-                <button
-                  type="button"
-                  disabled={cart.length === 0}
-                  onClick={() => parkCurrentSale()}
-                  className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-3 py-3 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
-                  title="Pausar esta venta para atender a otro cliente (Multiticket)"
-                >
-                  <PauseCircle className="h-4 w-4 text-[#52635A]" />
-                  <span>Pausar</span>
-                </button>
+                {isFuncActive('pos_multiticket') && (
+                  <button
+                    type="button"
+                    disabled={cart.length === 0}
+                    onClick={() => parkCurrentSale()}
+                    className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-3 py-3 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                    title="Pausar esta venta para atender a otro cliente (Multiticket)"
+                  >
+                    <PauseCircle className="h-4 w-4 text-[#52635A]" />
+                    <span>Pausar</span>
+                  </button>
+                )}
 
                 <button
                   type="button"

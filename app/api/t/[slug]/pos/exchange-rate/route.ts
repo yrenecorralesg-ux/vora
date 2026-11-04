@@ -153,3 +153,4 @@ export async function POST(
     return NextResponse.json({ ok: false, error: err.message || 'Error en servidor' }, { status: 500 });
   }
 }
+

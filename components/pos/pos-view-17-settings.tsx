@@ -17,6 +17,7 @@ export function PosView17Settings() {
     exchangeRate,
     refreshExchangeRate,
     isFetchingExchangeRate,
+    isFuncActive,
   } = usePos();
 
   const [maxDiscount, setMaxDiscount] = useState<number>(settings.max_cashier_discount_percent);
@@ -158,95 +159,110 @@ export function PosView17Settings() {
             </div>
 
             {/* Bloque Integración Tasa BCV & APIs */}
-            <div className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0]/60 p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Globe className="h-4 w-4 text-[#1E6B4E]" />
-                  <span className="text-xs font-bold text-[#111827]">
-                    Tasa Oficial BCV e Integración con APIs
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleSyncExchangeRate}
-                  disabled={isFetchingExchangeRate}
-                  className="flex items-center gap-1.5 rounded-xl bg-[#1E6B4E] px-3 py-1.5 text-[11px] font-bold text-white shadow-2xs hover:bg-[#144D37] transition disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-3 w-3 ${isFetchingExchangeRate ? 'animate-spin' : ''}`} />
-                  <span>{isFetchingExchangeRate ? 'Sincronizando...' : 'Sincronizar tasa BCV ahora'}</span>
-                </button>
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-bold text-[#111827]">
-                  URL de API cambiaria (REST JSON)
-                </label>
-                <input
-                  type="url"
-                  value={exchangeRateApiUrl}
-                  onChange={(e) => setExchangeRateApiUrl(e.target.value)}
-                  placeholder="https://ve.dolarapi.com/v1/dolares/oficial"
-                  className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
-                />
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {isFuncActive('pos_exchange_rate_api') ? (
+              <div className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0]/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe className="h-4 w-4 text-[#1E6B4E]" />
+                    <span className="text-xs font-bold text-[#111827]">
+                      Tasa Oficial BCV e Integración con APIs
+                    </span>
+                  </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setExchangeRateApiUrl('https://ve.dolarapi.com/v1/dolares/oficial');
-                    }}
-                    className="rounded-lg border border-[#DCE3DF] bg-white px-2 py-0.5 text-[10px] font-medium text-[#52635A] hover:bg-[#DCE3DF]"
+                    onClick={handleSyncExchangeRate}
+                    disabled={isFetchingExchangeRate}
+                    className="flex items-center gap-1.5 rounded-xl bg-[#1E6B4E] px-3 py-1.5 text-[11px] font-bold text-white shadow-2xs hover:bg-[#144D37] transition disabled:opacity-50"
                   >
-                    Preset: DolarApi Oficial (BCV)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setExchangeRateApiUrl('https://ve.dolarapi.com/v1/dolares/paralelo');
-                    }}
-                    className="rounded-lg border border-[#DCE3DF] bg-white px-2 py-0.5 text-[10px] font-medium text-[#52635A] hover:bg-[#DCE3DF]"
-                  >
-                    Preset: DolarApi Paralelo
+                    <RefreshCw className={`h-3 w-3 ${isFetchingExchangeRate ? 'animate-spin' : ''}`} />
+                    <span>{isFetchingExchangeRate ? 'Sincronizando...' : 'Sincronizar tasa BCV ahora'}</span>
                   </button>
                 </div>
-              </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                   <label className="block text-[11px] font-bold text-[#111827]">
-                    Tasa de cambio activa (VES/USD)
+                    URL de API cambiaria (REST JSON)
                   </label>
                   <input
-                    type="number"
-                    step="0.0001"
-                    value={exchangeRateInput}
-                    onChange={(e) => setExchangeRateInput(e.target.value)}
-                    className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-black text-[#111827]"
+                    type="url"
+                    value={exchangeRateApiUrl}
+                    onChange={(e) => setExchangeRateApiUrl(e.target.value)}
+                    placeholder="https://ve.dolarapi.com/v1/dolares/oficial"
+                    className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
                   />
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExchangeRateApiUrl('https://ve.dolarapi.com/v1/dolares/oficial');
+                      }}
+                      className="rounded-lg border border-[#DCE3DF] bg-white px-2 py-0.5 text-[10px] font-medium text-[#52635A] hover:bg-[#DCE3DF]"
+                    >
+                      Preset: DolarApi Oficial (BCV)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExchangeRateApiUrl('https://ve.dolarapi.com/v1/dolares/paralelo');
+                      }}
+                      className="rounded-lg border border-[#DCE3DF] bg-white px-2 py-0.5 text-[10px] font-medium text-[#52635A] hover:bg-[#DCE3DF]"
+                    >
+                      Preset: DolarApi Paralelo
+                    </button>
+                  </div>
                 </div>
-                <div className="flex flex-col justify-end">
-                  <label className="flex items-center gap-2 rounded-2xl border border-[#DCE3DF] bg-white p-2.5 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoFetchRate}
-                      onChange={(e) => setAutoFetchRate(e.target.checked)}
-                      className="accent-[#1E6B4E]"
-                    />
-                    <span className="text-[11px] font-bold text-[#111827]">
-                      Actualizar tasa BCV automáticamente
-                    </span>
-                  </label>
-                </div>
-              </div>
 
-              {settings.last_exchange_rate_fetch && (
-                <div className="flex items-center gap-2 text-[10px] text-[#52635A]">
-                  <CheckCircle2 className="h-3 w-3 text-[#1E6B4E]" />
-                  <span>
-                    Última sincronización: {new Date(settings.last_exchange_rate_fetch).toLocaleString('es-VE')} ({settings.exchange_rate_source || 'dolarapi'})
-                  </span>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#111827]">
+                      Tasa de cambio activa (VES/USD)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.0001"
+                      value={exchangeRateInput}
+                      onChange={(e) => setExchangeRateInput(e.target.value)}
+                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-black text-[#111827]"
+                    />
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <label className="flex items-center gap-2 rounded-2xl border border-[#DCE3DF] bg-white p-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={autoFetchRate}
+                        onChange={(e) => setAutoFetchRate(e.target.checked)}
+                        className="accent-[#1E6B4E]"
+                      />
+                      <span className="text-[11px] font-bold text-[#111827]">
+                        Actualizar tasa BCV automáticamente
+                      </span>
+                    </label>
+                  </div>
                 </div>
-              )}
-            </div>
+
+                {settings.last_exchange_rate_fetch && (
+                  <div className="flex items-center gap-2 text-[10px] text-[#52635A]">
+                    <CheckCircle2 className="h-3 w-3 text-[#1E6B4E]" />
+                    <span>
+                      Última sincronización: {new Date(settings.last_exchange_rate_fetch).toLocaleString('es-VE')} ({settings.exchange_rate_source || 'dolarapi'})
+                    </span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div>
+                <label className="block text-xs font-bold text-[#111827]">
+                  Tasa de cambio activa oficial (VES/USD)
+                </label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={exchangeRateInput}
+                  onChange={(e) => setExchangeRateInput(e.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-bold text-[#111827]"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-xs font-bold text-[#111827]">
@@ -265,7 +281,9 @@ export function PosView17Settings() {
                 Métodos de cobro habilitados en mostrador
               </label>
               <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                {(['efectivo', 'pago_movil', 'tarjeta', 'cashea'] as PosPaymentMethod[]).map((m) => (
+                {(['efectivo', 'pago_movil', 'tarjeta', 'cashea'] as PosPaymentMethod[])
+                  .filter((m) => m !== 'cashea' || isFuncActive('pos_cashea'))
+                  .map((m) => (
                   <label key={m} className="flex items-center gap-2 rounded-2xl border border-[#E5E9E7] bg-[#F6F5F0] p-3 cursor-pointer">
                     <input
                       type="checkbox"

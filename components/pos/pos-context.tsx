@@ -122,6 +122,12 @@ interface PosContextType {
   refreshExchangeRate: (customUrl?: string) => Promise<{ ok: boolean; rate?: number; error?: string }>;
   isFetchingExchangeRate: boolean;
 
+  // Feature Flags from Gestor / Admin Panel
+  isModuleEnabled: boolean;
+  posFeatures: Record<string, boolean>;
+  isFuncActive: (funcKey: string) => boolean;
+  reloadTenantFeatures: () => Promise<void>;
+
   // Notification Toast Message (Pure Typography)
   notification: { title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null;
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
@@ -162,6 +168,54 @@ export function PosProvider({
   // Tasa de cambio BCV / API
   const [exchangeRate, setExchangeRate] = useState<number>(posStore.settings.active_exchange_rate);
   const [isFetchingExchangeRate, setIsFetchingExchangeRate] = useState<boolean>(false);
+
+  // Modularidad & Feature Flags configurables desde el Gestor VORA
+  const [isModuleEnabled, setIsModuleEnabled] = useState<boolean>(true);
+  const [posFeatures, setPosFeatures] = useState<Record<string, boolean>>({
+    pos_sales: true,
+    pos_shifts: true,
+    pos_payments: true,
+    pos_cashea: true,
+    pos_fiscal: true,
+    pos_fiscal_reports: true,
+    pos_c2p_debit: true,
+    pos_multiticket: true,
+    pos_scanner: true,
+    pos_thermal_print: true,
+    pos_blind_reconciliation: true,
+    pos_exchange_rate_api: true,
+    pos_returns: true,
+    pos_authorizations: true,
+    pos_documents: true,
+    pos_kardex: true,
+    pos_settings: true,
+    pos_reports: true,
+  });
+
+  const isFuncActive = (funcKey: string): boolean => {
+    if (!isModuleEnabled) return false;
+    if (posFeatures[funcKey] === undefined) return true;
+    return Boolean(posFeatures[funcKey]);
+  };
+
+  const reloadTenantFeatures = async () => {
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/features`, { cache: 'no-store' });
+      const data = await res.json();
+      if (data.ok) {
+        setIsModuleEnabled(Boolean(data.is_module_enabled));
+        if (data.functions) {
+          setPosFeatures(data.functions);
+        }
+      }
+    } catch {
+      // Mantener configuración local segura
+    }
+  };
+
+  useEffect(() => {
+    reloadTenantFeatures();
+  }, [activeTenantSlug]);
 
   const activeBranch = posStore.branches.find((b) => b.id === activeBranchId) ?? posStore.branches[0];
   const activeUser = MOCK_USERS.find((u) => u.id === activeUserId) ?? MOCK_USERS[0];
@@ -367,6 +421,10 @@ export function PosProvider({
 
   // Multiticket / Ventas en espera
   const parkCurrentSale = (note?: string) => {
+    if (!isFuncActive('pos_multiticket')) {
+      showNotification('Ventas en espera deshabilitadas', 'La funcionalidad de multiticket está inhabilitada en el Gestor de VORA.', 'alert');
+      return;
+    }
     if (cart.length === 0) {
       showNotification('Carrito vacío', 'Agregue al menos un producto para pausar la venta.', 'alert');
       return;
@@ -424,6 +482,10 @@ export function PosProvider({
 
   // Escaneo rápido de código de barras
   const scanBarcode = (code: string): boolean => {
+    if (!isFuncActive('pos_scanner')) {
+      showNotification('Lector deshabilitado', 'El lector de código de barras está inhabilitado en el Gestor de VORA.', 'alert');
+      return false;
+    }
     const clean = code.trim().toLowerCase();
     const product = posStore.products.find(
       (p) =>
@@ -448,6 +510,7 @@ export function PosProvider({
     let lastKeyTime = Date.now();
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isFuncActive('pos_scanner')) return;
       const target = e.target as HTMLElement;
       const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
 
@@ -557,6 +620,10 @@ export function PosProvider({
         isOnline,
         offlineQueueCount,
         scanBarcode,
+        isModuleEnabled,
+        posFeatures,
+        isFuncActive,
+        reloadTenantFeatures,
       }}
     >
       {children}

@@ -17,7 +17,7 @@ import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
 
 export function PosView15ShiftClosure() {
-  const { activeShift, activeBranch, activeUser, refreshActiveShift, showNotification, navigateTo } = usePos();
+  const { activeShift, activeBranch, activeUser, refreshActiveShift, showNotification, navigateTo, isFuncActive } = usePos();
 
   // Movimiento Manual
   const [movType, setMovType] = useState<'ingreso_efectivo' | 'retiro_efectivo' | 'ajuste_caja' | 'cambio_saldo_inicial'>('ingreso_efectivo');
@@ -26,7 +26,7 @@ export function PosView15ShiftClosure() {
   const [movReason, setMovReason] = useState<string>('Dotación de cambio para caja [mock]');
 
   // Cierre y Arqueo Ciego
-  const [isBlindMode, setIsBlindMode] = useState<boolean>(true);
+  const [isBlindMode, setIsBlindMode] = useState<boolean>(isFuncActive('pos_blind_reconciliation'));
   const [revealed, setRevealed] = useState<boolean>(false);
   const [declaredUsd, setDeclaredUsd] = useState<string>('110.00');
   const [declaredVes, setDeclaredVes] = useState<string>('1230.00');
@@ -162,17 +162,19 @@ export function PosView15ShiftClosure() {
               <Printer className="h-4 w-4 text-[#52635A]" />
               <span>Corte X (Parcial)</span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setReportType('Z');
-                setShowReportModal(true);
-              }}
-              className="flex items-center gap-1.5 rounded-2xl border border-[#1E6B4E] bg-[#DCFCE7] px-3.5 py-2 text-xs font-bold text-[#14532D] hover:bg-[#BBF7D0]"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              <span>Corte Z (Fiscal)</span>
-            </button>
+            {isFuncActive('pos_fiscal_reports') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setReportType('Z');
+                  setShowReportModal(true);
+                }}
+                className="flex items-center gap-1.5 rounded-2xl border border-[#1E6B4E] bg-[#DCFCE7] px-3.5 py-2 text-xs font-bold text-[#14532D] hover:bg-[#BBF7D0]"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                <span>Corte Z (Fiscal)</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => navigateTo('POS-13')}

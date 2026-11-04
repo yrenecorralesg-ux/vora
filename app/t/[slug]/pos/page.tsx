@@ -19,7 +19,36 @@ import { PosView17Settings } from '@/components/pos/pos-view-17-settings';
 import { PosView18FiscalConfig } from '@/components/pos/pos-view-18-fiscal-config';
 
 function PosModuleContent() {
-  const { currentView } = usePos();
+  const { currentView, isModuleEnabled, isFuncActive, activeTenantSlug } = usePos();
+
+  if (!isModuleEnabled) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#F6F5F0] p-6 text-[#111827]">
+        <div className="max-w-md rounded-3xl border border-[#DCE3DF] bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#C83E3B]/10 text-[#C83E3B]">
+            <svg className="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="3" width="20" height="14" rx="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+          </div>
+          <h1 className="text-xl font-bold">Módulo POS Inhabilitado</h1>
+          <p className="mt-2 text-xs text-[#52635A] leading-relaxed">
+            El módulo de Punto de Venta (POS) se encuentra inactivo para esta empresa.
+            Puedes activarlo o personalizar sus funcionalidades individuales desde el panel del Gestor de VORA.
+          </p>
+          <div className="mt-6 flex flex-col gap-2">
+            <a
+              href={`/t/${activeTenantSlug}`}
+              className="inline-flex h-10 items-center justify-center rounded-2xl bg-[#144D37] px-6 text-xs font-bold text-white transition hover:bg-[#1E6B4E]"
+            >
+              Volver al CRM
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F6F5F0] text-[#111827] print:block print:bg-white">
@@ -50,7 +79,7 @@ function PosModuleContent() {
             {currentView === 'POS-15' && <PosView15ShiftClosure />}
             {currentView === 'POS-16' && <PosView16Reports />}
             {currentView === 'POS-17' && <PosView17Settings />}
-            {currentView === 'POS-18' && <PosView18FiscalConfig />}
+            {currentView === 'POS-18' && (isFuncActive('pos_fiscal') ? <PosView18FiscalConfig /> : <PosView17Settings />)}
           </div>
         </main>
       </div>

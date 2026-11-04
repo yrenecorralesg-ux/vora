@@ -6,7 +6,7 @@ import { usePos } from './pos-context';
 import { posStore, hkaProvider } from '@/lib/pos-service';
 
 export function PosView12DocumentPdf() {
-  const { lastConfirmedSale, activeBranch, showNotification, navigateTo } = usePos();
+  const { lastConfirmedSale, activeBranch, showNotification, navigateTo, isFuncActive } = usePos();
   const [fiscalSale, setFiscalSale] = useState(lastConfirmedSale ?? posStore.sales[0]);
   const [fiscalLoading, setFiscalLoading] = useState(false);
   const [providerMessage, setProviderMessage] = useState<string | null>(null);
@@ -149,17 +149,19 @@ export function PosView12DocumentPdf() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setThermalFormat(!thermalFormat)}
-              className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${
-                thermalFormat
-                  ? 'border-[#1E6B4E] bg-[#DCFCE7] text-[#14532D]'
-                  : 'border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
-              }`}
-            >
-              {thermalFormat ? 'Formato: Ticket Térmico 80mm' : 'Cambiar a Ticket Térmico 80mm'}
-            </button>
+            {isFuncActive('pos_thermal_print') && (
+              <button
+                type="button"
+                onClick={() => setThermalFormat(!thermalFormat)}
+                className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${
+                  thermalFormat
+                    ? 'border-[#1E6B4E] bg-[#DCFCE7] text-[#14532D]'
+                    : 'border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
+                }`}
+              >
+                {thermalFormat ? 'Formato: Ticket Térmico 80mm' : 'Cambiar a Ticket Térmico 80mm'}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => window.print()}
@@ -294,6 +296,16 @@ export function PosView12DocumentPdf() {
 
         {/* ADAPTADOR THE FACTORY HKA (5 cols) (Oculto al imprimir recibo) */}
         <div className="space-y-4 lg:col-span-5 print:hidden">
+          {!isFuncActive('pos_fiscal') ? (
+            <div className="rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-sm">
+              <h2 className="text-base font-bold text-[#111827]">
+                Facturación Fiscal Desactivada
+              </h2>
+              <p className="mt-2 text-xs text-[#52635A] leading-relaxed">
+                La emisión fiscal digital The Factory HKA se encuentra inhabilitada para esta empresa en el Gestor de VORA. Los comprobantes se emiten como documentos internos válidos para control de inventario y caja.
+              </p>
+            </div>
+          ) : (
           <div className="rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-sm">
             <h2 className="text-base font-bold text-[#111827]">
               Integración Fiscal HKA
@@ -374,6 +386,7 @@ export function PosView12DocumentPdf() {
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

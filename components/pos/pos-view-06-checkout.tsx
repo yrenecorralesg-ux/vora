@@ -48,6 +48,7 @@ export function PosView06Checkout() {
     clearCart,
     setLastConfirmedSale,
     showNotification,
+    isFuncActive,
   } = usePos();
 
   // Pagos aplicados a esta operación
@@ -472,18 +473,20 @@ export function PosView06Checkout() {
                 <CreditCard className="h-4 w-4" />
                 <span>Tarjeta</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('cashea')}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 font-bold transition ${
-                  activeTab === 'cashea'
-                    ? 'bg-[#1E6B4E] text-white shadow-xs'
-                    : 'bg-[#F6F5F0] text-[#52635A] hover:bg-[#DCE3DF]'
-                }`}
-              >
-                <CasheaIcon className="h-4 w-4 shrink-0" />
-                <span>Cashea</span>
-              </button>
+              {isFuncActive('pos_cashea') && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('cashea')}
+                  className={`flex items-center gap-2 rounded-full px-4 py-2 font-bold transition ${
+                    activeTab === 'cashea'
+                      ? 'bg-[#1E6B4E] text-white shadow-xs'
+                      : 'bg-[#F6F5F0] text-[#52635A] hover:bg-[#DCE3DF]'
+                  }`}
+                >
+                  <CasheaIcon className="h-4 w-4 shrink-0" />
+                  <span>Cashea</span>
+                </button>
+              )}
             </div>
 
             {/* Panel: Efectivo */}

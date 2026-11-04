@@ -13,6 +13,7 @@ export function PosHeader() {
     exchangeRate,
     refreshExchangeRate,
     isFetchingExchangeRate,
+    isFuncActive,
   } = usePos();
 
   if (currentView === 'POS-01' && !notification) {
@@ -67,15 +68,17 @@ export function PosHeader() {
                   Bs. {exchangeRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / $
                 </span>
               </span>
-              <button
-                type="button"
-                onClick={() => refreshExchangeRate()}
-                disabled={isFetchingExchangeRate}
-                title="Sincronizar tasa BCV ahora con la API configurada"
-                className="rounded-xl border border-[#DCE3DF] bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#52635A] hover:bg-[#F6F5F0] hover:text-[#111827] transition disabled:opacity-50"
-              >
-                {isFetchingExchangeRate ? '...' : 'Sync'}
-              </button>
+              {isFuncActive('pos_exchange_rate_api') && (
+                <button
+                  type="button"
+                  onClick={() => refreshExchangeRate()}
+                  disabled={isFetchingExchangeRate}
+                  title="Sincronizar tasa BCV ahora con la API configurada"
+                  className="rounded-xl border border-[#DCE3DF] bg-white px-2.5 py-1 text-[10px] font-bold uppercase text-[#52635A] hover:bg-[#F6F5F0] hover:text-[#111827] transition disabled:opacity-50"
+                >
+                  {isFetchingExchangeRate ? '...' : 'Sync'}
+                </button>
+              )}
             </div>
           </div>
         )}

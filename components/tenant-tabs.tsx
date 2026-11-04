@@ -1276,9 +1276,46 @@ function ModulosTab({
               {/* Sub-functions accordion */}
               {isExpanded && funcs.length > 0 && (
                 <div className="mt-3.5 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5 space-y-2.5">
-                  <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Funciones disponibles en {f.feature_name}
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Funciones disponibles en {f.feature_name}
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFeaturesList((prev) =>
+                            prev.map((item) => {
+                              if (item.feature_key !== f.feature_key) return item;
+                              const updated = { ...(item.config?.functions ?? {}) };
+                              funcs.forEach((fn) => { updated[fn.key] = true; });
+                              return { ...item, config: { ...item.config, functions: updated } };
+                            }),
+                          );
+                        }}
+                        className="text-[10px] font-semibold text-emerald-700 hover:underline"
+                      >
+                        Activar todas
+                      </button>
+                      <span className="text-slate-300 text-xs">|</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFeaturesList((prev) =>
+                            prev.map((item) => {
+                              if (item.feature_key !== f.feature_key) return item;
+                              const updated = { ...(item.config?.functions ?? {}) };
+                              funcs.forEach((fn) => { updated[fn.key] = false; });
+                              return { ...item, config: { ...item.config, functions: updated } };
+                            }),
+                          );
+                        }}
+                        className="text-[10px] font-semibold text-slate-500 hover:underline"
+                      >
+                        Desactivar todas
+                      </button>
+                    </div>
+                  </div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {funcs.map((fn) => {
                       const isFuncActive = f.config?.functions?.[fn.key] ?? fn.defaultEnabled;

@@ -24,6 +24,7 @@ export function PosSidebar() {
     activeUser,
     currentView,
     navigateTo,
+    isFuncActive,
   } = usePos();
 
   const handleLogout = async () => {
@@ -81,20 +82,28 @@ export function PosSidebar() {
       isActive: currentView === 'POS-05',
       onClick: () => navigateTo('POS-05'),
     },
-    {
-      id: 'reports',
-      label: 'Reportes',
-      icon: BarChart2,
-      isActive: currentView === 'POS-16',
-      onClick: () => navigateTo('POS-16'),
-    },
-    {
-      id: 'settings',
-      label: 'Configuración',
-      icon: Settings,
-      isActive: currentView === 'POS-17' || currentView === 'POS-18',
-      onClick: () => navigateTo('POS-17'),
-    },
+    ...(isFuncActive('pos_reports')
+      ? [
+          {
+            id: 'reports',
+            label: 'Reportes',
+            icon: BarChart2,
+            isActive: currentView === 'POS-16',
+            onClick: () => navigateTo('POS-16'),
+          },
+        ]
+      : []),
+    ...(isFuncActive('pos_settings')
+      ? [
+          {
+            id: 'settings',
+            label: 'Configuración',
+            icon: Settings,
+            isActive: currentView === 'POS-17' || currentView === 'POS-18',
+            onClick: () => navigateTo('POS-17'),
+          },
+        ]
+      : []),
   ];
 
   return (
