@@ -12,6 +12,12 @@ import {
   Trash2,
   ArrowRight,
   ShieldAlert,
+  Clock,
+  Wifi,
+  WifiOff,
+  PauseCircle,
+  PlayCircle,
+  X,
 } from 'lucide-react';
 import { usePos } from './pos-context';
 import type { PosProduct } from '@/lib/types';
@@ -36,15 +42,24 @@ export function PosView0304SaleCart() {
     navigateTo,
     showNotification,
     activeShift,
+    parkedSales,
+    parkCurrentSale,
+    resumeParkedSale,
+    deleteParkedSale,
+    isOnline,
+    scanBarcode,
   } = usePos();
 
   // Filtros de Catálogo
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todas las categorías');
 
-  // Modal de Nota Comercial
+  // Modales
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [noteInput, setNoteInput] = useState(cartNotes);
+  const [showParkedModal, setShowParkedModal] = useState(false);
+  const [showBarcodeModal, setShowBarcodeModal] = useState(false);
+  const [barcodeInput, setBarcodeInput] = useState('');
 
   // Modal de Autorización de Descuento
   const [showSupervisorModal, setShowSupervisorModal] = useState(false);
@@ -144,7 +159,23 @@ export function PosView0304SaleCart() {
       {/* Disposición en Dos Columnas: Catálogo (Izquierda ~60%) y Carrito (Derecha ~40%) */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Columna Izquierda: Buscador, Categorías y Grilla de Productos */}
-        <div className="space-y-5 lg:col-span-7">
+        <div className="space-y-4 lg:col-span-7">
+          {/* Barra de Estado: Conectividad y Lector USB */}
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                isOnline ? 'bg-[#DCFCE7] text-[#15803D]' : 'bg-[#FEF3C7] text-[#92400E]'
+              }`}>
+                {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
+                {isOnline ? 'Online (Sincronizado)' : 'Offline (Contingencia)'}
+              </span>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-[#52635A]">
+                <ScanLine className="h-3 w-3 text-[#1E6B4E]" />
+                Lector USB activo (escucha automática)
+              </span>
+            </div>
+          </div>
+
           {/* Buscador de Alto Contraste con Bordes Redondeados */}
           <div className="flex items-center gap-2 rounded-2xl border border-[#DCE3DF] bg-white p-2 shadow-xs transition focus-within:border-[#1E6B4E]">
             <Search className="ml-2 h-5 w-5 text-[#52635A]" />
@@ -167,10 +198,12 @@ export function PosView0304SaleCart() {
             <div className="flex items-center border-l border-[#DCE3DF] pl-2 pr-1">
               <button
                 type="button"
-                title="Lector de código de barras"
-                className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#F6F5F0] text-[#52635A] hover:bg-[#DCE3DF]"
+                onClick={() => setShowBarcodeModal(true)}
+                title="Lector manual o pistola USB"
+                className="flex h-8 items-center gap-1.5 rounded-xl bg-[#F6F5F0] px-2.5 text-xs font-semibold text-[#52635A] hover:bg-[#DCE3DF]"
               >
                 <ScanLine className="h-4 w-4" />
+                <span className="hidden sm:inline text-[11px]">Escanear</span>
               </button>
             </div>
           </div>
@@ -233,8 +266,20 @@ export function PosView0304SaleCart() {
                       ${p.price_usd.toFixed(2)}
                     </span>
                     {!p.is_service && (
-                      <span className="text-[10px] text-[#52635A]">
-                        Disp: {p.stock_quantity}
+                      <span
+                        className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                          p.stock_quantity <= 0
+                            ? 'bg-[#FEF2F2] text-[#B91C1C]'
+                            : p.stock_quantity <= 3
+                            ? 'bg-[#FEF3C7] text-[#92400E]'
+                            : 'text-[#52635A]'
+                        }`}
+                      >
+                        {p.stock_quantity <= 0
+                          ? 'Agotado'
+                          : p.stock_quantity <= 3
+                          ? `Bajo: ${p.stock_quantity} u.`
+                          : `Disp: ${p.stock_quantity}`}
                       </span>
                     )}
                   </div>
@@ -250,7 +295,24 @@ export function PosView0304SaleCart() {
             <div>
               {/* Cabecera del Carrito */}
               <div className="flex items-center justify-between pb-4 border-b border-[#E5E9E7]">
-                <h3 className="text-lg font-bold text-[#111827]">Venta actual</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-lg font-bold text-[#111827]">Venta actual</h3>
+                  {/* Botón de Ventas en Espera / Multiticket */}
+                  <button
+                    type="button"
+                    onClick={() => setShowParkedModal(true)}
+                    className={`flex items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-bold transition ${
+                      parkedSales.length > 0
+                        ? 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A] hover:bg-[#FDE68A]'
+                        : 'bg-[#F6F5F0] text-[#52635A] hover:bg-[#DCE3DF]'
+                    }`}
+                    title="Ventas pausadas en espera"
+                  >
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>En Espera ({parkedSales.length})</span>
+                  </button>
+                </div>
+
                 <div className="flex items-center gap-2">
                   {/* Botón Selector de Cliente */}
                   <button
@@ -430,14 +492,25 @@ export function PosView0304SaleCart() {
               </div>
 
               {/* Botones de Acción */}
-              <div className="mt-4 flex items-center gap-3">
+              <div className="mt-4 flex items-center gap-2">
                 <button
                   type="button"
                   disabled={cart.length === 0}
                   onClick={clearCart}
-                  className="rounded-2xl border border-[#DCE3DF] bg-white px-4 py-3 text-xs font-bold text-[#B91C1C] hover:bg-[#FEF2F2] transition disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="rounded-2xl border border-[#DCE3DF] bg-white px-3 py-3 text-xs font-bold text-[#B91C1C] hover:bg-[#FEF2F2] transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  Limpiar venta
+                  Limpiar
+                </button>
+
+                <button
+                  type="button"
+                  disabled={cart.length === 0}
+                  onClick={() => parkCurrentSale()}
+                  className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-3 py-3 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  title="Pausar esta venta para atender a otro cliente (Multiticket)"
+                >
+                  <PauseCircle className="h-4 w-4 text-[#52635A]" />
+                  <span>Pausar</span>
                 </button>
 
                 <button
@@ -572,6 +645,163 @@ export function PosView0304SaleCart() {
                 Autorizar descuento
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Multiticket / Ventas en Espera */}
+      {showParkedModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E5E9E7]">
+              <div className="flex items-center gap-2">
+                <Clock className="h-5 w-5 text-[#1E6B4E]" />
+                <h3 className="text-base font-bold text-[#111827]">
+                  Ventas en Espera ({parkedSales.length})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowParkedModal(false)}
+                className="p-1 text-[#52635A] hover:text-[#111827]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="mt-2 text-xs text-[#52635A]">
+              Tickets suspendidos en mostrador. Seleccione uno para reanudar el cobro.
+            </p>
+
+            <div className="mt-4 max-h-80 space-y-3 overflow-y-auto pr-1">
+              {parkedSales.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-[#DCE3DF] p-6 text-center text-xs text-[#52635A]">
+                  No hay ventas pausadas en este momento.
+                </div>
+              ) : (
+                parkedSales.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center justify-between rounded-2xl border border-[#E5E9E7] bg-[#FDFDFD] p-4 text-xs transition hover:border-[#1E6B4E]"
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[#111827]">
+                          {p.customer ? p.customer.legal_name : 'Consumidor Final'}
+                        </span>
+                        <span className="rounded-full bg-[#F6F5F0] px-2 py-0.5 text-[10px] font-mono text-[#52635A]">
+                          #{p.id.slice(-4)}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[#52635A]">
+                        {p.cart.length} {p.cart.length === 1 ? 'producto' : 'productos'} · {new Date(p.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {p.notes && (
+                        <p className="text-[10px] italic text-[#1E6B4E]">“{p.notes}”</p>
+                      )}
+                      <div className="font-extrabold text-[#111827] text-sm">
+                        ${p.totalUsd.toFixed(2)} USD
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => deleteParkedSale(p.id)}
+                        className="rounded-xl border border-[#DCE3DF] p-2 text-[#B91C1C] hover:bg-[#FEF2F2]"
+                        title="Descartar ticket"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resumeParkedSale(p.id);
+                          setShowParkedModal(false);
+                        }}
+                        className="flex items-center gap-1.5 rounded-xl bg-[#1E6B4E] px-3.5 py-2 font-bold text-white hover:bg-[#16523B]"
+                      >
+                        <PlayCircle className="h-4 w-4" />
+                        <span>Reanudar</span>
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowParkedModal(false)}
+                className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-4 py-2 text-xs font-bold text-[#111827]"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Escáner Manual de Código de Barras */}
+      {showBarcodeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-[#E5E9E7]">
+              <div className="flex items-center gap-2">
+                <ScanLine className="h-5 w-5 text-[#1E6B4E]" />
+                <h3 className="text-base font-bold text-[#111827]">Lector de Código</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBarcodeModal(false)}
+                className="p-1 text-[#52635A] hover:text-[#111827]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#52635A]">
+              Ingrese el código SKU o código de barras para agregarlo inmediatamente al carrito:
+            </p>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!barcodeInput.trim()) return;
+                const ok = scanBarcode(barcodeInput.trim());
+                if (ok) {
+                  setBarcodeInput('');
+                  setShowBarcodeModal(false);
+                }
+              }}
+              className="space-y-3"
+            >
+              <input
+                type="text"
+                autoFocus
+                value={barcodeInput}
+                onChange={(e) => setBarcodeInput(e.target.value)}
+                placeholder="Ej: CMB-001 o 7591234..."
+                className="w-full rounded-2xl border border-[#DCE3DF] p-3 text-sm font-bold text-[#111827] outline-none focus:border-[#1E6B4E]"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBarcodeModal(false)}
+                  className="flex-1 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] py-2.5 text-xs font-bold text-[#111827]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 rounded-2xl bg-[#1E6B4E] py-2.5 text-xs font-bold text-white hover:bg-[#16523B]"
+                >
+                  Buscar y Agregar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

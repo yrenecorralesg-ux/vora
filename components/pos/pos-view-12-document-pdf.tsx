@@ -10,6 +10,7 @@ export function PosView12DocumentPdf() {
   const [fiscalSale, setFiscalSale] = useState(lastConfirmedSale ?? posStore.sales[0]);
   const [fiscalLoading, setFiscalLoading] = useState(false);
   const [providerMessage, setProviderMessage] = useState<string | null>(null);
+  const [thermalFormat, setThermalFormat] = useState(false);
 
   if (!fiscalSale) {
     return (
@@ -150,6 +151,17 @@ export function PosView12DocumentPdf() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setThermalFormat(!thermalFormat)}
+              className={`rounded-2xl border px-3 py-2 text-xs font-bold transition ${
+                thermalFormat
+                  ? 'border-[#1E6B4E] bg-[#DCFCE7] text-[#14532D]'
+                  : 'border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
+              }`}
+            >
+              {thermalFormat ? 'Formato: Ticket Térmico 80mm' : 'Cambiar a Ticket Térmico 80mm'}
+            </button>
+            <button
+              type="button"
               onClick={() => window.print()}
               className="flex items-center gap-1.5 rounded-2xl border border-[#DCE3DF] bg-white px-4 py-2 text-xs font-bold text-[#111827] shadow-xs hover:bg-[#F6F5F0]"
             >
@@ -169,7 +181,9 @@ export function PosView12DocumentPdf() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 print:block print:w-full print:m-0">
         {/* DOCUMENTO PDF / COMPROBANTE INTERNO (7 cols) */}
-        <div className="lg:col-span-7 print:w-full print:max-w-2xl print:mx-auto print:p-0">
+        <div className={`lg:col-span-7 print:w-full print:mx-auto print:p-0 ${
+          thermalFormat ? 'max-w-md mx-auto font-mono text-[11px]' : 'print:max-w-2xl'
+        }`}>
           <div className="rounded-3xl border border-[#DCE3DF] bg-white p-8 shadow-sm print:rounded-2xl print:border-2 print:border-[#111827] print:shadow-none print:p-8 print:m-0 print:text-black">
             {/* Rótulo Obligatorio en Bloque Visible con Bordes Redondeados */}
             <div className="rounded-2xl border-2 border-[#111827] bg-[#F6F5F0] p-3 text-center">

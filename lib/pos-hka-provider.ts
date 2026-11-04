@@ -212,23 +212,23 @@ export class TheFactoryHkaProvider implements FiscalProviderInterface {
     // Determinar formas de pago
     const formasPago = (sale.payments && sale.payments.length > 0)
       ? sale.payments.map((p) => ({
-          Descripcion: p.method === 'efectivo' ? 'Efectivo' : p.method === 'pago_movil' ? 'Pago Movil' : p.method === 'tarjeta' ? 'Tarjeta' : 'Cashea',
-          Fecha: dateFormatted,
-          Forma: p.method === 'efectivo' ? '01' : p.method === 'pago_movil' ? '02' : '03',
-          Monto: p.amount_applied.toFixed(2),
-          Moneda: p.currency,
-          TipoCambio: p.currency === 'USD' ? '1.0000' : exchangeRate.toFixed(4),
-        }))
+        Descripcion: p.method === 'efectivo' ? 'Efectivo' : p.method === 'pago_movil' ? 'Pago Movil' : p.method === 'tarjeta' ? 'Tarjeta' : 'Cashea',
+        Fecha: dateFormatted,
+        Forma: p.method === 'efectivo' ? '01' : p.method === 'pago_movil' ? '02' : '03',
+        Monto: p.amount_applied.toFixed(2),
+        Moneda: p.currency,
+        TipoCambio: p.currency === 'USD' ? '1.0000' : exchangeRate.toFixed(4),
+      }))
       : [
-          {
-            Descripcion: 'Efectivo',
-            Fecha: dateFormatted,
-            Forma: '01',
-            Monto: totalUsd.toFixed(2),
-            Moneda: 'USD',
-            TipoCambio: '1.0000',
-          },
-        ];
+        {
+          Descripcion: 'Efectivo',
+          Fecha: dateFormatted,
+          Forma: '01',
+          Monto: totalUsd.toFixed(2),
+          Moneda: 'USD',
+          TipoCambio: '1.0000',
+        },
+      ];
 
     // Detalle de ítems
     const lines = sale.lines || [];
@@ -369,7 +369,7 @@ export class TheFactoryHkaProvider implements FiscalProviderInterface {
 
       // Si HKA devolvió validaciones específicas de control/numeración
       const validacionMsg = data.validaciones?.join('. ') || data.mensaje || 'Error no especificado por pasarela fiscal';
-      
+
       return {
         success: false,
         status: 'rechazado',

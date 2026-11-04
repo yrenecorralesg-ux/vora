@@ -20,6 +20,15 @@ import {
 } from '@/lib/pos-demo-data';
 import { posStore } from '@/lib/pos-service';
 
+export interface ParkedSale {
+  id: string;
+  createdAt: string;
+  customer: PosCustomer | null;
+  cart: CartLine[];
+  notes: string;
+  totalUsd: number;
+}
+
 export interface CartLine {
   productId?: string;
   sku: string;
@@ -96,6 +105,19 @@ interface PosContextType {
   lastConfirmedSale: PosSale | null;
   setLastConfirmedSale: (sale: PosSale | null) => void;
 
+  // Parked Sales (Multiticket)
+  parkedSales: ParkedSale[];
+  parkCurrentSale: (note?: string) => void;
+  resumeParkedSale: (id: string) => void;
+  deleteParkedSale: (id: string) => void;
+
+  // Connectivity & Offline
+  isOnline: boolean;
+  offlineQueueCount: number;
+
+  // Barcode quick scan
+  scanBarcode: (code: string) => boolean;
+
   // Notification Toast Message (Pure Typography)
   notification: { title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null;
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
@@ -125,6 +147,13 @@ export function PosProvider({
   const [discountAuthorizedBy, setDiscountAuthorizedBy] = useState<string | null>(null);
   const [lastConfirmedSale, setLastConfirmedSale] = useState<PosSale | null>(posStore.sales[0] ?? null);
   const [notification, setNotification] = useState<{ title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null>(null);
+
+  // Multiticket / Ventas en Espera
+  const [parkedSales, setParkedSales] = useState<ParkedSale[]>([]);
+
+  // Conectividad & Offline
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [offlineQueueCount, setOfflineQueueCount] = useState<number>(0);
 
   const activeBranch = posStore.branches.find((b) => b.id === activeBranchId) ?? posStore.branches[0];
   const activeUser = MOCK_USERS.find((u) => u.id === activeUserId) ?? MOCK_USERS[0];
@@ -271,6 +300,144 @@ export function PosProvider({
     setDiscountAuthorizedBy(null);
   };
 
+  // Multiticket / Ventas en espera
+  const parkCurrentSale = (note?: string) => {
+    if (cart.length === 0) {
+      showNotification('Carrito vacío', 'Agregue al menos un producto para pausar la venta.', 'alert');
+      return;
+    }
+    const totalUsd = cart.reduce((sum, item) => sum + item.lineTotalUsd, 0);
+    const newParked: ParkedSale = {
+      id: `park-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      customer: selectedCustomer,
+      cart: [...cart],
+      notes: note || cartNotes,
+      totalUsd,
+    };
+
+    setParkedSales((prev) => [newParked, ...prev]);
+    clearCart();
+    setSelectedCustomer(posStore.customers[0] ?? null);
+    showNotification(
+      'Venta en espera',
+      `Carrito pausado (#${newParked.id.slice(-4)}). Puede atender al siguiente cliente.`,
+      'success',
+    );
+  };
+
+  const resumeParkedSale = (id: string) => {
+    const found = parkedSales.find((p) => p.id === id);
+    if (!found) return;
+
+    // Si el carrito actual tiene productos, pausarlo primero
+    if (cart.length > 0) {
+      const totalUsd = cart.reduce((sum, item) => sum + item.lineTotalUsd, 0);
+      const autoPark: ParkedSale = {
+        id: `park-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        customer: selectedCustomer,
+        cart: [...cart],
+        notes: cartNotes,
+        totalUsd,
+      };
+      setParkedSales((prev) => [autoPark, ...prev.filter((p) => p.id !== id)]);
+    } else {
+      setParkedSales((prev) => prev.filter((p) => p.id !== id));
+    }
+
+    setCart(found.cart);
+    setCartNotes(found.notes);
+    setSelectedCustomer(found.customer);
+    showNotification('Venta reanudada', `Carrito recuperado (${found.cart.length} productos).`, 'success');
+  };
+
+  const deleteParkedSale = (id: string) => {
+    setParkedSales((prev) => prev.filter((p) => p.id !== id));
+    showNotification('Venta eliminada', 'Ticket pausado descartado de la memoria.', 'alert');
+  };
+
+  // Escaneo rápido de código de barras
+  const scanBarcode = (code: string): boolean => {
+    const clean = code.trim().toLowerCase();
+    const product = posStore.products.find(
+      (p) =>
+        p.sku.toLowerCase() === clean ||
+        p.id.toLowerCase() === clean ||
+        p.name.toLowerCase().includes(clean),
+    );
+
+    if (product) {
+      addToCart(product, 1);
+      showNotification('Código escaneado', `${product.name} (+1 en carrito).`, 'success');
+      return true;
+    }
+
+    showNotification('Código no encontrado', `No se encontró producto con código: ${code}`, 'alert');
+    return false;
+  };
+
+  // Listener global de teclado para pistola USB HID
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = Date.now();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA');
+
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeyTime;
+      lastKeyTime = currentTime;
+
+      if (e.key === 'Enter') {
+        if (buffer.length >= 3 && (timeDiff < 70 || !isInput)) {
+          const matched = scanBarcode(buffer.trim());
+          if (matched) {
+            e.preventDefault();
+            buffer = '';
+            return;
+          }
+        }
+        buffer = '';
+        return;
+      }
+
+      if (e.key.length === 1) {
+        if (timeDiff > 120 && buffer.length > 0) {
+          buffer = '';
+        }
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Listener de conectividad Online / Offline
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsOnline(navigator.onLine);
+    }
+
+    const handleOnline = () => {
+      setIsOnline(true);
+      showNotification('Conexión reanudada', 'VORA POS conectado y sincronizado con servidor.', 'success');
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      showNotification('Modo sin conexión', 'Operando en contingencia local. Cobros en cola de sincronización.', 'alert');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
   const navigateTo = (view: PosViewKey) => {
     setCurrentView(view);
   };
@@ -316,6 +483,13 @@ export function PosProvider({
         notification,
         showNotification,
         clearNotification,
+        parkedSales,
+        parkCurrentSale,
+        resumeParkedSale,
+        deleteParkedSale,
+        isOnline,
+        offlineQueueCount,
+        scanBarcode,
       }}
     >
       {children}

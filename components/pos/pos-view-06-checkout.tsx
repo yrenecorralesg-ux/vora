@@ -102,6 +102,9 @@ export function PosView06Checkout() {
   const [pmPayerPhone, setPmPayerPhone] = useState(selectedCustomer?.phone ?? '0414-1234567');
   const [pmPayerDoc, setPmPayerDoc] = useState(selectedCustomer?.document_number ?? '12345678');
   const [pmStatus, setPmStatus] = useState<'registrado' | 'pendiente_verificacion' | 'verificado'>('verificado');
+  const [pmSubMode, setPmSubMode] = useState<'p2p' | 'c2p'>('p2p');
+  const [c2pToken, setC2pToken] = useState('');
+  const [c2pLoading, setC2pLoading] = useState(false);
 
   // Inputs Tarjeta
   const [cardTerminal, setCardTerminal] = useState('POS-Banesco-01 [mock]');
@@ -215,6 +218,40 @@ export function PosView06Checkout() {
       },
     ]);
     setPmReference('');
+  };
+
+  // Cobro C2P (Comercio a Personas - Débito Inmediato)
+  const handleChargeC2P = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const amount = parseFloat(pmAmountVes);
+    if (isNaN(amount) || amount <= 0) return;
+    if (!c2pToken.trim() || c2pToken.trim().length < 6) {
+      showNotification('Token inválido', 'Ingrese la clave dinámica de 6 a 8 dígitos provista por el cliente.', 'critical');
+      return;
+    }
+
+    setC2pLoading(true);
+    await new Promise((r) => setTimeout(r, 600));
+
+    const ref = `C2P-${Math.floor(100000 + Math.random() * 900000)}`;
+    setAppliedPayments([
+      ...appliedPayments,
+      {
+        method: 'pago_movil',
+        currency: 'VES',
+        amountReceived: amount,
+        amountApplied: amount,
+        changeAmount: 0,
+        referenceNumber: ref,
+        bankName: `${pmBank} (C2P Inmediato)`,
+        payerPhone: pmPayerPhone.trim(),
+        payerDocument: pmPayerDoc.trim(),
+        providerStatus: 'verificado',
+      },
+    ]);
+    setC2pToken('');
+    setC2pLoading(false);
+    showNotification('Cobro C2P Aprobado', `Débito inmediato exitoso con referencia ${ref}.`, 'success');
   };
 
   // Agregar Tarjeta
@@ -511,75 +548,196 @@ export function PosView06Checkout() {
 
             {/* Panel: Pago Móvil */}
             {activeTab === 'pago_movil' && (
-              <form onSubmit={handleAddPagoMovil} className="mt-5 space-y-4">
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
-                      Banco receptor
-                    </label>
-                    <select
-                      value={pmBank}
-                      onChange={(e) => setPmBank(e.target.value)}
-                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 text-xs font-semibold text-[#111827]"
+              <div className="mt-5 space-y-4">
+                {/* Selector de Modalidad P2P / C2P */}
+                <div className="flex rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-1 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setPmSubMode('p2p')}
+                    className={`flex-1 rounded-xl py-2 font-bold transition ${
+                      pmSubMode === 'p2p'
+                        ? 'bg-white text-[#111827] shadow-xs'
+                        : 'text-[#52635A] hover:text-[#111827]'
+                    }`}
+                  >
+                    P2P Tradicional (Comprobante)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPmSubMode('c2p')}
+                    className={`flex-1 rounded-xl py-2 font-bold transition ${
+                      pmSubMode === 'c2p'
+                        ? 'bg-[#1E6B4E] text-white shadow-xs'
+                        : 'text-[#52635A] hover:text-[#111827]'
+                    }`}
+                  >
+                    C2P Débito Inmediato (Token OTP)
+                  </button>
+                </div>
+
+                {pmSubMode === 'p2p' ? (
+                  <form onSubmit={handleAddPagoMovil} className="space-y-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
+                          Banco receptor
+                        </label>
+                        <select
+                          value={pmBank}
+                          onChange={(e) => setPmBank(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 text-xs font-semibold text-[#111827]"
+                        >
+                          <option value="0102 - Banco de Venezuela">0102 - Banco de Venezuela</option>
+                          <option value="0134 - Banesco">0134 - Banesco</option>
+                          <option value="0108 - Banco Provincial">0108 - Banco Provincial</option>
+                          <option value="0105 - Mercantil">0105 - Mercantil</option>
+                          <option value="0172 - Bancamiga">0172 - Bancamiga</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
+                          Monto en Bolívares (VES)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={pmAmountVes}
+                          onChange={(e) => setPmAmountVes(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-bold text-[#111827]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
+                          Número de referencia
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="Últimos 4 a 8 dígitos"
+                          value={pmReference}
+                          onChange={(e) => setPmReference(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs text-[#111827]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
+                          Teléfono pagador
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={pmPayerPhone}
+                          onChange={(e) => setPmPayerPhone(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs text-[#111827]"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full rounded-2xl bg-[#1E6B4E] py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-[#16523B]"
                     >
-                      <option value="0102 - Banco de Venezuela">0102 - Banco de Venezuela</option>
-                      <option value="0134 - Banesco">0134 - Banesco</option>
-                      <option value="0108 - Banco Provincial">0108 - Banco Provincial</option>
-                      <option value="0105 - Mercantil">0105 - Mercantil</option>
-                    </select>
-                  </div>
+                      Incorporar declaración de Pago Móvil P2P
+                    </button>
+                  </form>
+                ) : (
+                  <form onSubmit={handleChargeC2P} className="space-y-4">
+                    <div className="rounded-2xl border border-[#DCFCE7] bg-[#F0FDF4] p-3 text-xs text-[#15803D]">
+                      💡 El comercio debita directamente la cuenta del cliente solicitándole el <strong>Token OTP SMS</strong> generado en su banco.
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
-                      Monto en Bolívares (VES)
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      required
-                      value={pmAmountVes}
-                      onChange={(e) => setPmAmountVes(e.target.value)}
-                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-bold text-[#111827]"
-                    />
-                  </div>
-                </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
+                          Banco del cliente
+                        </label>
+                        <select
+                          value={pmBank}
+                          onChange={(e) => setPmBank(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 text-xs font-semibold text-[#111827]"
+                        >
+                          <option value="0102 - Banco de Venezuela">0102 - Banco de Venezuela</option>
+                          <option value="0134 - Banesco">0134 - Banesco</option>
+                          <option value="0108 - Banco Provincial">0108 - Banco Provincial</option>
+                          <option value="0105 - Mercantil">0105 - Mercantil</option>
+                          <option value="0172 - Bancamiga">0172 - Bancamiga</option>
+                        </select>
+                      </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
-                      Número de referencia
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="Últimos 4 a 8 dígitos"
-                      value={pmReference}
-                      onChange={(e) => setPmReference(e.target.value)}
-                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs text-[#111827]"
-                    />
-                  </div>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
+                          Monto a debitar (VES)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          required
+                          value={pmAmountVes}
+                          onChange={(e) => setPmAmountVes(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-bold text-[#111827]"
+                        />
+                      </div>
+                    </div>
 
-                  <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
-                      Teléfono pagador
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={pmPayerPhone}
-                      onChange={(e) => setPmPayerPhone(e.target.value)}
-                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs text-[#111827]"
-                    />
-                  </div>
-                </div>
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
+                          Cédula del cliente
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={pmPayerDoc}
+                          onChange={(e) => setPmPayerDoc(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs text-[#111827]"
+                        />
+                      </div>
 
-                <button
-                  type="submit"
-                  className="w-full rounded-2xl bg-[#1E6B4E] py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-[#16523B]"
-                >
-                  Incorporar declaración de Pago Móvil
-                </button>
-              </form>
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
+                          Teléfono afiliado
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={pmPayerPhone}
+                          onChange={(e) => setPmPayerPhone(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs text-[#111827]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-[#1E6B4E]">
+                          Token OTP / Clave SMS
+                        </label>
+                        <input
+                          type="password"
+                          maxLength={8}
+                          required
+                          placeholder="6 a 8 dígitos"
+                          value={c2pToken}
+                          onChange={(e) => setC2pToken(e.target.value)}
+                          className="mt-1 w-full rounded-2xl border border-[#1E6B4E] p-3 text-xs font-bold text-[#111827]"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={c2pLoading}
+                      className="w-full rounded-2xl bg-[#1E6B4E] py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-[#16523B] disabled:opacity-50"
+                    >
+                      {c2pLoading ? 'Procesando débito interbancario...' : 'Ejecutar débito C2P Inmediato'}
+                    </button>
+                  </form>
+                )}
+              </div>
             )}
 
             {/* Panel: Tarjeta */}
