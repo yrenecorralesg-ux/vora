@@ -1,0 +1,172 @@
+================================================================================
+                    VORA POS & GESTOR PRINCIPAL
+           RESUMEN DE FUNCIONALIDADES E IMPLEMENTACIONES
+================================================================================
+
+Este documento detalla todas las mejoras, nuevas herramientas y modificaciones
+realizadas en la plataforma VORA, explicadas de forma sencilla y sin tecnicismos.
+
+--------------------------------------------------------------------------------
+1. CONTROL TOTAL DESDE EL GESTOR (PANEL PRINCIPAL)
+--------------------------------------------------------------------------------
+Todo el sistema ahora es completamente modular. Desde la pestaña "Módulos" de
+cada empresa en el panel del Gestor, el administrador puede:
+
+* Encender o apagar cualquier módulo completo (como el Punto de Venta POS,
+  la Tienda Virtual, el CRM, etc.).
+* Activar o desactivar cada función individual del Punto de Venta según lo
+  que el comercio realmente use:
+    - ¿No quieren usar Cashea? Se desmarca Cashea y desaparece del mostrador.
+    - ¿No usan facturación fiscal? Se desmarca y opera solo con comprobantes internos.
+    - ¿No tienen pistola de código de barras? Se apaga el lector.
+    - ¿No usan ventas en espera? Se oculta el botón de pausar.
+* Botones rápidos de "Activar todas" y "Desactivar todas" para configurar
+  una tienda en segundos.
+* Cualquier cambio que hagas en el Gestor se refleja en el punto de venta
+  en tiempo real sin tener que reiniciar nada.
+
+
+--------------------------------------------------------------------------------
+2. INTEGRACIÓN CON FACTURACIÓN FISCAL SENIAT (THE FACTORY HKA)
+--------------------------------------------------------------------------------
+El sistema ya cuenta con la conexión legal requerida en Venezuela:
+
+* Emisión de Facturas Fiscales Digitales autorizadas directamente ante el
+  SENIAT a través de los servidores de The Factory HKA.
+* Reportes de jornada obligatorios:
+    - Corte X: Arqueo parcial a mitad del día para revisar cuánto se ha vendido
+      sin cerrar el día fiscal.
+    - Corte Z: Cierre fiscal obligatorio al final del día que reinicia los
+      acumuladores de la jornada ante el SENIAT.
+* Protección contra duplicados: si se cae el internet mientras se emitía una
+  factura, el sistema consulta el estatus anterior para no cobrar ni facturar
+  dos veces lo mismo.
+
+
+--------------------------------------------------------------------------------
+3. INTEGRACIÓN CON CASHEA (PAGOS EN CUOTAS)
+--------------------------------------------------------------------------------
+Los clientes ahora pueden pagar sus compras con financiamiento Cashea en mostrador:
+
+* Disponible automáticamente en ventas a partir de $25.00 USD.
+* El cajero solo ingresa la cédula del cliente y genera la solicitud.
+* El cliente recibe y aprueba la orden en su aplicación de Cashea en su teléfono.
+* El sistema confirma la operación de inmediato y descuenta la cuota inicial
+  y el monto a liquidar al comercio (95%).
+
+
+--------------------------------------------------------------------------------
+4. TASA DE CAMBIO BCV AUTOMÁTICA (CONEXIÓN A INTERNET)
+--------------------------------------------------------------------------------
+Ya no es necesario que el cajero o encargado tenga que escribir a mano la tasa
+del dólar todos los días:
+
+* El sistema se conecta a internet (mediante DolarApi) y obtiene la tasa oficial
+  del Banco Central de Venezuela (BCV) en tiempo real.
+* Botón "Sync" en la parte superior de la pantalla para sincronizar la tasa
+  en cualquier momento con un solo clic.
+* En la pantalla de Configuración, el negocio puede:
+    - Ver cuándo fue la última vez que se actualizó la tasa.
+    - Cambiar la dirección de la API por otra si lo prefiere.
+    - Usar botones de un clic para tasa oficial del BCV o tasa de referencia.
+    - Activar o desactivar si quiere que se actualice sola o manual.
+
+
+--------------------------------------------------------------------------------
+5. VENTAS EN ESPERA / PAUSAR VENTAS (MULTITICKET)
+--------------------------------------------------------------------------------
+Permite atender a filas de clientes de forma ágil sin perder tiempo:
+
+* Si un cliente está en caja y olvidó su dinero, fue a buscar otro producto
+  o su acompañante se retrasó, el cajero presiona el botón "Pausar".
+* Los productos quedan guardados en la memoria y la caja queda libre para cobrar
+  al siguiente cliente de la fila.
+* Se pueden pausar múltiples ventas a la vez (aparece un botón "En Espera (N)").
+* Al regresar el cliente, con un solo clic se recuperan todos sus productos,
+  notas y datos tal como los dejó.
+
+
+--------------------------------------------------------------------------------
+6. LECTOR DE CÓDIGO DE BARRAS (PISTOLA LÁSER USB)
+--------------------------------------------------------------------------------
+Cobro veloz en mostrador tipo supermercado:
+
+* Funciona con cualquier pistola lectora USB estándar conectada al computador.
+* El cajero simplemente apunta al código de barras del producto, dispara el láser
+  y el producto se agrega de inmediato al carrito.
+* Si el código está rayado o roto, hay un botón en pantalla llamado "Escanear"
+  donde se puede escribir o buscar el código manualmente.
+
+
+--------------------------------------------------------------------------------
+7. PAGOS MIXTOS Y DÉBITO INMEDIATO (C2P Y PAGO MÓVIL)
+--------------------------------------------------------------------------------
+Máxima flexibilidad para cobrar como el cliente prefiera:
+
+* Un mismo ticket se puede pagar combinando varios métodos: por ejemplo,
+  $10 en billetes físicos de dólar, el resto en Bolívares por Pago Móvil y
+  otra parte con tarjeta de débito.
+* Débito Inmediato C2P: el cajero selecciona el banco del cliente, coloca su
+  teléfono, cédula y el código de seguridad (token SMS) que el banco le manda
+  al cliente para debitar los fondos directamente.
+
+
+--------------------------------------------------------------------------------
+8. CIERRE DE TURNO CON ARQUEO A CIEGAS (CONTROL CONTRA ROBOS)
+--------------------------------------------------------------------------------
+Seguridad estricta para dueños de negocio:
+
+* Apertura de turno: el cajero ingresa con cuánto dinero en efectivo abre
+  su jornada (en Dólares y en Bolívares).
+* Cierre de turno "A Ciegas": al terminar el día, el cajero debe contar sus
+  billetes físicos y anotar cuánto tiene en la mano, SIN que el sistema le diga
+  cuánto debería haber. Esto evita que los cajeros manipulen el dinero para
+  hacer coincidir los números.
+* Una vez anotado, el sistema compara y emite un informe que muestra si hubo
+  sobrante, faltante o si la caja cuadró exactamente.
+
+
+--------------------------------------------------------------------------------
+9. IMPRESIÓN DE TICKETS TÉRMICOS (80mm) Y FACTURAS (A4)
+--------------------------------------------------------------------------------
+Diseño de impresión adaptable:
+
+* Con un botón se puede alternar entre formato Ticket Térmico de 80mm (para
+  las impresoras pequeñas de papel de rollo de mostrador) o Formato Hoja Carta
+  A4 (para notas de entrega formales de oficina).
+* Se puede mandar a imprimir con un clic o guardar como PDF.
+
+
+--------------------------------------------------------------------------------
+10. SEGURIDAD Y APROBACIONES DE SUPERVISOR (CLAVE PIN)
+--------------------------------------------------------------------------------
+* El administrador fija un porcentaje máximo de descuento que el cajero puede
+  dar libremente (por ejemplo, máximo 5%).
+* Si el cajero intenta dar un descuento mayor o anular un cobro, la pantalla
+  se bloquea pidiendo la clave PIN de un supervisor para autorizarlo.
+
+
+--------------------------------------------------------------------------------
+11. FUNCIONAMIENTO CON Y SIN INTERNET
+--------------------------------------------------------------------------------
+* El sistema detecta en todo momento si la computadora tiene conexión a internet.
+* Si el internet falla, el punto de venta avisa con una alerta amarilla y sigue
+  vendiendo normalmente en modo local para no parar la atención al público.
+* Cuando el internet regresa, avisa con una alerta verde de que el servicio
+  está nuevamente conectado.
+
+
+--------------------------------------------------------------------------------
+12. DISEÑO VISUAL MEJORADO Y ESPACIOS CORREGIDOS
+--------------------------------------------------------------------------------
+* Se corrigió la separación excesiva que existía entre el botón de "Volver al
+  inicio" y los títulos de las pantallas (como Ventas y Reportes), logrando una
+  vista compacta, moderna y cómoda para trabajar en pantallas de laptops y tablets.
+* Se agregó en la barra superior el valor actual de la tasa del BCV con su botón
+  de sincronización rápida.
+* Los productos muestran etiquetas claras de disponibilidad: Verde (Disponible),
+  Amarillo (Bajo Stock) y Rojo (Agotado, bloqueando que se agregue si no hay).
+
+================================================================================
+Fin del Resumen. Todos los cambios están probados y cargados en la rama feat/vora-pos.
+================================================================================
