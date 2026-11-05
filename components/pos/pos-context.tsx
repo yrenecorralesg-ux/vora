@@ -193,6 +193,7 @@ export function PosProvider({
     pos_kardex: true,
     pos_settings: true,
     pos_reports: true,
+    pos_credit_sales: true,
   });
 
   const isFuncActive = (funcKey: string): boolean => {

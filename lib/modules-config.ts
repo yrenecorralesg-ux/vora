@@ -196,6 +196,7 @@ export const CRM_MODULES_CATALOG: Record<string, ModuleDefinition> = {
       { key: 'pos_documents', name: 'Comprobantes internos PDF', description: 'Generación e impresión de notas de entrega y comprobantes.', defaultEnabled: true },
       { key: 'pos_kardex', name: 'Kardex e inventario de sede', description: 'Descuento atómico e inmutable de existencias por venta.', defaultEnabled: true },
       { key: 'pos_settings', name: 'Configuración de sede y cajas', description: 'Administración de cajas físicas y límites operativos.', defaultEnabled: true },
+      { key: 'pos_credit_sales', name: 'Ventas a crédito y Cuentas por Cobrar (CxC)', description: 'Venta con saldo pendiente diferido, control de plazos y recepción de abonos en mostrador.', defaultEnabled: true },
       { key: 'pos_reports', name: 'Reportes y distribución de cobros', description: 'Métricas financieras en tiempo real y gráficos de venta.', defaultEnabled: true },
     ],
   },

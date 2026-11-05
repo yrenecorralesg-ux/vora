@@ -509,7 +509,7 @@ export function PosView06Checkout() {
         </div>
 
         {/* Sección Venta a Crédito / Abono Parcial (DOCX §6 / §15 / CxC) */}
-        {balanceDueUsd > 0.05 && (
+        {balanceDueUsd > 0.05 && isFuncActive('pos_credit_sales') && (
           <div className="mt-4 rounded-3xl border border-[#FDE68A] bg-[#FEF3C7]/90 p-5 shadow-xs">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
