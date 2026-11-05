@@ -451,9 +451,20 @@ export function PosView17Settings() {
               </div>
             </div>
 
-            <span className="rounded-full bg-[#1E6B4E] px-3 py-1 text-xs font-bold text-white shadow-2xs">
-              Módulo Supervisor Activo
-            </span>
+            <div className="flex items-center gap-2">
+              {isFuncActive('pos_supervisor_users_crud') && (
+                <button
+                  type="button"
+                  onClick={() => navigateTo('POS-19')}
+                  className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-3.5 py-1.5 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition"
+                >
+                  Abrir Módulo de Personal (CRUD)
+                </button>
+              )}
+              <span className="rounded-full bg-[#1E6B4E] px-3 py-1 text-xs font-bold text-white shadow-2xs">
+                Módulo Supervisor Activo
+              </span>
+            </div>
           </div>
 
           <form onSubmit={handleSaveSupervisorPolicies} className="grid grid-cols-1 gap-6 lg:grid-cols-2">

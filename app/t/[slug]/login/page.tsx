@@ -221,3 +221,4 @@ export default function TenantPosLoginPage({ params }: { params: { slug: string 
     </div>
   );
 }
+

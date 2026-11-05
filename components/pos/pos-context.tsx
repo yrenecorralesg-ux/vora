@@ -60,7 +60,8 @@ export type PosViewKey =
   | 'POS-15'
   | 'POS-16'
   | 'POS-17'
-  | 'POS-18';
+  | 'POS-18'
+  | 'POS-19';
 
 interface PosContextType {
   // Contex Switchers
@@ -153,6 +154,9 @@ interface PosContextType {
     enforceBlindCount?: boolean;
   }) => PosSettings;
   addStaffUser: (user: Omit<PosMockUser, 'id'>) => PosMockUser;
+  createUser: (user: Omit<PosMockUser, 'id'>) => PosMockUser;
+  updateUser: (id: string, updates: Partial<PosMockUser>) => PosMockUser | null;
+  deleteUser: (id: string) => { ok: boolean; error?: string };
   toggleStaffUser: (id: string) => boolean;
   updateStaffPin: (id: string, newPin: string) => boolean;
 
@@ -227,6 +231,7 @@ export function PosProvider({
     pos_promotions_engine: true,
     pos_tenant_isolated_login: true,
     pos_supervisor_panel: true,
+    pos_supervisor_users_crud: true,
   });
 
   // Estado nuevas capacidades
@@ -376,6 +381,33 @@ export function PosProvider({
       showNotification('PIN actualizado', 'La clave PIN del usuario ha sido modificada.', 'success');
     }
     return ok;
+  };
+
+  const createUser = (user: Omit<PosMockUser, 'id'>) => {
+    const created = posStore.createUser(user);
+    setStaffUsers([...posStore.users]);
+    showNotification('Usuario Creado', `Usuario ${created.name} registrado con éxito en el sistema.`, 'success');
+    return created;
+  };
+
+  const updateUser = (id: string, updates: Partial<PosMockUser>) => {
+    const updated = posStore.updateUser(id, updates);
+    if (updated) {
+      setStaffUsers([...posStore.users]);
+      showNotification('Usuario Actualizado', `Datos del usuario ${updated.name} guardados.`, 'success');
+    }
+    return updated;
+  };
+
+  const deleteUser = (id: string) => {
+    const res = posStore.deleteUser(id);
+    if (res.ok) {
+      setStaffUsers([...posStore.users]);
+      showNotification('Usuario Eliminado', 'El usuario fue eliminado del personal de esta sede.', 'alert');
+    } else {
+      showNotification('Error al eliminar', res.error || 'No se pudo eliminar el usuario.', 'critical');
+    }
+    return res;
   };
 
   // Cart operations
@@ -721,6 +753,9 @@ export function PosProvider({
         validateSupervisorPin,
         updateSupervisorConfig,
         addStaffUser,
+        createUser,
+        updateUser,
+        deleteUser,
         toggleStaffUser,
         updateStaffPin,
       }}

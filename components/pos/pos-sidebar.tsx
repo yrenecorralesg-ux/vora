@@ -9,6 +9,7 @@ import {
   Package,
   Boxes,
   Users,
+  UserCheck,
   BarChart2,
   Settings,
   LogOut,
@@ -90,6 +91,17 @@ export function PosSidebar() {
             icon: BarChart2,
             isActive: currentView === 'POS-16',
             onClick: () => navigateTo('POS-16'),
+          },
+        ]
+      : []),
+    ...(isFuncActive('pos_supervisor_users_crud')
+      ? [
+          {
+            id: 'staff_users',
+            label: 'Personal & Roles',
+            icon: UserCheck,
+            isActive: currentView === 'POS-19',
+            onClick: () => navigateTo('POS-19'),
           },
         ]
       : []),

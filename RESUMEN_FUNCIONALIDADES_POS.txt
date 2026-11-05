@@ -352,6 +352,21 @@ Diseño de impresión adaptable:
   - Botón para dar de alta nuevo personal en el mostrador.
 * Todo configurable y con interruptor modular desde el Gestor de Gestores.
 
+
+--------------------------------------------------------------------------------
+28. MÓDULO DE USUARIOS Y CRUD COMPLETO PARA SUPERVISORES (MODULAR: pos_supervisor_users_crud)
+--------------------------------------------------------------------------------
+* Módulo independiente (POS-19) accesible desde la barra lateral ("Personal & Roles")
+  y desde la configuración del supervisor.
+* Permite al supervisor de tienda realizar CRUD total sobre los usuarios del gestor específico:
+  - Crear usuarios asignando su rol (Cajero, Supervisor, Asesor de Venta, Admin Tienda),
+    caja física asignada, correo institucional, clave PIN de caja y porcentaje de comisión.
+  - Listar y filtrar por rol, búsqueda en tiempo real por nombre/correo y estado activo/inactivo.
+  - Editar datos, cambiar claves PIN individuales y alternar activación con un clic.
+  - Eliminar personal de la sede con validación de seguridad (bloqueo si tiene un turno abierto).
+* Respaldado por endpoint API específico: /api/t/[slug]/pos/users con fallback híbrido.
+* 100% modular y configurable con interruptor on/off en el Gestor de Gestores.
+
 ================================================================================
 Fin del Resumen. Todas las funcionalidades están probadas y cargadas en la rama feat/vora-pos.
 ================================================================================

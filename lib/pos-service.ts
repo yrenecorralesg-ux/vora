@@ -105,13 +105,47 @@ class PosInMemoryStore {
   }
 
   addStaffUser(user: Omit<PosMockUser, 'id'>): PosMockUser {
+    return this.createUser(user);
+  }
+
+  createUser(userData: Omit<PosMockUser, 'id'>): PosMockUser {
     const newUser: PosMockUser = {
-      id: `u-${Date.now()}`,
-      ...user,
-      is_active: true,
+      id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      ...userData,
+      is_active: userData.is_active !== undefined ? userData.is_active : true,
     };
     this.users.push(newUser);
     return newUser;
+  }
+
+  updateUser(id: string, updates: Partial<PosMockUser>): PosMockUser | null {
+    const user = this.users.find((u) => u.id === id);
+    if (!user) return null;
+    if (updates.name !== undefined) user.name = updates.name.trim();
+    if (updates.email !== undefined) user.email = updates.email.trim();
+    if (updates.role !== undefined) user.role = updates.role;
+    if (updates.pin !== undefined) user.pin = updates.pin.trim();
+    if (updates.assignedRegisterId !== undefined) user.assignedRegisterId = updates.assignedRegisterId;
+    if (updates.assignedBranchId !== undefined) user.assignedBranchId = updates.assignedBranchId;
+    if (updates.commission_rate_percent !== undefined) user.commission_rate_percent = updates.commission_rate_percent;
+    if (updates.is_active !== undefined) user.is_active = updates.is_active;
+    return user;
+  }
+
+  deleteUser(id: string): { ok: boolean; error?: string } {
+    const index = this.users.findIndex((u) => u.id === id);
+    if (index === -1) {
+      return { ok: false, error: 'Usuario no encontrado.' };
+    }
+    const hasOpenShift = this.shifts.some((s) => s.cashier_user_id === id && s.status === 'abierto');
+    if (hasOpenShift) {
+      return {
+        ok: false,
+        error: 'No se puede eliminar un usuario con un turno de caja abierto. Cierre el turno primero.',
+      };
+    }
+    this.users.splice(index, 1);
+    return { ok: true };
   }
 
   toggleStaffUser(id: string): boolean {

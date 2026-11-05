@@ -18,6 +18,7 @@ import { PosView15ShiftClosure } from '@/components/pos/pos-view-15-shift-closur
 import { PosView16Reports } from '@/components/pos/pos-view-16-reports';
 import { PosView17Settings } from '@/components/pos/pos-view-17-settings';
 import { PosView18FiscalConfig } from '@/components/pos/pos-view-18-fiscal-config';
+import { PosView19Users } from '@/components/pos/pos-view-19-users';
 
 function PosModuleContent() {
   const { currentView, isModuleEnabled, isFuncActive, activeTenantSlug } = usePos();
@@ -84,6 +85,7 @@ function PosModuleContent() {
             {currentView === 'POS-16' && <PosView16Reports />}
             {currentView === 'POS-17' && <PosView17Settings />}
             {currentView === 'POS-18' && (isFuncActive('pos_fiscal') ? <PosView18FiscalConfig /> : <PosView17Settings />)}
+            {currentView === 'POS-19' && <PosView19Users />}
           </div>
         </main>
       </div>
