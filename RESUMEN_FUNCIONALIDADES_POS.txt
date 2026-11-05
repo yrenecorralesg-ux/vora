@@ -167,6 +167,40 @@ Diseño de impresión adaptable:
 * Los productos muestran etiquetas claras de disponibilidad: Verde (Disponible),
   Amarillo (Bajo Stock) y Rojo (Agotado, bloqueando que se agregue si no hay).
 
+
+--------------------------------------------------------------------------------
+13. BLOQUEO DE CIERRE CON VENTAS EN ESPERA (REGLA DE CAJA #5)
+--------------------------------------------------------------------------------
+* El sistema impide que un cajero cierre su turno si dejó ventas pausadas o en
+  espera en el mostrador.
+* Muestra una advertencia en color ámbar informando exactamente cuántas ventas
+  están pendientes y deshabilita el botón de cierre definitivo hasta que sean
+  reanudadas, cobradas o descartadas.
+
+
+--------------------------------------------------------------------------------
+14. RETIROS Y AJUSTES DE CAJA CON PIN DE SUPERVISOR (DIAGRAMA §5)
+--------------------------------------------------------------------------------
+* Los cajeros tienen restringido sacar dinero de la gaveta de efectivo por su
+  propia cuenta.
+* Al registrar un retiro o un ajuste de caja, el sistema solicita obligatoriamente
+  elegir al supervisor en turno e ingresar su clave PIN de autorización.
+* Todo movimiento queda registrado en el historial de auditoría con la hora,
+  el cajero y el supervisor que lo autorizó.
+
+
+--------------------------------------------------------------------------------
+15. VALIDACIÓN ESTRICTA DE RIF SENIAT Y DIRECCIÓN FISCAL (DOCX §5 / FACTURACIÓN)
+--------------------------------------------------------------------------------
+* Al registrar un cliente nuevo desde el punto de venta, el sistema valida en
+  tiempo real que el RIF cumpla el formato legal del SENIAT:
+  - Empresas (J y G): exige exactamente 9 dígitos numéricos (base + verificador).
+  - Personas naturales (V y E): exige entre 6 y 9 dígitos numéricos.
+* Para empresas y entidades jurídicas (J y G), es obligatorio colocar la
+  dirección fiscal completa, evitando rechazos (errores 422) al emitir facturas
+  fiscales ante The Factory HKA / SENIAT.
+
 ================================================================================
 Fin del Resumen. Todos los cambios están probados y cargados en la rama feat/vora-pos.
 ================================================================================
+

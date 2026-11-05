@@ -12,18 +12,36 @@ import {
   EyeOff,
   FileSpreadsheet,
   X,
+  Lock,
+  AlertTriangle,
 } from 'lucide-react';
 import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
+import { MOCK_USERS } from '@/lib/pos-demo-data';
 
 export function PosView15ShiftClosure() {
-  const { activeShift, activeBranch, activeUser, refreshActiveShift, showNotification, navigateTo, isFuncActive } = usePos();
+  const {
+    activeShift,
+    activeBranch,
+    activeUser,
+    refreshActiveShift,
+    showNotification,
+    navigateTo,
+    isFuncActive,
+    parkedSales,
+  } = usePos();
 
   // Movimiento Manual
   const [movType, setMovType] = useState<'ingreso_efectivo' | 'retiro_efectivo' | 'ajuste_caja' | 'cambio_saldo_inicial'>('ingreso_efectivo');
   const [movCurrency, setMovCurrency] = useState<'USD' | 'VES'>('USD');
   const [movAmount, setMovAmount] = useState<string>('20.00');
   const [movReason, setMovReason] = useState<string>('Dotación de cambio para caja [mock]');
+
+  // Autorización de Supervisor para movimientos (Diagrama §5)
+  const supervisors = MOCK_USERS.filter((u) => u.role === 'pos_supervisor' || u.role === 'pos_store_admin');
+  const [authSupervisorId, setAuthSupervisorId] = useState<string>(supervisors[0]?.id || '');
+  const [authSupervisorPin, setAuthSupervisorPin] = useState<string>('');
+  const [movementError, setMovementError] = useState<string | null>(null);
 
   // Cierre y Arqueo Ciego
   const [isBlindMode, setIsBlindMode] = useState<boolean>(isFuncActive('pos_blind_reconciliation'));
@@ -65,11 +83,29 @@ export function PosView15ShiftClosure() {
     Math.abs(diffCard) > 0.01 ||
     Math.abs(diffCashea) > 0.01;
 
-  // Registrar Movimiento Manual
+  // Registrar Movimiento Manual con control de permisos (Diagrama §5)
   const handleAddMovement = (e: React.FormEvent) => {
     e.preventDefault();
+    setMovementError(null);
     const amt = parseFloat(movAmount);
     if (isNaN(amt) || amt <= 0 || !movReason.trim()) return;
+
+    // Retiros, ajustes y cambio de saldo inicial requieren autorización de Supervisor/Admin (Diagrama §5)
+    const requiresSupervisorAuth =
+      movType === 'retiro_efectivo' ||
+      movType === 'ajuste_caja' ||
+      movType === 'cambio_saldo_inicial' ||
+      activeUser.role === 'pos_cashier';
+
+    let authorizedById: string | null = null;
+    if (requiresSupervisorAuth && activeUser.role === 'pos_cashier') {
+      const supervisor = supervisors.find((u) => u.id === authSupervisorId);
+      if (!supervisor || supervisor.pin !== authSupervisorPin.trim()) {
+        setMovementError('Autorización denegada: PIN de supervisor incorrecto (Diagrama §5 - Modelo de permisos).');
+        return;
+      }
+      authorizedById = supervisor.id;
+    }
 
     const res = posStore.addCashMovement({
       branchId: activeBranch.id,
@@ -86,14 +122,27 @@ export function PosView15ShiftClosure() {
       return;
     }
 
+    setAuthSupervisorPin('');
     refreshActiveShift();
-    showNotification('Movimiento de caja registrado', `${movType}: ${amt} ${movCurrency} [mock].`, 'success');
+    showNotification(
+      'Movimiento registrado',
+      `${movType}: ${amt} ${movCurrency}${authorizedById ? ' (Autorizado por supervisor)' : ''} [mock].`,
+      'success',
+    );
   };
 
-  // Cierre Definitivo de Turno
+  // Cierre Definitivo de Turno (Regla #5: Bloqueo si hay ventas en espera)
   const handleCloseShift = (e: React.FormEvent) => {
     e.preventDefault();
     setClosureError(null);
+
+    // Regla de Negocio #5 (Diagrama): No se puede cerrar un turno con ventas pendientes de cobro
+    if (parkedSales.length > 0) {
+      setClosureError(
+        `Cierre bloqueado: Existen ${parkedSales.length} ventas en espera (pausadas) en mostrador. Debe reanudarlas, cobrarlas o cancelarlas antes de conciliar la caja (Regla de Caja #5).`,
+      );
+      return;
+    }
 
     if (hasAnyDiscrepancy && !justification.trim()) {
       setClosureError('Existe una discrepancia entre el conteo ciego declarado y lo esperado por sistema. La justificación de auditoría es obligatoria.');
@@ -266,6 +315,51 @@ export function PosView15ShiftClosure() {
                   className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-2.5 text-xs"
                 />
               </div>
+
+              {/* Autorización con PIN Supervisor si es retiro o ajuste (Diagrama §5) */}
+              {activeUser.role === 'pos_cashier' && (movType === 'retiro_efectivo' || movType === 'ajuste_caja') && (
+                <div className="rounded-2xl border border-[#FDE68A] bg-[#FEF3C7]/60 p-3.5 space-y-2.5">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-[#92400E]">
+                    <Lock className="h-3.5 w-3.5" />
+                    <span>Autorización de Supervisor Requerida (Diagrama §5)</span>
+                  </div>
+                  <p className="text-[10px] text-[#92400E]">
+                    Los cajeros no pueden realizar retiros ni ajustes sin autorización de un supervisor en turno.
+                  </p>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#52635A]">Supervisor en turno</label>
+                    <select
+                      value={authSupervisorId}
+                      onChange={(e) => setAuthSupervisorId(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs font-medium"
+                    >
+                      {supervisors.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-bold text-[#52635A]">PIN del supervisor</label>
+                    <input
+                      type="password"
+                      maxLength={6}
+                      required
+                      placeholder="PIN (ej: 9999)"
+                      value={authSupervisorPin}
+                      onChange={(e) => setAuthSupervisorPin(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs font-bold"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {movementError && (
+                <div role="alert" className="rounded-2xl border border-[#C83E3B] bg-[#FEF2F2] p-2.5 text-[11px] font-semibold text-[#B91C1C]">
+                  {movementError}
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -462,13 +556,30 @@ export function PosView15ShiftClosure() {
                 </div>
               )}
 
+              {/* Regla de Negocio #5: Bloqueo si hay ventas en espera */}
+              {parkedSales.length > 0 && (
+                <div className="rounded-2xl border border-[#FDE68A] bg-[#FEF3C7] p-4 text-xs text-[#92400E] space-y-1">
+                  <div className="flex items-center gap-2 font-bold">
+                    <AlertTriangle className="h-4 w-4 text-[#B45309]" />
+                    <span>Cierre Bloqueado: {parkedSales.length} ventas en espera</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed">
+                    Según la <strong>Regla de negocio #5 de Caja</strong>, no se permite cerrar el turno con ventas pendientes de cobro o pausadas en mostrador. Resuelva o descarte las ventas pausadas para habilitar el arqueo.
+                  </p>
+                </div>
+              )}
+
               {/* Botón de Cierre */}
               <button
                 type="submit"
-                disabled={isClosed}
+                disabled={isClosed || parkedSales.length > 0}
                 className="w-full rounded-2xl bg-[#B91C1C] py-4 text-xs font-bold uppercase tracking-widest text-white shadow-md hover:bg-[#991B1B] disabled:opacity-40"
               >
-                {isClosed ? 'Turno actualmente cerrado' : 'Ejecutar arqueo y cierre definitivo de turno'}
+                {isClosed
+                  ? 'Turno actualmente cerrado'
+                  : parkedSales.length > 0
+                  ? `Bloqueado por ${parkedSales.length} ventas en espera (Regla #5)`
+                  : 'Ejecutar arqueo y cierre definitivo de turno'}
               </button>
             </form>
           </div>

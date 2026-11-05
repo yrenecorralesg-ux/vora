@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, UserPlus, CheckCircle2, ArrowLeft, X, Edit2, ShieldCheck } from 'lucide-react';
+import { Search, UserPlus, CheckCircle2, ArrowLeft, X, Edit2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { usePos } from './pos-context';
 import type { PosCustomer } from '@/lib/types';
 import { posStore } from '@/lib/pos-service';
@@ -20,6 +20,37 @@ export function PosView05CustomerSelector() {
   const [phone, setPhone] = useState('0414-');
   const [email, setEmail] = useState('');
   const [fiscalAddress, setFiscalAddress] = useState('Caracas, Venezuela [mock]');
+  const [rifError, setRifError] = useState<string | null>(null);
+
+  // Validador de RIF SENIAT / Cédula (DOCX §5 / Facturación HKA)
+  const validateRif = (type: string, num: string): { valid: boolean; formatted: string; message?: string } => {
+    const raw = num.replace(/[\s\.-]/g, '').toUpperCase();
+    if (!raw) return { valid: false, formatted: '', message: 'El número de identificación o RIF es obligatorio.' };
+
+    if (type === 'J' || type === 'G') {
+      if (!/^\d{9}$/.test(raw)) {
+        return {
+          valid: false,
+          formatted: `${type}-${raw}`,
+          message: `El RIF ${type} debe contener exactamente 9 dígitos numéricos (8 base + 1 verificador, ej: ${type}-12345678-9).`,
+        };
+      }
+      return { valid: true, formatted: `${type}-${raw.slice(0, 8)}-${raw.slice(8)}` };
+    }
+
+    if (type === 'V' || type === 'E') {
+      if (!/^\d{6,9}$/.test(raw)) {
+        return {
+          valid: false,
+          formatted: `${type}-${raw}`,
+          message: `La cédula o RIF ${type} debe contener entre 6 y 9 dígitos numéricos.`,
+        };
+      }
+      return { valid: true, formatted: `${type}-${raw}` };
+    }
+
+    return { valid: true, formatted: `${type}-${raw}` };
+  };
 
   const filtered = customers.filter(
     (c) =>
@@ -48,11 +79,25 @@ export function PosView05CustomerSelector() {
 
   const handleCreateCustomer = (e: React.FormEvent) => {
     e.preventDefault();
+    setRifError(null);
     if (!docNumber.trim() || !legalName.trim()) return;
+
+    // Validación estricta SENIAT
+    const rifCheck = validateRif(docType, docNumber);
+    if (!rifCheck.valid) {
+      setRifError(rifCheck.message || 'Formato de RIF SENIAT inválido.');
+      return;
+    }
+
+    // Para personas jurídicas la dirección fiscal es obligatoria ante SENIAT
+    if ((docType === 'J' || docType === 'G') && !fiscalAddress.trim()) {
+      setRifError('La dirección fiscal completa es obligatoria para personas jurídicas ante el SENIAT.');
+      return;
+    }
 
     const created = posStore.addCustomer({
       document_type: docType,
-      document_number: docNumber.trim(),
+      document_number: docNumber.trim().replace(/[\s\.-]/g, ''),
       legal_name: `${legalName.trim()} [mock]`,
       phone: phone.trim() || null,
       email: email.trim() || null,
@@ -65,7 +110,7 @@ export function PosView05CustomerSelector() {
     setShowNewForm(false);
     showNotification(
       'Cliente Creado',
-      `${created.legal_name} registrado y asociado a la venta [mock].`,
+      `${created.legal_name} (${rifCheck.formatted}) registrado y validado ante SENIAT [mock].`,
       'success',
     );
     navigateTo('POS-03-04');
@@ -242,31 +287,56 @@ export function PosView05CustomerSelector() {
         {/* Formulario Desplegable Nuevo Cliente */}
         {showNewForm && (
           <form onSubmit={handleCreateCustomer} className="mt-6 rounded-3xl border border-[#DCE3DF] bg-[#FDFDFD] p-5 shadow-xs">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
-              Alta rápida de cliente en mostrador
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                Alta rápida de cliente en mostrador
+              </h4>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[#E8F5E9] px-2.5 py-0.5 text-[10px] font-bold text-[#144D37]">
+                <ShieldCheck className="h-3 w-3" /> Validación RIF SENIAT
+              </span>
+            </div>
+
+            {rifError && (
+              <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0 text-red-600 mt-0.5" />
+                <span className="font-medium">{rifError}</span>
+              </div>
+            )}
+
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>
                 <label className="text-[10px] font-bold text-[#52635A]">Tipo doc.</label>
                 <select
                   value={docType}
-                  onChange={(e) => setDocType(e.target.value as any)}
+                  onChange={(e) => {
+                    setDocType(e.target.value as any);
+                    setRifError(null);
+                  }}
                   className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs"
                 >
                   <option value="V">V - Venezolano</option>
                   <option value="J">J - Jurídico</option>
                   <option value="E">E - Extranjero</option>
                   <option value="G">G - Gubernamental</option>
+                  <option value="P">P - Pasaporte</option>
                 </select>
               </div>
               <div className="sm:col-span-2">
-                <label className="text-[10px] font-bold text-[#52635A]">Número de Cédula / RIF</label>
+                <label className="text-[10px] font-bold text-[#52635A]">
+                  Número de Cédula / RIF
+                  <span className="ml-1 text-[9px] font-normal text-[#52635A]">
+                    {docType === 'J' || docType === 'G' ? '(Exacto 9 dígitos, ej: 123456789)' : '(6 a 9 dígitos)'}
+                  </span>
+                </label>
                 <input
                   type="text"
                   required
                   value={docNumber}
-                  onChange={(e) => setDocNumber(e.target.value)}
-                  placeholder="Ej: 12345678"
+                  onChange={(e) => {
+                    setDocNumber(e.target.value);
+                    if (rifError) setRifError(null);
+                  }}
+                  placeholder={docType === 'J' || docType === 'G' ? 'Ej: 312345678' : 'Ej: 12345678'}
                   className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs"
                 />
               </div>
@@ -277,7 +347,22 @@ export function PosView05CustomerSelector() {
                   required
                   value={legalName}
                   onChange={(e) => setLegalName(e.target.value)}
-                  placeholder="Ej: Pedro Pérez"
+                  placeholder="Ej: Inversiones Los Andes C.A."
+                  className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs"
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <label className="text-[10px] font-bold text-[#52635A]">
+                  Dirección Fiscal {docType === 'J' || docType === 'G' ? '(Requerida SENIAT)' : '(Opcional)'}
+                </label>
+                <input
+                  type="text"
+                  value={fiscalAddress}
+                  onChange={(e) => {
+                    setFiscalAddress(e.target.value);
+                    if (rifError) setRifError(null);
+                  }}
+                  placeholder="Ej: Av. Francisco de Miranda, Edif. Centro Lido, Chacao, Caracas"
                   className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs"
                 />
               </div>
