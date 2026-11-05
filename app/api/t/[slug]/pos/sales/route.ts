@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { posStore } from '@/lib/pos-service';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(
   request: NextRequest,
@@ -52,6 +56,50 @@ export async function POST(
   try {
     const payload = await request.json();
 
+    // 1. Intento híbrido: Ejecutar RPC de PostgreSQL / Supabase si la base de datos está disponible
+    try {
+      const supabase = getSupabaseServiceClient();
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('id')
+        .eq('slug', params.slug)
+        .maybeSingle();
+
+      if (tenant) {
+        payload.tenant_id = tenant.id;
+        const { data: rpcData, error: rpcError } = await supabase.rpc('vora_pos_confirm_sale', {
+          p_payload: payload,
+        });
+
+        if (!rpcError && rpcData?.ok) {
+          // Sincronizar en memoria para reflejo inmediato en pantalla
+          const memRes = posStore.confirmSale({
+            branchId: payload.branch_id,
+            shiftId: payload.shift_id,
+            registerId: payload.register_id,
+            cashierUserId: payload.cashier_user_id,
+            customerId: payload.customer_id,
+            idempotencyKey: payload.idempotency_key,
+            correlationId: payload.correlation_id || `corr-${Date.now()}`,
+            lines: payload.lines || [],
+            payments: payload.payments || [],
+            notes: payload.notes,
+            discountAuthorizationId: payload.discount_authorization_id,
+          });
+
+          return NextResponse.json({
+            ok: true,
+            sale: memRes.sale ?? rpcData,
+            source: 'supabase_rpc',
+            idempotent_replay: rpcData.idempotent_replay ?? false,
+          });
+        }
+      }
+    } catch {
+      // Fallback a motor en memoria local
+    }
+
+    // 2. Fallback de alta disponibilidad en memoria
     const result = posStore.confirmSale({
       branchId: payload.branch_id,
       shiftId: payload.shift_id,
@@ -73,6 +121,7 @@ export async function POST(
     return NextResponse.json({
       ok: true,
       sale: result.sale,
+      source: 'local_in_memory',
       idempotent_replay: result.idempotentReplay ?? false,
     });
   } catch (err: any) {

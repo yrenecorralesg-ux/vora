@@ -8,6 +8,7 @@ import type {
   PosProduct,
   PosCustomer,
   PosSale,
+  PosCashMovement,
   PosSettings,
   PosFiscalIntegration,
 } from '@/lib/types';
@@ -86,6 +87,8 @@ interface PosContextType {
   products: PosProduct[];
   customers: PosCustomer[];
   sales: PosSale[];
+  shifts: PosShift[];
+  cashMovements: PosCashMovement[];
 
   // Cart & Active Sale
   cart: CartLine[];
@@ -596,6 +599,8 @@ export function PosProvider({
         products: posStore.products,
         customers: posStore.customers,
         sales: posStore.sales,
+        shifts: posStore.shifts,
+        cashMovements: posStore.cashMovements,
         cart,
         addToCart,
         updateCartQuantity,

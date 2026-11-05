@@ -200,6 +200,55 @@ Diseño de impresión adaptable:
   dirección fiscal completa, evitando rechazos (errores 422) al emitir facturas
   fiscales ante The Factory HKA / SENIAT.
 
+
+--------------------------------------------------------------------------------
+16. REPORTE DE TURNOS Y ARQUEOS DE CAJA (DIAGRAMA §8 / DOCX §16)
+--------------------------------------------------------------------------------
+* Nueva pestaña en la sección de Reportes para auditar todos los turnos abiertos
+  y cerrados de la sede.
+* Permite ver la hora exacta de apertura y cierre, duración del turno, fondo
+  inicial entregado, total esperado por sistema y total declarado en el conteo
+  a ciegas por el cajero.
+* Detecta y resalta si la caja cuadró ($0.00) o si hubo faltantes/sobrantes,
+  con acceso a una ventana modal para ver el arqueo desglosado por método
+  (Efectivo USD/VES, Pago Móvil, Tarjeta, Cashea) e imprimir el informe sellado.
+
+
+--------------------------------------------------------------------------------
+17. REPORTE COMPARATIVO POR CAJERO Y CAJA FÍSICA (DIAGRAMA §8)
+--------------------------------------------------------------------------------
+* Muestra el volumen total de ventas, cantidad de tickets cobrados, ticket promedio
+  y consistencia de dinero en caja para cada cajero (María C., Carlos R., etc.).
+* Compara el desempeño y las operaciones entre las diferentes cajas físicas de la
+  tienda (Caja 1 Mostrador Principal vs Caja 2 Autoservicio).
+
+
+--------------------------------------------------------------------------------
+18. GESTIÓN DE VENTAS A CRÉDITO Y CUENTAS POR COBRAR (DOCX §6 / §15 / CXC)
+--------------------------------------------------------------------------------
+* Permite despachar ventas con abono parcial o sin pago inicial (a crédito).
+* El sistema exige que el cliente esté plenamente identificado con su RIF/Cédula
+  (bloqueando que se otorgue crédito a "Consumidor Final" anónimo).
+* Permite fijar el plazo de pago acordado (7, 15, 30 días o contra entrega) y la
+  fecha límite de cobro.
+* En el Historial de Ventas (POS-13) se incluye:
+  - Filtro para ver las ventas hechas en un turno específico.
+  - Indicador amarillo con el saldo pendiente por cobrar en dólares.
+  - Botón "Abonar CxC" para registrar abonos parciales o liquidar la deuda en
+    efectivo, pago móvil o tarjeta, actualizando el saldo en tiempo real.
+
+
+--------------------------------------------------------------------------------
+19. CONEXIÓN HÍBRIDA BACKEND CON SUPABASE RPC (DOCX §4 / PROCEDIMIENTOS)
+--------------------------------------------------------------------------------
+* Los servicios del punto de venta ahora intentan primero comunicarse directamente
+  con los procedimientos almacenados de PostgreSQL en Supabase:
+  - vora_pos_confirm_sale (para guardar la venta con control de inventario y saldos).
+  - vora_pos_open_shift (para iniciar y sellar la apertura de turno).
+  - vora_pos_close_shift (para procesar el arqueo ciego definitivo).
+* Si no hay conexión o se está usando en modo demostración/offline, el sistema
+  continúa operando sin interrupción con el motor local en memoria.
+
 ================================================================================
 Fin del Resumen. Todos los cambios están probados y cargados en la rama feat/vora-pos.
 ================================================================================

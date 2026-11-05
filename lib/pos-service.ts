@@ -19,6 +19,7 @@ import {
   MOCK_SETTINGS,
   MOCK_FISCAL_INTEGRATION,
   MOCK_ACTIVE_SHIFT,
+  MOCK_SHIFTS_HISTORY,
   MOCK_CASH_MOVEMENTS,
   MOCK_SALES_HISTORY,
   MOCK_RETURNS_HISTORY,
@@ -51,7 +52,7 @@ class PosInMemoryStore {
   registers: PosRegister[] = [...MOCK_REGISTERS];
   customers: PosCustomer[] = [...MOCK_CUSTOMERS];
   products: PosProduct[] = [...MOCK_PRODUCTS];
-  shifts: PosShift[] = [{ ...MOCK_ACTIVE_SHIFT }];
+  shifts: PosShift[] = MOCK_SHIFTS_HISTORY.map((s) => ({ ...s }));
   cashMovements: PosCashMovement[] = [...MOCK_CASH_MOVEMENTS];
   sales: PosSale[] = [...MOCK_SALES_HISTORY];
   returns: PosSaleReturn[] = [...MOCK_RETURNS_HISTORY];
@@ -617,6 +618,96 @@ class PosInMemoryStore {
     };
     this.customers.unshift(newCust);
     return newCust;
+  }
+
+  // Cobro de Cuentas por Cobrar / Abono a Venta a Crédito
+  recordDebtPayment(params: {
+    saleId: string;
+    shiftId: string;
+    amountUsd: number;
+    amountVes: number;
+    paymentMethod: 'efectivo' | 'pago_movil' | 'tarjeta';
+    reference?: string;
+    notes?: string;
+    performedBy: string;
+  }): { ok: boolean; sale?: PosSale; error?: string } {
+    const sale = this.sales.find((s) => s.id === params.saleId);
+    if (!sale) return { ok: false, error: 'Venta no encontrada' };
+
+    const remainingUsd = sale.balance_due_usd;
+    if (remainingUsd <= 0) return { ok: false, error: 'Esta venta ya se encuentra totalmente saldada' };
+
+    const appliedUsd = Math.min(params.amountUsd, remainingUsd);
+    const appliedVes = Math.min(params.amountVes, sale.balance_due_ves);
+
+    sale.paid_total_usd = Number((sale.paid_total_usd + appliedUsd).toFixed(2));
+    sale.paid_total_ves = Number((sale.paid_total_ves + appliedVes).toFixed(2));
+    sale.balance_due_usd = Math.max(0, Number((sale.total_usd - sale.paid_total_usd).toFixed(2)));
+    sale.balance_due_ves = Math.max(0, Number((sale.total_ves - sale.paid_total_ves).toFixed(2)));
+
+    if (sale.balance_due_usd <= 0) {
+      sale.payment_status = 'pagada';
+    } else {
+      sale.payment_status = 'parcial';
+    }
+
+    const paymentId = `pay-${Date.now()}`;
+    const newPayment: PosSalePayment = {
+      id: paymentId,
+      tenant_id: MOCK_TENANT_ID,
+      branch_id: sale.branch_id,
+      sale_id: sale.id,
+      shift_id: params.shiftId,
+      method: params.paymentMethod,
+      currency: params.amountVes > 0 ? 'VES' : 'USD',
+      amount_received: params.amountUsd,
+      amount_applied: appliedUsd,
+      change_amount: 0,
+      change_currency: null,
+      exchange_rate_snapshot: sale.exchange_rate_snapshot,
+      reference_number: params.reference ?? paymentId,
+      bank_code: null,
+      bank_name: null,
+      payer_phone: null,
+      payer_document: null,
+      terminal_id: null,
+      card_last4: null,
+      approval_code: null,
+      cashea_operation_id: null,
+      cashea_merchant_amount: null,
+      provider_status: 'verificado',
+      verified_by: params.performedBy,
+      verified_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    };
+
+    sale.payments = sale.payments || [];
+    sale.payments.push(newPayment);
+
+    // Impactar cubetas de efectivo en el turno activo si el pago fue en efectivo
+    const shift = this.shifts.find((s) => s.id === params.shiftId);
+    if (shift && shift.status === 'abierto') {
+      if (params.paymentMethod === 'efectivo') {
+        if (params.amountVes > 0) {
+          shift.expected_totals['efectivo_ves'] = (shift.expected_totals['efectivo_ves'] ?? 0) + appliedVes;
+        } else {
+          shift.expected_totals['efectivo_usd'] = (shift.expected_totals['efectivo_usd'] ?? 0) + appliedUsd;
+        }
+      }
+    }
+
+    this.addAudit({
+      branch_id: sale.branch_id,
+      shift_id: params.shiftId,
+      actor_id: params.performedBy,
+      event_type: 'abono_cxc',
+      entity_type: 'pos_sales',
+      entity_id: sale.id,
+      description: `Abono a cuenta por cobrar registrado por $${appliedUsd.toFixed(2)} USD en venta ${sale.sale_number} [mock]`,
+      metadata: { appliedUsd, remainingDueUsd: sale.balance_due_usd, method: params.paymentMethod },
+    });
+
+    return { ok: true, sale };
   }
 
   // Auditoría auxiliar

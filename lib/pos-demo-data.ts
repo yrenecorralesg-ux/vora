@@ -373,6 +373,78 @@ export const MOCK_ACTIVE_SHIFT: PosShift = {
   created_at: '2026-10-19T08:00:00Z',
 };
 
+export const MOCK_SHIFTS_HISTORY: PosShift[] = [
+  MOCK_ACTIVE_SHIFT,
+  {
+    id: 'sh000000-0000-0000-0000-000000000002',
+    tenant_id: MOCK_TENANT_ID,
+    branch_id: 'b0000000-0000-0000-0000-000000000001',
+    register_id: 'r0000000-0000-0000-0000-000000000001',
+    cashier_user_id: 'u0000000-0000-0000-0000-000000000002',
+    cashier_name_snapshot: 'Carlos R. [mock]',
+    status: 'cerrado',
+    opened_at: '2026-10-18T08:00:00Z',
+    closed_at: '2026-10-18T16:30:00Z',
+    opening_amount_usd: 50.00,
+    opening_amount_ves: 500.00,
+    expected_totals: {
+      efectivo_usd: 120.00,
+      efectivo_ves: 1450.00,
+      pago_movil_ves: 2100.00,
+      tarjeta_ves: 3400.00,
+      cashea_usd: 45.00,
+    },
+    declared_totals: {
+      efectivo_usd: 120.00,
+      efectivo_ves: 1450.00,
+      pago_movil_ves: 2100.00,
+      tarjeta_ves: 3400.00,
+      cashea_usd: 45.00,
+    },
+    differences_totals: {
+      efectivo_usd: 0.00,
+      efectivo_ves: 0.00,
+    },
+    opening_notes: 'Turno completo con fondo de caja estándar [mock].',
+    closing_justification: 'Arqueo ciego cuadrado sin discrepancias [mock].',
+    closed_by: 'u0000000-0000-0000-0000-000000000002',
+    created_at: '2026-10-18T08:00:00Z',
+  },
+  {
+    id: 'sh000000-0000-0000-0000-000000000003',
+    tenant_id: MOCK_TENANT_ID,
+    branch_id: 'b0000000-0000-0000-0000-000000000001',
+    register_id: 'r0000000-0000-0000-0000-000000000002',
+    cashier_user_id: 'u0000000-0000-0000-0000-000000000001',
+    cashier_name_snapshot: 'María C. [mock]',
+    status: 'cerrado',
+    opened_at: '2026-10-17T09:00:00Z',
+    closed_at: '2026-10-17T17:15:00Z',
+    opening_amount_usd: 40.00,
+    opening_amount_ves: 400.00,
+    expected_totals: {
+      efectivo_usd: 95.00,
+      efectivo_ves: 890.00,
+      pago_movil_ves: 1450.00,
+      tarjeta_ves: 1980.00,
+    },
+    declared_totals: {
+      efectivo_usd: 93.00,
+      efectivo_ves: 890.00,
+      pago_movil_ves: 1450.00,
+      tarjeta_ves: 1980.00,
+    },
+    differences_totals: {
+      efectivo_usd: -2.00,
+      efectivo_ves: 0.00,
+    },
+    opening_notes: 'Apertura en caja secundaria [mock].',
+    closing_justification: 'Faltante de $2.00 USD por redondeo de cambio en efectivo [mock].',
+    closed_by: 'u0000000-0000-0000-0000-000000000003',
+    created_at: '2026-10-17T09:00:00Z',
+  },
+];
+
 export const MOCK_CASH_MOVEMENTS: PosCashMovement[] = [
   {
     id: 'm0000000-0000-0000-0000-000000000001',

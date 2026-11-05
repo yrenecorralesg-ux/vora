@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
+import type { PosSale } from '@/lib/types';
 
 function CasheaIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -49,6 +50,8 @@ export function PosView06Checkout() {
     setLastConfirmedSale,
     showNotification,
     isFuncActive,
+    isOnline,
+    activeTenantSlug,
   } = usePos();
 
   // Pagos aplicados a esta operación
@@ -120,6 +123,12 @@ export function PosView06Checkout() {
   const [casheaCustomerDoc, setCasheaCustomerDoc] = useState<string>(selectedCustomer?.document_number || '');
   const [casheaIntent, setCasheaIntent] = useState<any | null>(null);
   const [generatingCashea, setGeneratingCashea] = useState(false);
+
+  // Inputs Venta a Crédito / Abono Parcial (CxC)
+  const [allowCreditSale, setAllowCreditSale] = useState(false);
+  const [creditTerms, setCreditTerms] = useState('Crédito a 15 días');
+  const [creditDueDate, setCreditDueDate] = useState('2026-11-20');
+  const [creditNotes, setCreditNotes] = useState('');
 
   const handleGenerateCasheaIntent = async () => {
     const amount = parseFloat(casheaAmountUsd);
@@ -304,7 +313,7 @@ export function PosView06Checkout() {
   };
 
   // Confirmación Atómica
-  const handleConfirmSale = () => {
+  const handleConfirmSale = async () => {
     if (!activeShift || activeShift.status !== 'abierto') {
       showNotification('Turno cerrado', 'Debe existir un turno abierto para confirmar la venta.', 'critical');
       navigateTo('POS-02');
@@ -318,24 +327,47 @@ export function PosView06Checkout() {
     }
 
     if (balanceDueUsd > 0.05) {
-      showNotification(
-        'Saldo pendiente',
-        `Resta por cobrar $${balanceDueUsd.toFixed(2)} USD para completar el total de la venta.`,
-        'alert',
-      );
-      return;
+      if (!selectedCustomer || selectedCustomer.customer_tier === 'consumidor_final') {
+        showNotification(
+          'Cliente Requerido para Crédito / CxC',
+          `Resta un saldo de $${balanceDueUsd.toFixed(2)} USD. Las ventas a crédito o con abono parcial requieren un cliente registrado con RIF/Cédula (no Consumidor Final) para imputar la cuenta por cobrar.`,
+          'critical',
+        );
+        return;
+      }
+
+      if (!allowCreditSale) {
+        showNotification(
+          'Saldo pendiente sin autorizar',
+          `Resta un saldo de $${balanceDueUsd.toFixed(2)} USD. Active la casilla "Habilitar crédito para esta venta" para confirmar la operación con abono parcial.`,
+          'alert',
+        );
+        return;
+      }
     }
 
     const idempotencyKey = `sale-${activeRegister.id}-${Date.now()}`;
+    const correlationId = `corr-${Date.now()}`;
 
-    const saleResult = posStore.confirmSale({
-      branchId: activeBranch.id,
-      shiftId: activeShift.id,
-      registerId: activeRegister.id,
-      cashierUserId: activeUser.id,
-      customerId: selectedCustomer?.id,
-      idempotencyKey,
-      correlationId: `corr-${Date.now()}`,
+    const creditNoteSegment = allowCreditSale && balanceDueUsd > 0.05
+      ? `[VENTA A CRÉDITO / CxC]: Plazo: ${creditTerms} (Vence: ${creditDueDate}). Saldo pendiente: $${balanceDueUsd.toFixed(2)} USD (~${balanceDueVes.toFixed(2)} VES). ${creditNotes}`
+      : '';
+
+    const finalNotes = [cartNotes, creditNoteSegment].filter(Boolean).join(' | ');
+
+    const salePayload = {
+      branch_id: activeBranch.id,
+      shift_id: activeShift.id,
+      register_id: activeRegister.id,
+      cashier_user_id: activeUser.id,
+      customer_id: selectedCustomer?.id,
+      idempotency_key: idempotencyKey,
+      correlation_id: correlationId,
+      total_usd: totalUsd,
+      total_ves: totalVes,
+      paid_total_usd: totalPaidUsd,
+      paid_total_ves: totalPaidVes,
+      exchange_rate_snapshot: exchangeRate,
       lines: cart.map((c) => ({
         productId: c.productId,
         name: c.name,
@@ -364,18 +396,62 @@ export function PosView06Checkout() {
         casheaOperationId: p.casheaOperationId,
         providerStatus: p.providerStatus,
       })),
-      notes: cartNotes || undefined,
-      discountAuthorizationId: discountAuthorizedBy ?? undefined,
-    });
+      notes: finalNotes || undefined,
+      discount_authorization_id: discountAuthorizedBy ?? undefined,
+    };
 
-    if (!saleResult.ok || !saleResult.sale) {
-      showNotification('Error en confirmación', saleResult.error ?? 'Fallo al confirmar la venta.', 'critical');
-      return;
+    let confirmedSale: PosSale | null = null;
+
+    // Intento híbrido backend API / RPC
+    if (isOnline) {
+      try {
+        const response = await fetch(`/api/t/${activeTenantSlug}/pos/sales`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(salePayload),
+        });
+        if (response.ok) {
+          const resData = await response.json();
+          if (resData.ok && resData.sale) {
+            confirmedSale = resData.sale;
+          }
+        }
+      } catch {
+        // Fallback inmediato a posStore local
+      }
     }
 
-    setLastConfirmedSale(saleResult.sale);
+    if (!confirmedSale) {
+      const saleResult = posStore.confirmSale({
+        branchId: activeBranch.id,
+        shiftId: activeShift.id,
+        registerId: activeRegister.id,
+        cashierUserId: activeUser.id,
+        customerId: selectedCustomer?.id,
+        idempotencyKey,
+        correlationId,
+        lines: salePayload.lines,
+        payments: salePayload.payments,
+        notes: finalNotes || undefined,
+        discountAuthorizationId: discountAuthorizedBy ?? undefined,
+      });
+
+      if (!saleResult.ok || !saleResult.sale) {
+        showNotification('Error en confirmación', saleResult.error ?? 'Fallo al confirmar la venta.', 'critical');
+        return;
+      }
+      confirmedSale = saleResult.sale;
+    }
+
+    setLastConfirmedSale(confirmedSale);
     clearCart();
-    showNotification('Venta confirmada', `Operación ${saleResult.sale.sale_number} procesada con éxito.`, 'success');
+    showNotification(
+      confirmedSale.balance_due_usd > 0 ? 'Venta a Crédito Confirmada' : 'Venta confirmada',
+      confirmedSale.balance_due_usd > 0
+        ? `Operación ${confirmedSale.sale_number} registrada con saldo pendiente de $${confirmedSale.balance_due_usd.toFixed(2)} USD en CxC.`
+        : `Operación ${confirmedSale.sale_number} procesada con éxito.`,
+      'success',
+    );
     navigateTo('POS-11');
   };
 
@@ -431,6 +507,86 @@ export function PosView06Checkout() {
             </p>
           </div>
         </div>
+
+        {/* Sección Venta a Crédito / Abono Parcial (DOCX §6 / §15 / CxC) */}
+        {balanceDueUsd > 0.05 && (
+          <div className="mt-4 rounded-3xl border border-[#FDE68A] bg-[#FEF3C7]/90 p-5 shadow-xs">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[#92400E]">Modalidad de Venta a Crédito / Abono Parcial</span>
+                  <span className="rounded-full bg-[#B45309] px-2.5 py-0.5 text-[10px] font-bold text-white">
+                    CxC ${balanceDueUsd.toFixed(2)} USD
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[#92400E]">
+                  {selectedCustomer && selectedCustomer.customer_tier !== 'consumidor_final'
+                    ? `Cliente imputable en cuentas por cobrar: ${selectedCustomer.legal_name} (${selectedCustomer.document_type}-${selectedCustomer.document_number}).`
+                    : '⚠️ Las ventas a crédito o con saldo pendiente requieren un cliente registrado (con Cédula/RIF y dirección fiscal) para registrar la cuenta por cobrar (CxC).'}
+                </p>
+              </div>
+
+              {selectedCustomer && selectedCustomer.customer_tier !== 'consumidor_final' ? (
+                <label className="flex items-center gap-2 cursor-pointer rounded-2xl bg-white border border-[#DCE3DF] px-4 py-2.5 text-xs font-bold text-[#111827] shadow-xs hover:border-[#1E6B4E]">
+                  <input
+                    type="checkbox"
+                    checked={allowCreditSale}
+                    onChange={(e) => setAllowCreditSale(e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#1E6B4E]"
+                  />
+                  <span>Habilitar crédito para esta venta</span>
+                </label>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigateTo('POS-05')}
+                  className="rounded-2xl bg-[#144D37] px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-[#1E6B4E]"
+                >
+                  Asignar Cliente Registrado
+                </button>
+              )}
+            </div>
+
+            {allowCreditSale && selectedCustomer && selectedCustomer.customer_tier !== 'consumidor_final' && (
+              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-[#FDE68A] pt-3 text-xs sm:grid-cols-3">
+                <div>
+                  <label className="block text-[10px] font-bold text-[#92400E]">Términos / Plazo de pago</label>
+                  <select
+                    value={creditTerms}
+                    onChange={(e) => setCreditTerms(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs font-semibold"
+                  >
+                    <option value="Crédito a 7 días">Crédito a 7 días</option>
+                    <option value="Crédito a 15 días">Crédito a 15 días</option>
+                    <option value="Crédito a 30 días">Crédito a 30 días</option>
+                    <option value="Contra entrega">Contra entrega / Por cobrar</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-[#92400E]">Fecha límite de cobro</label>
+                  <input
+                    type="date"
+                    value={creditDueDate}
+                    onChange={(e) => setCreditDueDate(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs font-semibold"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-bold text-[#92400E]">Observaciones de crédito</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Acordado con gerencia"
+                    value={creditNotes}
+                    onChange={(e) => setCreditNotes(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs font-semibold"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Grid: Formularios de Pago y Desglose */}

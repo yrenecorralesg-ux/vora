@@ -1,5 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { posStore } from '@/lib/pos-service';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(
   request: NextRequest,
@@ -36,6 +40,45 @@ export async function POST(
     const action = body.action;
 
     if (action === 'open') {
+      // 1. Intento híbrido RPC
+      try {
+        const supabase = getSupabaseServiceClient();
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('slug', params.slug)
+          .maybeSingle();
+
+        if (tenant) {
+          const { data: rpcData, error: rpcError } = await supabase.rpc('vora_pos_open_shift', {
+            p_payload: {
+              tenant_id: tenant.id,
+              branch_id: body.branch_id,
+              register_id: body.register_id,
+              cashier_user_id: body.cashier_user_id,
+              cashier_name: body.cashier_name,
+              opening_usd: Number(body.opening_usd ?? 0),
+              opening_ves: Number(body.opening_ves ?? 0),
+              notes: body.notes,
+            },
+          });
+          if (!rpcError && rpcData?.ok) {
+            const memRes = posStore.openShift({
+              branchId: body.branch_id,
+              registerId: body.register_id,
+              cashierUserId: body.cashier_user_id,
+              cashierName: body.cashier_name,
+              openingUsd: Number(body.opening_usd ?? 0),
+              openingVes: Number(body.opening_ves ?? 0),
+              notes: body.notes,
+            });
+            return NextResponse.json({ ok: true, shift: memRes.shift ?? rpcData, source: 'supabase_rpc' });
+          }
+        }
+      } catch {
+        // Fallback local
+      }
+
       const res = posStore.openShift({
         branchId: body.branch_id,
         registerId: body.register_id,
@@ -50,7 +93,7 @@ export async function POST(
         return NextResponse.json({ ok: false, error: res.error }, { status: 400 });
       }
 
-      return NextResponse.json({ ok: true, shift: res.shift });
+      return NextResponse.json({ ok: true, shift: res.shift, source: 'local_in_memory' });
     }
 
     if (action === 'movement') {
@@ -72,6 +115,39 @@ export async function POST(
     }
 
     if (action === 'close') {
+      // 1. Intento híbrido RPC
+      try {
+        const supabase = getSupabaseServiceClient();
+        const { data: tenant } = await supabase
+          .from('tenants')
+          .select('id')
+          .eq('slug', params.slug)
+          .maybeSingle();
+
+        if (tenant) {
+          const { data: rpcData, error: rpcError } = await supabase.rpc('vora_pos_close_shift', {
+            p_payload: {
+              tenant_id: tenant.id,
+              shift_id: body.shift_id,
+              declared_totals: body.declared ?? {},
+              closing_justification: body.justification,
+              closed_by: body.closed_by,
+            },
+          });
+          if (!rpcError && rpcData?.ok) {
+            const memRes = posStore.closeShift({
+              shiftId: body.shift_id,
+              declared: body.declared ?? {},
+              justification: body.justification,
+              closedBy: body.closed_by,
+            });
+            return NextResponse.json({ ok: true, shift: memRes.shift ?? rpcData, source: 'supabase_rpc' });
+          }
+        }
+      } catch {
+        // Fallback local
+      }
+
       const res = posStore.closeShift({
         shiftId: body.shift_id,
         declared: body.declared ?? {},
@@ -83,7 +159,7 @@ export async function POST(
         return NextResponse.json({ ok: false, error: res.error }, { status: 400 });
       }
 
-      return NextResponse.json({ ok: true, shift: res.shift });
+      return NextResponse.json({ ok: true, shift: res.shift, source: 'local_in_memory' });
     }
 
     return NextResponse.json({ ok: false, error: 'Acción no reconocida' }, { status: 400 });
