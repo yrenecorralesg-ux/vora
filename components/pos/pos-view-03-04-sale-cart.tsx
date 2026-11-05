@@ -52,6 +52,8 @@ export function PosView0304SaleCart() {
     scanBarcode,
     isFuncActive,
     promotions,
+    staffUsers,
+    validateSupervisorPin,
   } = usePos();
 
   // Filtros de Catálogo
@@ -146,18 +148,23 @@ export function PosView0304SaleCart() {
   };
 
   const handleApproveDiscount = () => {
-    const supervisor = MOCK_USERS.find((u) => u.id === supervisorId);
-    if (!supervisor || supervisorPin !== supervisor.pin) {
+    const supervisor = staffUsers.find((u) => u.id === supervisorId);
+    const isValid =
+      (supervisor && supervisorPin === supervisor.pin) ||
+      validateSupervisorPin(supervisorPin);
+
+    if (!isValid) {
       setSupervisorError('El PIN del supervisor no es válido. Operación denegada.');
       return;
     }
 
     if (supervisorIndex !== null) {
       updateCartDiscount(supervisorIndex, requestedDiscountPercent);
-      setDiscountAuthorizedBy(supervisor.name);
+      const authName = supervisor?.name || 'Supervisor de Guardia';
+      setDiscountAuthorizedBy(authName);
       showNotification(
         'Descuento Aprobado',
-        `Descuento del ${requestedDiscountPercent}% autorizado por ${supervisor.name} [mock].`,
+        `Descuento del ${requestedDiscountPercent}% autorizado por ${authName} [mock].`,
         'success',
       );
     }

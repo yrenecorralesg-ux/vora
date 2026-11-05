@@ -26,6 +26,7 @@ import {
   MOCK_AUDIT_EVENTS,
   MOCK_SALES_REPS,
   MOCK_PROMOTIONS,
+  type PosMockUser,
 } from './pos-demo-data';
 import type {
   PosBranch,
@@ -65,6 +66,67 @@ class PosInMemoryStore {
   auditEvents: PosAuditEvent[] = [...MOCK_AUDIT_EVENTS];
   salesReps: PosSalesRep[] = [...MOCK_SALES_REPS];
   promotions: PosPromotion[] = [...MOCK_PROMOTIONS];
+  users: PosMockUser[] = [...MOCK_USERS];
+
+  // Métodos de Supervisión y Control de Roles
+  updateSupervisorConfig(params: {
+    supervisorPin?: string;
+    maxCashierDiscountPercent?: number;
+    requirePinForReturns?: boolean;
+    requirePinForWithdrawals?: boolean;
+    requirePinForCancel?: boolean;
+    enforceBlindCount?: boolean;
+  }) {
+    if (params.supervisorPin !== undefined) this.settings.supervisor_pin = params.supervisorPin;
+    if (params.maxCashierDiscountPercent !== undefined) {
+      this.settings.max_cashier_discount_percent = params.maxCashierDiscountPercent;
+    }
+    if (params.requirePinForReturns !== undefined) this.settings.require_pin_for_returns = params.requirePinForReturns;
+    if (params.requirePinForWithdrawals !== undefined) {
+      this.settings.require_pin_for_withdrawals = params.requirePinForWithdrawals;
+    }
+    if (params.requirePinForCancel !== undefined) this.settings.require_pin_for_cancel = params.requirePinForCancel;
+    if (params.enforceBlindCount !== undefined) this.settings.enforce_blind_count = params.enforceBlindCount;
+    return this.settings;
+  }
+
+  validateSupervisorPin(inputPin: string): boolean {
+    const cleanPin = inputPin.trim();
+    if (!cleanPin) return false;
+    const supervisorPin = this.settings.supervisor_pin || '9999';
+    if (cleanPin === supervisorPin) return true;
+    const supervisorUser = this.users.find(
+      (u) =>
+        (u.role === 'pos_supervisor' || u.role === 'pos_store_admin') &&
+        u.pin === cleanPin &&
+        u.is_active !== false,
+    );
+    return Boolean(supervisorUser);
+  }
+
+  addStaffUser(user: Omit<PosMockUser, 'id'>): PosMockUser {
+    const newUser: PosMockUser = {
+      id: `u-${Date.now()}`,
+      ...user,
+      is_active: true,
+    };
+    this.users.push(newUser);
+    return newUser;
+  }
+
+  toggleStaffUser(id: string): boolean {
+    const user = this.users.find((u) => u.id === id);
+    if (!user) return false;
+    user.is_active = user.is_active === false ? true : false;
+    return true;
+  }
+
+  updateStaffPin(id: string, newPin: string): boolean {
+    const user = this.users.find((u) => u.id === id);
+    if (!user) return false;
+    user.pin = newPin.trim();
+    return true;
+  }
 
   // Métodos de Turno
   getOpenShift(registerId: string): PosShift | undefined {

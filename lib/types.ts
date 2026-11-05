@@ -522,6 +522,11 @@ export interface PosSettings {
   exchange_rate_source?: string | null;
   updated_by: string | null;
   updated_at: string;
+  supervisor_pin?: string;
+  require_pin_for_returns?: boolean;
+  require_pin_for_withdrawals?: boolean;
+  require_pin_for_cancel?: boolean;
+  enforce_blind_count?: boolean;
 }
 
 export interface PosInventoryKardex {

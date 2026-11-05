@@ -27,13 +27,18 @@ export const MOCK_TENANT_SLUG = 'test1';
 export const MOCK_EXCHANGE_RATE = 36.500000;
 export const MOCK_EXCHANGE_RATE_LABEL = 'Tasa BCV Oficial 36,500000 VES/USD [mock]';
 
+export type PosUserRole = 'pos_cashier' | 'pos_supervisor' | 'pos_sales_rep' | 'pos_store_admin' | 'pos_auditor' | 'tenant_admin';
+
 export interface PosMockUser {
   id: string;
   name: string;
-  role: 'pos_cashier' | 'pos_supervisor' | 'pos_store_admin' | 'pos_auditor' | 'tenant_admin';
+  role: PosUserRole;
+  email?: string;
   assignedRegisterId?: string;
   assignedBranchId: string;
   pin: string;
+  commission_rate_percent?: number;
+  is_active?: boolean;
 }
 
 export const MOCK_BRANCHES: PosBranch[] = [
@@ -102,32 +107,60 @@ export const MOCK_USERS: PosMockUser[] = [
   {
     id: 'u0000000-0000-0000-0000-000000000001',
     name: 'María C. [mock] (Cajera - Caja 01)',
+    email: 'maria.cajero@ejemplo.com',
     role: 'pos_cashier',
     assignedRegisterId: 'r0000000-0000-0000-0000-000000000001',
     assignedBranchId: 'b0000000-0000-0000-0000-000000000001',
     pin: '1234',
+    is_active: true,
   },
   {
     id: 'u0000000-0000-0000-0000-000000000002',
     name: 'Luis P. [mock] (Cajero - Caja 02)',
+    email: 'luis.cajero@ejemplo.com',
     role: 'pos_cashier',
     assignedRegisterId: 'r0000000-0000-0000-0000-000000000002',
     assignedBranchId: 'b0000000-0000-0000-0000-000000000001',
     pin: '2345',
+    is_active: true,
   },
   {
     id: 'u0000000-0000-0000-0000-000000000003',
     name: 'Carlos R. [mock] (Supervisor de Sede)',
+    email: 'carlos.supervisor@ejemplo.com',
     role: 'pos_supervisor',
     assignedBranchId: 'b0000000-0000-0000-0000-000000000001',
     pin: '9999',
+    is_active: true,
   },
   {
     id: 'u0000000-0000-0000-0000-000000000004',
     name: 'Admin General test1 [mock] (Administrador de Tienda/Tenant)',
+    email: 'admin.tienda@ejemplo.com',
     role: 'pos_store_admin',
     assignedBranchId: 'b0000000-0000-0000-0000-000000000001',
     pin: '0000',
+    is_active: true,
+  },
+  {
+    id: 'u0000000-0000-0000-0000-000000000005',
+    name: 'Elena Morales (Asesora Comercial)',
+    email: 'elena.asesor@ejemplo.com',
+    role: 'pos_sales_rep',
+    assignedBranchId: 'b0000000-0000-0000-0000-000000000001',
+    pin: '3333',
+    commission_rate_percent: 3.0,
+    is_active: true,
+  },
+  {
+    id: 'u0000000-0000-0000-0000-000000000006',
+    name: 'Carlos Delgado (Asesor Comercial)',
+    email: 'carlos.asesor@ejemplo.com',
+    role: 'pos_sales_rep',
+    assignedBranchId: 'b0000000-0000-0000-0000-000000000001',
+    pin: '4444',
+    commission_rate_percent: 4.0,
+    is_active: true,
   },
 ];
 
@@ -398,6 +431,11 @@ export const MOCK_SETTINGS: PosSettings = {
   exchange_rate_source: 'BCV Oficial (dolarapi)',
   updated_by: 'u0000000-0000-0000-0000-000000000004',
   updated_at: '2026-10-19T08:00:00Z',
+  supervisor_pin: '9999',
+  require_pin_for_returns: true,
+  require_pin_for_withdrawals: true,
+  require_pin_for_cancel: true,
+  enforce_blind_count: true,
 };
 
 export const MOCK_FISCAL_INTEGRATION: PosFiscalIntegration = {

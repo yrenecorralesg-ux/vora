@@ -49,6 +49,11 @@ export default async function TenantCrmLayout({
   children: React.ReactNode;
   params: { slug: string };
 }) {
+  const currentPath = headers().get('x-vora-path') || '';
+  if (currentPath.endsWith('/login') || currentPath.includes('/login?')) {
+    return <>{children}</>;
+  }
+
   const supabase = getSupabaseServerClient();
 
   /* 1. Sesion ------------------------------------------------------------- */

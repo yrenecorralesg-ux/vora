@@ -7,7 +7,17 @@ import { posStore } from '@/lib/pos-service';
 import { MOCK_USERS } from '@/lib/pos-demo-data';
 
 export function PosView14Returns() {
-  const { sales, lastConfirmedSale, activeBranch, activeShift, activeUser, showNotification, navigateTo } = usePos();
+  const {
+    sales,
+    lastConfirmedSale,
+    activeBranch,
+    activeShift,
+    activeUser,
+    showNotification,
+    navigateTo,
+    staffUsers,
+    validateSupervisorPin,
+  } = usePos();
 
   const [saleSearch, setSaleSearch] = useState('');
   const [selectedSale, setSelectedSale] = useState(lastConfirmedSale ?? sales[0]);
@@ -20,7 +30,10 @@ export function PosView14Returns() {
   const [refundMethod, setRefundMethod] = useState<'efectivo_usd' | 'efectivo_ves' | 'reverso_electronico' | 'nota_credito_interna'>('efectivo_usd');
 
   // Supervisor PIN
-  const [supervisorId, setSupervisorId] = useState(MOCK_USERS[2].id);
+  const supervisors = staffUsers.filter(
+    (u) => (u.role === 'pos_supervisor' || u.role === 'pos_store_admin') && u.is_active !== false,
+  );
+  const [supervisorId, setSupervisorId] = useState(supervisors[0]?.id || MOCK_USERS[2].id);
   const [supervisorPin, setSupervisorPin] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -53,8 +66,12 @@ export function PosView14Returns() {
     }
 
     // Validar PIN de supervisor
-    const supervisor = MOCK_USERS.find((u) => u.id === supervisorId);
-    if (!supervisor || supervisor.pin !== supervisorPin) {
+    const supervisor = staffUsers.find((u) => u.id === supervisorId);
+    const isValid =
+      (supervisor && supervisor.pin === supervisorPin.trim()) ||
+      validateSupervisorPin(supervisorPin);
+
+    if (!isValid) {
       setErrorMsg('Credencial o PIN de supervisor inválido. Operación no autorizada.');
       return;
     }
@@ -90,7 +107,7 @@ export function PosView14Returns() {
       notes: notes.trim() || undefined,
       refundMethod,
       requestedBy: activeUser.name,
-      approvedBy: supervisor.name,
+      approvedBy: supervisor?.name || 'Supervisor de Guardia',
     });
 
     if (!res.ok) {

@@ -204,6 +204,8 @@ export const CRM_MODULES_CATALOG: Record<string, ModuleDefinition> = {
       { key: 'pos_scale_weighing', name: 'Venta por peso y básculas electrónicas (Kg/g)', description: 'Tarado y cálculo dinámico de precio por fracción de peso y códigos EAN-13 con peso embebido.', defaultEnabled: true },
       { key: 'pos_sales_commissions', name: 'Comisiones y asignación de asesores de venta', description: 'Asignación de asesores comerciales por ticket para incentivos y cálculo de comisiones.', defaultEnabled: true },
       { key: 'pos_promotions_engine', name: 'Motor de promociones automáticas y combos', description: 'Aplicación automática de descuentos por reglas de volumen (combos, 3x2, happy hour).', defaultEnabled: true },
+      { key: 'pos_tenant_isolated_login', name: 'Login independiente por empresa (/t/[slug]/login)', description: 'Portal de autenticación propio para cajeros y supervisores, aislado del Gestor de Gestores y con identidad corporativa.', defaultEnabled: true },
+      { key: 'pos_supervisor_panel', name: 'Panel de control del supervisor y gestión de roles', description: 'Gestión de políticas de caja, cambio de PIN supervisor, límites de descuento y asignación de cajeros/asesores.', defaultEnabled: true },
     ],
   },
   'commerce.storefront': {

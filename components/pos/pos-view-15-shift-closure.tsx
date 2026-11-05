@@ -29,6 +29,8 @@ export function PosView15ShiftClosure() {
     navigateTo,
     isFuncActive,
     parkedSales,
+    staffUsers,
+    validateSupervisorPin,
   } = usePos();
 
   // Movimiento Manual
@@ -38,7 +40,9 @@ export function PosView15ShiftClosure() {
   const [movReason, setMovReason] = useState<string>('Dotación de cambio para caja [mock]');
 
   // Autorización de Supervisor para movimientos (Diagrama §5)
-  const supervisors = MOCK_USERS.filter((u) => u.role === 'pos_supervisor' || u.role === 'pos_store_admin');
+  const supervisors = staffUsers.filter(
+    (u) => (u.role === 'pos_supervisor' || u.role === 'pos_store_admin') && u.is_active !== false,
+  );
   const [authSupervisorId, setAuthSupervisorId] = useState<string>(supervisors[0]?.id || '');
   const [authSupervisorPin, setAuthSupervisorPin] = useState<string>('');
   const [movementError, setMovementError] = useState<string | null>(null);
@@ -100,11 +104,15 @@ export function PosView15ShiftClosure() {
     let authorizedById: string | null = null;
     if (requiresSupervisorAuth && activeUser.role === 'pos_cashier') {
       const supervisor = supervisors.find((u) => u.id === authSupervisorId);
-      if (!supervisor || supervisor.pin !== authSupervisorPin.trim()) {
+      const isPinValid =
+        (supervisor && supervisor.pin === authSupervisorPin.trim()) ||
+        validateSupervisorPin(authSupervisorPin);
+
+      if (!isPinValid) {
         setMovementError('Autorización denegada: PIN de supervisor incorrecto (Diagrama §5 - Modelo de permisos).');
         return;
       }
-      authorizedById = supervisor.id;
+      authorizedById = supervisor?.id || authSupervisorId;
     }
 
     const res = posStore.addCashMovement({

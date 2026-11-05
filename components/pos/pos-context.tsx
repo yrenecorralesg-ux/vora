@@ -141,6 +141,21 @@ interface PosContextType {
   isCustomerDisplayOpen: boolean;
   setIsCustomerDisplayOpen: (open: boolean) => void;
 
+  // Personal, Roles y Supervisión
+  staffUsers: PosMockUser[];
+  validateSupervisorPin: (pin: string) => boolean;
+  updateSupervisorConfig: (params: {
+    supervisorPin?: string;
+    maxCashierDiscountPercent?: number;
+    requirePinForReturns?: boolean;
+    requirePinForWithdrawals?: boolean;
+    requirePinForCancel?: boolean;
+    enforceBlindCount?: boolean;
+  }) => PosSettings;
+  addStaffUser: (user: Omit<PosMockUser, 'id'>) => PosMockUser;
+  toggleStaffUser: (id: string) => boolean;
+  updateStaffPin: (id: string, newPin: string) => boolean;
+
   // Notification Toast Message (Pure Typography)
   notification: { title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null;
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
@@ -210,11 +225,14 @@ export function PosProvider({
     pos_scale_weighing: true,
     pos_sales_commissions: true,
     pos_promotions_engine: true,
+    pos_tenant_isolated_login: true,
+    pos_supervisor_panel: true,
   });
 
   // Estado nuevas capacidades
   const [selectedSalesRep, setSelectedSalesRep] = useState<PosSalesRep | null>(posStore.salesReps[0] ?? null);
   const [isCustomerDisplayOpen, setIsCustomerDisplayOpen] = useState<boolean>(false);
+  const [staffUsers, setStaffUsers] = useState<PosMockUser[]>(posStore.users);
 
   const isFuncActive = (funcKey: string): boolean => {
     if (!isModuleEnabled) return false;
@@ -316,6 +334,49 @@ export function PosProvider({
       refreshExchangeRate();
     }
   }, []);
+
+  // Supervisor & Staff Management
+  const updateSupervisorConfig = (params: {
+    supervisorPin?: string;
+    maxCashierDiscountPercent?: number;
+    requirePinForReturns?: boolean;
+    requirePinForWithdrawals?: boolean;
+    requirePinForCancel?: boolean;
+    enforceBlindCount?: boolean;
+  }) => {
+    const updated = posStore.updateSupervisorConfig(params);
+    showNotification('Supervisión actualizada', 'Políticas y parámetros de control guardados con éxito.', 'success');
+    return updated;
+  };
+
+  const validateSupervisorPin = (pin: string): boolean => {
+    return posStore.validateSupervisorPin(pin);
+  };
+
+  const addStaffUser = (user: Omit<PosMockUser, 'id'>) => {
+    const created = posStore.addStaffUser(user);
+    setStaffUsers([...posStore.users]);
+    showNotification('Usuario creado', `Se ha registrado al usuario ${created.name} con éxito.`, 'success');
+    return created;
+  };
+
+  const toggleStaffUser = (id: string) => {
+    const ok = posStore.toggleStaffUser(id);
+    if (ok) {
+      setStaffUsers([...posStore.users]);
+      showNotification('Estado actualizado', 'Estatus de activación del usuario modificado.', 'success');
+    }
+    return ok;
+  };
+
+  const updateStaffPin = (id: string, newPin: string) => {
+    const ok = posStore.updateStaffPin(id, newPin);
+    if (ok) {
+      setStaffUsers([...posStore.users]);
+      showNotification('PIN actualizado', 'La clave PIN del usuario ha sido modificada.', 'success');
+    }
+    return ok;
+  };
 
   // Cart operations
   const addToCart = (product: PosProduct, quantity = 1) => {
@@ -656,6 +717,12 @@ export function PosProvider({
         setSelectedSalesRep,
         isCustomerDisplayOpen,
         setIsCustomerDisplayOpen,
+        staffUsers,
+        validateSupervisorPin,
+        updateSupervisorConfig,
+        addStaffUser,
+        toggleStaffUser,
+        updateStaffPin,
       }}
     >
       {children}

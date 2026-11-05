@@ -1,7 +1,20 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Settings, ShieldCheck, Plus, ArrowLeft, RefreshCw, Globe, CheckCircle2 } from 'lucide-react';
+import {
+  Settings,
+  ShieldCheck,
+  Plus,
+  ArrowLeft,
+  RefreshCw,
+  Globe,
+  CheckCircle2,
+  KeyRound,
+  UserCheck,
+  Users,
+  Lock,
+  ShieldAlert,
+} from 'lucide-react';
 import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
 import type { PosPaymentMethod } from '@/lib/types';
@@ -18,6 +31,11 @@ export function PosView17Settings() {
     refreshExchangeRate,
     isFetchingExchangeRate,
     isFuncActive,
+    staffUsers,
+    updateSupervisorConfig,
+    addStaffUser,
+    toggleStaffUser,
+    updateStaffPin,
   } = usePos();
 
   const [maxDiscount, setMaxDiscount] = useState<number>(settings.max_cashier_discount_percent);
@@ -31,6 +49,21 @@ export function PosView17Settings() {
   );
   const [docPrefix, setDocPrefix] = useState<string>(settings.internal_doc_prefix);
   const [activeMethods, setActiveMethods] = useState<PosPaymentMethod[]>([...settings.active_methods]);
+
+  // Políticas y Configuración del Supervisor (pos_supervisor_panel)
+  const [supervisorPin, setSupervisorPin] = useState<string>(settings.supervisor_pin || '9999');
+  const [requirePinReturns, setRequirePinReturns] = useState<boolean>(settings.require_pin_for_returns !== false);
+  const [requirePinWithdrawals, setRequirePinWithdrawals] = useState<boolean>(settings.require_pin_for_withdrawals !== false);
+  const [requirePinCancel, setRequirePinCancel] = useState<boolean>(settings.require_pin_for_cancel !== false);
+  const [enforceBlindCount, setEnforceBlindCount] = useState<boolean>(settings.enforce_blind_count !== false);
+
+  // Nuevo Miembro del Personal (Cajero / Asesor / Supervisor)
+  const [showNewStaffModal, setShowNewStaffModal] = useState<boolean>(false);
+  const [newStaffName, setNewStaffName] = useState('');
+  const [newStaffEmail, setNewStaffEmail] = useState('');
+  const [newStaffRole, setNewStaffRole] = useState<'pos_cashier' | 'pos_supervisor' | 'pos_sales_rep'>('pos_cashier');
+  const [newStaffPin, setNewStaffPin] = useState('1111');
+  const [newStaffCommission, setNewStaffCommission] = useState('3.0');
 
   // Nueva Caja
   const [newRegCode, setNewRegCode] = useState('');
@@ -109,6 +142,42 @@ export function PosView17Settings() {
     setNewRegName('');
     setShowNewRegForm(false);
     showNotification('Caja registrada', `Nueva caja física ${newReg.code} agregada a ${activeBranch.name} [mock].`, 'success');
+  };
+
+  const handleSaveSupervisorPolicies = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supervisorPin.trim() || supervisorPin.trim().length < 4) {
+      showNotification('PIN inválido', 'El PIN de supervisor debe contener al menos 4 dígitos.', 'critical');
+      return;
+    }
+
+    updateSupervisorConfig({
+      supervisorPin: supervisorPin.trim(),
+      maxCashierDiscountPercent: maxDiscount,
+      requirePinForReturns: requirePinReturns,
+      requirePinForWithdrawals: requirePinWithdrawals,
+      requirePinForCancel: requirePinCancel,
+      enforceBlindCount: enforceBlindCount,
+    });
+  };
+
+  const handleCreateStaff = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStaffName.trim() || !newStaffPin.trim()) return;
+
+    addStaffUser({
+      name: newStaffName.trim(),
+      email: newStaffEmail.trim() || undefined,
+      role: newStaffRole,
+      pin: newStaffPin.trim(),
+      assignedBranchId: activeBranch.id,
+      commission_rate_percent: newStaffRole === 'pos_sales_rep' ? parseFloat(newStaffCommission) || 3.0 : undefined,
+    });
+
+    setNewStaffName('');
+    setNewStaffEmail('');
+    setNewStaffPin('1111');
+    setShowNewStaffModal(false);
   };
 
   return (
@@ -363,6 +432,272 @@ export function PosView17Settings() {
           </div>
         </div>
       </div>
+
+      {/* Panel de Supervisión y Control de Roles (pos_supervisor_panel) */}
+      {isFuncActive('pos_supervisor_panel') && (
+        <div className="rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-sm space-y-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E9E7] pb-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#DCFCE7] text-[#1E6B4E]">
+                <ShieldCheck className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold text-[#111827]">
+                  Panel de Control y Supervisión de Caja (Supervisor de Sede)
+                </h2>
+                <p className="text-xs text-[#52635A]">
+                  Configuración de PIN de autorización, políticas de arqueo/retiros y gestión de cajeros y asesores.
+                </p>
+              </div>
+            </div>
+
+            <span className="rounded-full bg-[#1E6B4E] px-3 py-1 text-xs font-bold text-white shadow-2xs">
+              Módulo Supervisor Activo
+            </span>
+          </div>
+
+          <form onSubmit={handleSaveSupervisorPolicies} className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Columna 1: Clave PIN y Políticas */}
+            <div className="space-y-4 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-5">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                Políticas de Autorización y PIN Supervisor
+              </h3>
+
+              <div>
+                <label className="block text-xs font-bold text-[#111827]">
+                  Clave PIN Maestra de Supervisor
+                </label>
+                <div className="relative mt-1">
+                  <input
+                    type="password"
+                    maxLength={8}
+                    required
+                    value={supervisorPin}
+                    onChange={(e) => setSupervisorPin(e.target.value)}
+                    className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 pr-10 text-xs font-mono font-bold tracking-widest text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
+                    placeholder="Mínimo 4 dígitos"
+                  />
+                  <KeyRound className="absolute right-3 top-3 h-4 w-4 text-[#52635A]" />
+                </div>
+                <p className="mt-1 text-[11px] text-[#52635A]">
+                  Utilizada para autorizar excepciones en caja, retiros y anulaciones.
+                </p>
+              </div>
+
+              <div className="space-y-2.5 pt-2 border-t border-[#DCE3DF]">
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#111827]">
+                  <input
+                    type="checkbox"
+                    checked={requirePinReturns}
+                    onChange={(e) => setRequirePinReturns(e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#1E6B4E]"
+                  />
+                  <span>Exigir PIN de supervisor para procesar devoluciones y notas de crédito</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#111827]">
+                  <input
+                    type="checkbox"
+                    checked={requirePinWithdrawals}
+                    onChange={(e) => setRequirePinWithdrawals(e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#1E6B4E]"
+                  />
+                  <span>Exigir PIN de supervisor para retiros o egresos de caja</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#111827]">
+                  <input
+                    type="checkbox"
+                    checked={requirePinCancel}
+                    onChange={(e) => setRequirePinCancel(e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#1E6B4E]"
+                  />
+                  <span>Exigir PIN de supervisor para cancelar ventas en curso</span>
+                </label>
+
+                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#111827]">
+                  <input
+                    type="checkbox"
+                    checked={enforceBlindCount}
+                    onChange={(e) => setEnforceBlindCount(e.target.checked)}
+                    className="h-4 w-4 rounded accent-[#1E6B4E]"
+                  />
+                  <span>Obligatoriedad de arqueo a ciegas en el cierre de turno</span>
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full rounded-xl bg-[#1E6B4E] py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-[#16523B]"
+              >
+                Actualizar políticas de supervisión
+              </button>
+            </div>
+
+            {/* Columna 2: Gestión de Personal (Cajeros, Supervisores, Asesores) */}
+            <div className="space-y-4 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
+                    Personal de Caja y Venta de la Sede
+                  </h3>
+                  <p className="text-[11px] text-[#52635A]">
+                    {staffUsers.length} usuarios registrados en la sede
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNewStaffModal(!showNewStaffModal)}
+                  className="rounded-xl border border-[#DCE3DF] bg-white px-3 py-1.5 text-xs font-bold text-[#111827] shadow-2xs hover:bg-[#DCE3DF]"
+                >
+                  {showNewStaffModal ? 'Cerrar formulario' : '+ Nuevo personal'}
+                </button>
+              </div>
+
+              {showNewStaffModal && (
+                <div className="rounded-2xl border border-[#86EFAC] bg-white p-4 text-xs space-y-3 shadow-xs">
+                  <span className="font-bold text-[#14532D]">Alta de Cajero, Supervisor o Asesor</span>
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                    <div>
+                      <label className="text-[10px] font-bold text-[#52635A]">Nombre completo</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Ej: Pedro Ramos"
+                        value={newStaffName}
+                        onChange={(e) => setNewStaffName(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-[#52635A]">Correo / Usuario</label>
+                      <input
+                        type="email"
+                        placeholder="pedro.cajero@ejemplo.com"
+                        value={newStaffEmail}
+                        onChange={(e) => setNewStaffEmail(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                    <div>
+                      <label className="text-[10px] font-bold text-[#52635A]">Rol asignado</label>
+                      <select
+                        value={newStaffRole}
+                        onChange={(e) => setNewStaffRole(e.target.value as any)}
+                        className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-semibold"
+                      >
+                        <option value="pos_cashier">Cajero(a)</option>
+                        <option value="pos_sales_rep">Asesor(a) de Venta</option>
+                        <option value="pos_supervisor">Supervisor(a)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold text-[#52635A]">Clave PIN (4 dígitos)</label>
+                      <input
+                        type="password"
+                        maxLength={4}
+                        required
+                        value={newStaffPin}
+                        onChange={(e) => setNewStaffPin(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-mono font-bold"
+                      />
+                    </div>
+                    {newStaffRole === 'pos_sales_rep' && (
+                      <div>
+                        <label className="text-[10px] font-bold text-[#52635A]">Comisión (%)</label>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={newStaffCommission}
+                          onChange={(e) => setNewStaffCommission(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-bold"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleCreateStaff}
+                    className="w-full rounded-xl bg-[#1E6B4E] py-2 text-xs font-bold text-white shadow-2xs hover:bg-[#16523B]"
+                  >
+                    Registrar en el equipo
+                  </button>
+                </div>
+              )}
+
+              {/* Lista de personal con estado y PIN */}
+              <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+                {staffUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className="flex items-center justify-between rounded-xl border border-[#E5E9E7] bg-white p-3 text-xs shadow-2xs"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-[#111827]">{user.name}</span>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
+                            user.role === 'pos_supervisor'
+                              ? 'bg-[#FEF3C7] text-[#92400E]'
+                              : user.role === 'pos_sales_rep'
+                              ? 'bg-[#EDE9FE] text-[#6D28D9]'
+                              : user.role === 'pos_store_admin'
+                              ? 'bg-[#E0E7FF] text-[#3730A3]'
+                              : 'bg-[#DCFCE7] text-[#14532D]'
+                          }`}
+                        >
+                          {user.role === 'pos_supervisor'
+                            ? 'Supervisor'
+                            : user.role === 'pos_sales_rep'
+                            ? `Asesor (${user.commission_rate_percent ?? 3}%)`
+                            : user.role === 'pos_store_admin'
+                            ? 'Admin Tienda'
+                            : 'Cajero'}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[10px] text-[#52635A]">
+                        {user.email || 'Sin correo asociado'} · PIN: <span className="font-mono font-bold">****</span>
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newPin = prompt(`Ingrese nuevo PIN (4 dígitos) para ${user.name}:`, user.pin);
+                          if (newPin && newPin.trim().length >= 4) {
+                            updateStaffPin(user.id, newPin.trim());
+                          }
+                        }}
+                        className="rounded-lg border border-[#DCE3DF] bg-[#F6F5F0] px-2 py-1 text-[10px] font-bold text-[#52635A] hover:bg-[#DCE3DF]"
+                      >
+                        Cambiar PIN
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => toggleStaffUser(user.id)}
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${
+                          user.is_active !== false
+                            ? 'bg-[#DCFCE7] text-[#14532D] hover:bg-[#FEE2E2] hover:text-[#991B1B]'
+                            : 'bg-[#FEE2E2] text-[#991B1B] hover:bg-[#DCFCE7] hover:text-[#14532D]'
+                        }`}
+                        title="Clic para activar o desactivar usuario"
+                      >
+                        {user.is_active !== false ? 'Activo' : 'Inactivo'}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

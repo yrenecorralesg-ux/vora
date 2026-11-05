@@ -322,6 +322,36 @@ Diseño de impresión adaptable:
   cuánto ahorró el cliente.
 * Toda la lógica se activa o desactiva con una sola llave en el Gestor de VORA.
 
+
+--------------------------------------------------------------------------------
+26. LOGIN INDEPENDIENTE POR EMPRESA / SEDE (MODULAR: pos_tenant_isolated_login)
+--------------------------------------------------------------------------------
+* Ruta propia /t/[slug]/login para que el personal de la empresa inicie sesión
+  directamente en su punto de venta sin pasar por el portal general /login ni por
+  el Gestor de Gestores (/admin).
+* Muestra el logotipo y nombre de la empresa respectiva (branding del tenant).
+* Valida membresía y roles del personal asignado a esa sede (Cajeros, Supervisores,
+  Asesores de Venta).
+* Incluye selector rápido para pruebas demo con un solo clic.
+* Modular y configurable desde el Gestor de Gestores.
+
+
+--------------------------------------------------------------------------------
+27. PANEL DE CONTROL DEL SUPERVISOR Y GESTIÓN DE ROLES (MODULAR: pos_supervisor_panel)
+--------------------------------------------------------------------------------
+* Permite al supervisor y administradores de tienda gestionar sus propias políticas
+  y personal directamente desde el POS (Configuración):
+  - Modificación de la Clave PIN Maestra de Supervisor.
+  - Ajuste del porcentaje máximo de descuento permitido al cajero sin PIN.
+  - Políticas de seguridad configurables: exigir PIN para anular tickets, exigir PIN
+    para retiros/egresos de efectivo, exigir PIN para devoluciones y obligatoriedad
+    de arqueo a ciegas.
+  - Directorio de Personal: listado de cajeros, supervisores y asesores de venta,
+    con visualización de rol, botón para activar/desactivar y botón para cambiar
+    el PIN individual de cada cajero.
+  - Botón para dar de alta nuevo personal en el mostrador.
+* Todo configurable y con interruptor modular desde el Gestor de Gestores.
+
 ================================================================================
 Fin del Resumen. Todas las funcionalidades están probadas y cargadas en la rama feat/vora-pos.
 ================================================================================
