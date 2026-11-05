@@ -1,12 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CheckCircle2, FileText, ArrowRight, RefreshCw, Printer } from 'lucide-react';
+import { CheckCircle2, FileText, ArrowRight, RefreshCw, Send, Tag, Wallet, UserCheck } from 'lucide-react';
 import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
 
 export function PosView11ConfirmedSale() {
-  const { lastConfirmedSale, navigateTo, showNotification } = usePos();
+  const { lastConfirmedSale, navigateTo, showNotification, isFuncActive } = usePos();
   const [replayNotice, setReplayNotice] = useState<string | null>(null);
 
   if (!lastConfirmedSale) {
@@ -42,6 +42,49 @@ export function PosView11ConfirmedSale() {
         'success',
       );
     }
+  };
+
+  const handleSendWhatsAppReceipt = () => {
+    if (!lastConfirmedSale) return;
+    const phone = lastConfirmedSale.customer?.phone || '';
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const targetPhone = cleanPhone.startsWith('58')
+      ? cleanPhone
+      : cleanPhone.length === 10 || cleanPhone.length === 11
+        ? `58${cleanPhone.replace(/^0/, '')}`
+        : cleanPhone;
+
+    let text = `*COMPROBANTE DE COMPRA - VORA POS*\n`;
+    text += `*Venta Nº:* ${lastConfirmedSale.sale_number}\n`;
+    text += `*Fecha:* ${new Date(lastConfirmedSale.confirmed_at ?? lastConfirmedSale.created_at).toLocaleString('es-VE')}\n`;
+    text += `*Cliente:* ${lastConfirmedSale.customer?.legal_name ?? 'Consumidor Final'}\n`;
+    if (lastConfirmedSale.sales_rep_name) {
+      text += `*Asesor de Venta:* ${lastConfirmedSale.sales_rep_name}\n`;
+    }
+    if (lastConfirmedSale.applied_promotion_title) {
+      text += `*Promoción:* ${lastConfirmedSale.applied_promotion_title}\n`;
+    }
+    text += `--------------------------------\n`;
+    (lastConfirmedSale.lines ?? []).forEach((l) => {
+      text += `• ${l.name_snapshot} x${l.quantity} = $${l.line_total_usd.toFixed(2)} USD\n`;
+    });
+    text += `--------------------------------\n`;
+    text += `*TOTAL:* $${lastConfirmedSale.total_usd.toFixed(2)} USD (${lastConfirmedSale.total_ves.toLocaleString('es-VE')} VES)\n`;
+    if (lastConfirmedSale.wallet_change_deposited_usd && lastConfirmedSale.wallet_change_deposited_usd > 0) {
+      text += `*Vuelto en Billetera Digital:* $${lastConfirmedSale.wallet_change_deposited_usd.toFixed(2)} USD\n`;
+    }
+    if (lastConfirmedSale.wallet_used_usd && lastConfirmedSale.wallet_used_usd > 0) {
+      text += `*Saldo a Favor aplicado:* -$${lastConfirmedSale.wallet_used_usd.toFixed(2)} USD\n`;
+    }
+    if (lastConfirmedSale.balance_due_usd > 0) {
+      text += `*Saldo pendiente (Crédito):* $${lastConfirmedSale.balance_due_usd.toFixed(2)} USD\n`;
+    }
+    text += `\n_¡Gracias por su preferencia en VORA!_`;
+
+    const url = targetPhone
+      ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
   };
 
   return (
@@ -89,6 +132,54 @@ export function PosView11ConfirmedSale() {
             </span>
           </div>
 
+          {lastConfirmedSale.sales_rep_name && (
+            <div className="flex justify-between items-center">
+              <span className="flex items-center gap-1 text-[#52635A]">
+                <UserCheck className="h-3.5 w-3.5 text-[#1E6B4E]" />
+                <span>Asesor comisionable</span>
+              </span>
+              <span className="font-bold text-[#1E6B4E]">
+                {lastConfirmedSale.sales_rep_name}
+              </span>
+            </div>
+          )}
+
+          {lastConfirmedSale.applied_promotion_title && (
+            <div className="flex justify-between items-center">
+              <span className="flex items-center gap-1 text-[#52635A]">
+                <Tag className="h-3.5 w-3.5 text-[#7C3AED]" />
+                <span>Promoción aplicada</span>
+              </span>
+              <span className="font-bold text-[#7C3AED]">
+                {lastConfirmedSale.applied_promotion_title}
+              </span>
+            </div>
+          )}
+
+          {lastConfirmedSale.wallet_used_usd && lastConfirmedSale.wallet_used_usd > 0 && (
+            <div className="flex justify-between items-center text-[#065F46]">
+              <span className="flex items-center gap-1">
+                <Wallet className="h-3.5 w-3.5" />
+                <span>Saldo Billetera Digital usado</span>
+              </span>
+              <span className="font-bold">
+                -${lastConfirmedSale.wallet_used_usd.toFixed(2)} USD
+              </span>
+            </div>
+          )}
+
+          {lastConfirmedSale.wallet_change_deposited_usd && lastConfirmedSale.wallet_change_deposited_usd > 0 && (
+            <div className="flex justify-between items-center text-[#1D4ED8]">
+              <span className="flex items-center gap-1">
+                <Wallet className="h-3.5 w-3.5" />
+                <span>Vuelto acreditado a Billetera</span>
+              </span>
+              <span className="font-bold">
+                +${lastConfirmedSale.wallet_change_deposited_usd.toFixed(2)} USD
+              </span>
+            </div>
+          )}
+
           <div className="flex justify-between items-baseline pt-2 border-t border-[#DCE3DF]">
             <span className="font-bold text-[#111827]">Total liquidado</span>
             <div className="text-right">
@@ -111,6 +202,17 @@ export function PosView11ConfirmedSale() {
 
         {/* Botones de Acción */}
         <div className="mt-6 space-y-2.5">
+          {isFuncActive('pos_whatsapp_receipt') && (
+            <button
+              type="button"
+              onClick={handleSendWhatsAppReceipt}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#25D366] py-3 text-xs font-bold text-white shadow-xs hover:bg-[#1EBE5D] transition"
+            >
+              <Send className="h-4 w-4" />
+              <span>Enviar comprobante digital por WhatsApp (1-Clic)</span>
+            </button>
+          )}
+
           <div className="flex gap-2">
             <button
               type="button"

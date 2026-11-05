@@ -260,6 +260,8 @@ export interface PosProduct {
   tax_rate_percent: number;
   stock_quantity: number;
   status: PosProductStatus;
+  is_weighable?: boolean;
+  unit_of_measure?: 'unit' | 'kg' | 'g';
   created_at: string;
   updated_at: string;
 }
@@ -276,6 +278,8 @@ export interface PosCustomer {
   customer_tier: PosCustomerTier;
   total_purchases_count: number;
   total_purchases_usd: number;
+  wallet_balance_usd?: number;
+  wallet_balance_ves?: number;
   last_purchase_at: string | null;
   created_at: string;
   updated_at: string;
@@ -329,6 +333,30 @@ export interface PosSale {
   customer?: PosCustomer | null;
   document?: PosCommercialDocument | null;
   fiscal_request?: PosFiscalRequest | null;
+  sales_rep_id?: string | null;
+  sales_rep_name?: string | null;
+  wallet_change_deposited_usd?: number;
+  wallet_used_usd?: number;
+  applied_promotion_title?: string | null;
+}
+
+export interface PosPromotion {
+  id: string;
+  name: string;
+  description: string;
+  type: 'combo' | 'percentage' | 'buy_x_get_y';
+  discount_percent: number;
+  trigger_skus: string[];
+  required_quantity: number;
+  is_active: boolean;
+}
+
+export interface PosSalesRep {
+  id: string;
+  name: string;
+  code: string;
+  commission_rate_percent: number;
+  is_active: boolean;
 }
 
 export interface PosSaleLine {

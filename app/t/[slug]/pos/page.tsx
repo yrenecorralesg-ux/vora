@@ -4,6 +4,7 @@ import React from 'react';
 import { PosProvider, usePos } from '@/components/pos/pos-context';
 import { PosSidebar } from '@/components/pos/pos-sidebar';
 import { PosHeader } from '@/components/pos/pos-header';
+import { PosCustomerDisplayModal } from '@/components/pos/pos-customer-display-modal';
 import { PosView01Dashboard } from '@/components/pos/pos-view-01-dashboard';
 import { PosView02OpenShift } from '@/components/pos/pos-view-02-open-shift';
 import { PosView0304SaleCart } from '@/components/pos/pos-view-03-04-sale-cart';
@@ -52,6 +53,9 @@ function PosModuleContent() {
 
   return (
     <div className="flex min-h-screen bg-[#F6F5F0] text-[#111827] print:block print:bg-white">
+      {/* Modal Pantalla de Cara al Cliente (pos_customer_display) */}
+      <PosCustomerDisplayModal />
+
       {/* Barra Lateral estilo PDF */}
       <PosSidebar />
 

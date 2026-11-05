@@ -18,6 +18,8 @@ import {
   PauseCircle,
   PlayCircle,
   X,
+  Scale,
+  Sparkles,
 } from 'lucide-react';
 import { usePos } from './pos-context';
 import type { PosProduct } from '@/lib/types';
@@ -49,6 +51,7 @@ export function PosView0304SaleCart() {
     isOnline,
     scanBarcode,
     isFuncActive,
+    promotions,
   } = usePos();
 
   // Filtros de Catálogo
@@ -70,6 +73,29 @@ export function PosView0304SaleCart() {
   const [supervisorPin, setSupervisorPin] = useState('');
   const [supervisorReason, setSupervisorReason] = useState('Campaña de fidelización autorizada en mostrador [mock]');
   const [supervisorError, setSupervisorError] = useState<string | null>(null);
+
+  // Modal de Pesaje en Balanza (pos_scale_weighing)
+  const [weighingProduct, setWeighingProduct] = useState<PosProduct | null>(null);
+  const [scaleWeightKg, setScaleWeightKg] = useState<string>('0.750');
+  const [scaleTareKg, setScaleTareKg] = useState<string>('0.000');
+
+  // Motor de Promociones Automáticas (pos_promotions_engine)
+  const matchedPromo = React.useMemo(() => {
+    if (!isFuncActive('pos_promotions_engine')) return null;
+    const cartSkus = cart.map((c) => c.sku);
+    for (const promo of promotions) {
+      if (!promo.is_active) continue;
+      const allMatched = promo.trigger_skus.every((sku) => cartSkus.includes(sku));
+      if (allMatched && promo.type === 'combo') {
+        return promo;
+      }
+      const matchQty = cart.find((c) => promo.trigger_skus.includes(c.sku) && c.quantity >= promo.required_quantity);
+      if (matchQty && promo.type === 'buy_x_get_y') {
+        return promo;
+      }
+    }
+    return null;
+  }, [cart, promotions, isFuncActive]);
 
   const categories = [
     'Todas las categorías',
@@ -243,7 +269,15 @@ export function PosView0304SaleCart() {
                   key={p.id}
                   type="button"
                   disabled={isOutOfStock}
-                  onClick={() => addToCart(p)}
+                  onClick={() => {
+                    if (p.is_weighable && isFuncActive('pos_scale_weighing')) {
+                      setWeighingProduct(p);
+                      setScaleWeightKg('0.750');
+                      setScaleTareKg('0.000');
+                    } else {
+                      addToCart(p);
+                    }
+                  }}
                   className={`group flex flex-col justify-between rounded-3xl border border-[#E5E9E7] bg-white p-4 text-left shadow-xs transition hover:border-[#1E6B4E] hover:shadow-md ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
                     }`}
                 >
@@ -254,6 +288,11 @@ export function PosView0304SaleCart() {
                       {p.is_service && (
                         <span className="absolute top-2 left-2 rounded-full bg-[#1E6B4E] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
                           Servicio
+                        </span>
+                      )}
+                      {p.is_weighable && isFuncActive('pos_scale_weighing') && (
+                        <span className="absolute top-2 right-2 inline-flex items-center gap-1 rounded-full bg-[#3B82F6] px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                          <Scale className="h-2.5 w-2.5" /> Balanza
                         </span>
                       )}
                     </div>
@@ -367,6 +406,22 @@ export function PosView0304SaleCart() {
                   >
                     Cambiar
                   </button>
+                </div>
+              )}
+
+              {/* Banner de Promoción Automática (pos_promotions_engine) */}
+              {matchedPromo && (
+                <div className="mt-3 flex items-center justify-between rounded-2xl border border-emerald-300 bg-emerald-50 p-2.5 text-xs text-emerald-900 shadow-2xs">
+                  <div className="flex items-center gap-1.5">
+                    <Sparkles className="h-4 w-4 text-emerald-600 shrink-0" />
+                    <div>
+                      <span className="font-bold">{matchedPromo.name}</span>
+                      <p className="text-[10px] text-emerald-700">{matchedPromo.description}</p>
+                    </div>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                    {matchedPromo.discount_percent}% OFF Auto
+                  </span>
                 </div>
               )}
 
@@ -809,6 +864,103 @@ export function PosView0304SaleCart() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Modal de Báscula / Balanza Electrónica (pos_scale_weighing) */}
+      {weighingProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#E5E9E7] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <Scale className="h-4 w-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-[#111827]">Pesaje en Balanza</h3>
+                  <p className="text-[10px] text-[#52635A]">{weighingProduct.name}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setWeighingProduct(null)}
+                className="flex h-7 w-7 items-center justify-center rounded-full bg-[#F6F5F0] text-[#52635A] hover:bg-[#DCE3DF]"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4 text-center">
+                <span className="text-[10px] font-bold uppercase text-blue-900 tracking-wider">
+                  Peso Bruto en Báscula (Kg)
+                </span>
+                <div className="mt-1 flex items-baseline justify-center gap-1 font-mono">
+                  <input
+                    type="number"
+                    step="0.005"
+                    min="0.005"
+                    max="100"
+                    value={scaleWeightKg}
+                    onChange={(e) => setScaleWeightKg(e.target.value)}
+                    className="w-32 bg-transparent text-center text-4xl font-black text-blue-950 outline-none"
+                  />
+                  <span className="text-sm font-bold text-blue-800">kg</span>
+                </div>
+                <div className="mt-2 flex justify-center gap-2">
+                  {['0.250', '0.500', '0.750', '1.000', '1.500'].map((preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setScaleWeightKg(preset)}
+                      className="rounded-lg border border-blue-200 bg-white px-2 py-0.5 text-[10px] font-bold text-blue-900 hover:bg-blue-100"
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl bg-[#F6F5F0] p-3 text-xs">
+                <span className="text-[#52635A]">Precio por Kilo:</span>
+                <span className="font-bold text-[#111827]">${weighingProduct.price_usd.toFixed(2)} USD / Kg</span>
+              </div>
+
+              <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-900 font-bold">
+                <span>Subtotal calculado:</span>
+                <span className="text-base font-black">
+                  ${(Number(scaleWeightKg || 0) * weighingProduct.price_usd).toFixed(2)} USD
+                </span>
+              </div>
+
+              <div className="flex gap-2 pt-2 border-t border-[#E5E9E7]">
+                <button
+                  type="button"
+                  onClick={() => setWeighingProduct(null)}
+                  className="flex-1 rounded-xl border border-[#DCE3DF] bg-white py-2.5 text-xs font-bold text-[#111827]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const weight = Number(scaleWeightKg);
+                    if (weight > 0) {
+                      addToCart(weighingProduct, weight);
+                      showNotification(
+                        'Producto Pesado',
+                        `${weighingProduct.name} (${weight.toFixed(3)} Kg) agregado al carrito [mock].`,
+                        'success',
+                      );
+                      setWeighingProduct(null);
+                    }
+                  }}
+                  className="flex-1 rounded-xl bg-[#144D37] py-2.5 text-xs font-bold text-white hover:bg-[#1E6B4E]"
+                >
+                  Agregar Peso
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

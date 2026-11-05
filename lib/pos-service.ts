@@ -24,6 +24,8 @@ import {
   MOCK_SALES_HISTORY,
   MOCK_RETURNS_HISTORY,
   MOCK_AUDIT_EVENTS,
+  MOCK_SALES_REPS,
+  MOCK_PROMOTIONS,
 } from './pos-demo-data';
 import type {
   PosBranch,
@@ -42,6 +44,8 @@ import type {
   PosCommercialDocument,
   PosFiscalRequest,
   PosAuditEvent,
+  PosPromotion,
+  PosSalesRep,
 } from './types';
 import { TheFactoryHkaProvider } from './pos-hka-provider';
 import { casheaProvider, CasheaPosProvider } from './pos-cashea-provider';
@@ -59,6 +63,8 @@ class PosInMemoryStore {
   settings: PosSettings = { ...MOCK_SETTINGS };
   fiscalIntegration: PosFiscalIntegration = { ...MOCK_FISCAL_INTEGRATION };
   auditEvents: PosAuditEvent[] = [...MOCK_AUDIT_EVENTS];
+  salesReps: PosSalesRep[] = [...MOCK_SALES_REPS];
+  promotions: PosPromotion[] = [...MOCK_PROMOTIONS];
 
   // Métodos de Turno
   getOpenShift(registerId: string): PosShift | undefined {
@@ -273,6 +279,11 @@ class PosInMemoryStore {
     }>;
     notes?: string;
     discountAuthorizationId?: string;
+    salesRepId?: string;
+    salesRepName?: string;
+    walletChangeDepositedUsd?: number;
+    walletUsedUsd?: number;
+    appliedPromotionTitle?: string;
   }): { ok: boolean; sale?: PosSale; idempotentReplay?: boolean; error?: string } {
     // Idempotencia
     const existing = this.sales.find((s) => s.idempotency_key === params.idempotencyKey);
@@ -392,6 +403,12 @@ class PosInMemoryStore {
       customer.total_purchases_count++;
       customer.total_purchases_usd += totalUsd;
       customer.last_purchase_at = new Date().toISOString();
+      if (params.walletChangeDepositedUsd && params.walletChangeDepositedUsd > 0) {
+        customer.wallet_balance_usd = Number(((customer.wallet_balance_usd ?? 0) + params.walletChangeDepositedUsd).toFixed(2));
+      }
+      if (params.walletUsedUsd && params.walletUsedUsd > 0) {
+        customer.wallet_balance_usd = Math.max(0, Number(((customer.wallet_balance_usd ?? 0) - params.walletUsedUsd).toFixed(2)));
+      }
     }
 
     const saleId = `sale-${Date.now()}`;
@@ -457,6 +474,11 @@ class PosInMemoryStore {
       lines: saleLines,
       payments: salePayments,
       customer: customer ?? null,
+      sales_rep_id: params.salesRepId ?? null,
+      sales_rep_name: params.salesRepName ?? null,
+      wallet_change_deposited_usd: params.walletChangeDepositedUsd ?? 0,
+      wallet_used_usd: params.walletUsedUsd ?? 0,
+      applied_promotion_title: params.appliedPromotionTitle ?? null,
       document: doc,
     };
 

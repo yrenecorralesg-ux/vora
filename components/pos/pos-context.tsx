@@ -11,6 +11,8 @@ import type {
   PosCashMovement,
   PosSettings,
   PosFiscalIntegration,
+  PosPromotion,
+  PosSalesRep,
 } from '@/lib/types';
 import {
   MOCK_TENANT_ID,
@@ -131,6 +133,14 @@ interface PosContextType {
   isFuncActive: (funcKey: string) => boolean;
   reloadTenantFeatures: () => Promise<void>;
 
+  // Nuevas capacidades diferenciadoras
+  salesReps: PosSalesRep[];
+  promotions: PosPromotion[];
+  selectedSalesRep: PosSalesRep | null;
+  setSelectedSalesRep: (rep: PosSalesRep | null) => void;
+  isCustomerDisplayOpen: boolean;
+  setIsCustomerDisplayOpen: (open: boolean) => void;
+
   // Notification Toast Message (Pure Typography)
   notification: { title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null;
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
@@ -194,7 +204,17 @@ export function PosProvider({
     pos_settings: true,
     pos_reports: true,
     pos_credit_sales: true,
+    pos_digital_wallet: true,
+    pos_customer_display: true,
+    pos_whatsapp_receipt: true,
+    pos_scale_weighing: true,
+    pos_sales_commissions: true,
+    pos_promotions_engine: true,
   });
+
+  // Estado nuevas capacidades
+  const [selectedSalesRep, setSelectedSalesRep] = useState<PosSalesRep | null>(posStore.salesReps[0] ?? null);
+  const [isCustomerDisplayOpen, setIsCustomerDisplayOpen] = useState<boolean>(false);
 
   const isFuncActive = (funcKey: string): boolean => {
     if (!isModuleEnabled) return false;
@@ -630,6 +650,12 @@ export function PosProvider({
         posFeatures,
         isFuncActive,
         reloadTenantFeatures,
+        salesReps: posStore.salesReps,
+        promotions: posStore.promotions,
+        selectedSalesRep,
+        setSelectedSalesRep,
+        isCustomerDisplayOpen,
+        setIsCustomerDisplayOpen,
       }}
     >
       {children}

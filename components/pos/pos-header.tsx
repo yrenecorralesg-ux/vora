@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Monitor } from 'lucide-react';
 import { usePos } from './pos-context';
 
 export function PosHeader() {
@@ -14,6 +14,7 @@ export function PosHeader() {
     refreshExchangeRate,
     isFetchingExchangeRate,
     isFuncActive,
+    setIsCustomerDisplayOpen,
   } = usePos();
 
   if (currentView === 'POS-01' && !notification) {
@@ -60,8 +61,19 @@ export function PosHeader() {
               <span>Volver al inicio</span>
             </button>
 
-            {/* Pill Tasa Oficial en cabecera */}
+            {/* Pill Tasa Oficial y Pantalla Cliente en cabecera */}
             <div className="flex items-center gap-2">
+              {isFuncActive('pos_customer_display') && (
+                <button
+                  type="button"
+                  onClick={() => setIsCustomerDisplayOpen(true)}
+                  title="Abrir pantalla de cara al cliente (Customer Display)"
+                  className="flex items-center gap-1.5 rounded-xl border border-[#DCE3DF] bg-white px-3 py-1 text-xs font-bold text-[#111827] shadow-2xs hover:bg-[#F6F5F0] transition"
+                >
+                  <Monitor className="h-3.5 w-3.5 text-[#1E6B4E]" />
+                  <span>Pantalla Cliente</span>
+                </button>
+              )}
               <span className="rounded-xl bg-white border border-[#DCE3DF] px-3 py-1 text-[11px] font-bold text-[#111827] shadow-2xs">
                 Tasa BCV:{' '}
                 <span className="text-[#1E6B4E]">

@@ -18,6 +18,8 @@ import type {
   PosCashMovement,
   PosSaleReturn,
   PosAuditEvent,
+  PosPromotion,
+  PosSalesRep,
 } from './types';
 
 export const MOCK_TENANT_ID = 't0000000-0000-0000-0000-000000000001';
@@ -142,6 +144,8 @@ export const MOCK_CUSTOMERS: PosCustomer[] = [
     customer_tier: 'frecuente',
     total_purchases_count: 8,
     total_purchases_usd: 420.00,
+    wallet_balance_usd: 5.50,
+    wallet_balance_ves: 200.75,
     last_purchase_at: '2026-10-18T15:30:00Z',
     created_at: '2026-08-10T10:00:00Z',
     updated_at: '2026-10-18T15:30:00Z',
@@ -308,6 +312,71 @@ export const MOCK_PRODUCTS: PosProduct[] = [
     status: 'disponible',
     created_at: '2026-10-01T00:00:00Z',
     updated_at: '2026-10-01T00:00:00Z',
+  },
+  {
+    id: 'p0000000-0000-0000-0000-000000000009',
+    tenant_id: MOCK_TENANT_ID,
+    branch_id: 'b0000000-0000-0000-0000-000000000001',
+    sku: 'BAL-001',
+    barcode: '200001000000',
+    name: 'Queso Blanco Llanero (Kg) [mock]',
+    category: 'Víveres y Charcutería',
+    is_service: false,
+    price_usd: 6.5000,
+    tax_rate_percent: 0.00, // Exento
+    stock_quantity: 45.500,
+    status: 'disponible',
+    is_weighable: true,
+    unit_of_measure: 'kg',
+    created_at: '2026-10-01T00:00:00Z',
+    updated_at: '2026-10-01T00:00:00Z',
+  },
+  {
+    id: 'p0000000-0000-0000-0000-000000000010',
+    tenant_id: MOCK_TENANT_ID,
+    branch_id: 'b0000000-0000-0000-0000-000000000001',
+    sku: 'BAL-002',
+    barcode: '200002000000',
+    name: 'Jamón Cocido Superior (Kg) [mock]',
+    category: 'Víveres y Charcutería',
+    is_service: false,
+    price_usd: 9.2000,
+    tax_rate_percent: 16.00,
+    stock_quantity: 28.300,
+    status: 'disponible',
+    is_weighable: true,
+    unit_of_measure: 'kg',
+    created_at: '2026-10-01T00:00:00Z',
+    updated_at: '2026-10-01T00:00:00Z',
+  },
+];
+
+export const MOCK_SALES_REPS: PosSalesRep[] = [
+  { id: 'rep-01', name: 'Elena Morales [mock]', code: 'VEN-01', commission_rate_percent: 3.0, is_active: true },
+  { id: 'rep-02', name: 'Roberto Gómez [mock]', code: 'VEN-02', commission_rate_percent: 2.5, is_active: true },
+  { id: 'rep-03', name: 'Venta Directa de Mostrador', code: 'VEN-DIR', commission_rate_percent: 0.0, is_active: true },
+];
+
+export const MOCK_PROMOTIONS: PosPromotion[] = [
+  {
+    id: 'promo-01',
+    name: 'Combo Ropa Urbana (10% OFF)',
+    description: 'Compra Camiseta Básica + Gorra Casual y obtén 10% de descuento en el carrito',
+    type: 'combo',
+    discount_percent: 10,
+    trigger_skus: ['CMB-001', 'GC-010'],
+    required_quantity: 2,
+    is_active: true,
+  },
+  {
+    id: 'promo-02',
+    name: 'Promoción 3x2 en Calzado',
+    description: 'Compra 3 o más unidades de Zapatos Deportivos y obtén 33% de descuento',
+    type: 'buy_x_get_y',
+    discount_percent: 33.33,
+    trigger_skus: ['ZD-402'],
+    required_quantity: 3,
+    is_active: true,
   },
 ];
 

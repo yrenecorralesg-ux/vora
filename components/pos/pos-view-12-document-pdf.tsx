@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Printer, RefreshCw, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { Printer, RefreshCw, AlertTriangle, ArrowLeft, Send } from 'lucide-react';
 import { usePos } from './pos-context';
 import { posStore, hkaProvider } from '@/lib/pos-service';
 
@@ -115,6 +115,40 @@ export function PosView12DocumentPdf() {
     }
   };
 
+  const handleSendWhatsAppReceipt = () => {
+    if (!fiscalSale) return;
+    const phone = fiscalSale.customer?.phone || '';
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    const targetPhone = cleanPhone.startsWith('58')
+      ? cleanPhone
+      : cleanPhone.length === 10 || cleanPhone.length === 11
+        ? `58${cleanPhone.replace(/^0/, '')}`
+        : cleanPhone;
+
+    let text = `*COMPROBANTE DE COMPRA - VORA POS*\n`;
+    text += `*Venta Nº:* ${fiscalSale.sale_number}\n`;
+    text += `*Fecha:* ${new Date(fiscalSale.confirmed_at ?? fiscalSale.created_at).toLocaleString('es-VE')}\n`;
+    text += `*Cliente:* ${fiscalSale.customer?.legal_name ?? 'Consumidor Final'}\n`;
+    if (fiscalSale.sales_rep_name) {
+      text += `*Asesor de Venta:* ${fiscalSale.sales_rep_name}\n`;
+    }
+    text += `--------------------------------\n`;
+    (fiscalSale.lines ?? []).forEach((l) => {
+      text += `• ${l.name_snapshot} x${l.quantity} = $${l.line_total_usd.toFixed(2)} USD\n`;
+    });
+    text += `--------------------------------\n`;
+    text += `*TOTAL:* $${fiscalSale.total_usd.toFixed(2)} USD (${fiscalSale.total_ves.toLocaleString('es-VE')} VES)\n`;
+    if (fiscalSale.balance_due_usd > 0) {
+      text += `*Saldo pendiente (Crédito):* $${fiscalSale.balance_due_usd.toFixed(2)} USD\n`;
+    }
+    text += `\n_¡Gracias por su compra en VORA!_`;
+
+    const url = targetPhone
+      ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(text)}`
+      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="space-y-6 print:space-y-0 print:m-0">
       {/* Estilos dedicados de impresión térmica / recibo limpio */}
@@ -160,6 +194,16 @@ export function PosView12DocumentPdf() {
                 }`}
               >
                 {thermalFormat ? 'Formato: Ticket Térmico 80mm' : 'Cambiar a Ticket Térmico 80mm'}
+              </button>
+            )}
+            {isFuncActive('pos_whatsapp_receipt') && (
+              <button
+                type="button"
+                onClick={handleSendWhatsAppReceipt}
+                className="flex items-center gap-1.5 rounded-2xl bg-[#25D366] px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-[#1EBE5D] transition"
+              >
+                <Send className="h-4 w-4" />
+                <span>Enviar WhatsApp</span>
               </button>
             )}
             <button

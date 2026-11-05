@@ -249,7 +249,80 @@ Diseño de impresión adaptable:
 * Si no hay conexión o se está usando en modo demostración/offline, el sistema
   continúa operando sin interrupción con el motor local en memoria.
 
+
+--------------------------------------------------------------------------------
+20. BILLETERA DIGITAL Y SALDO A FAVOR DEL CLIENTE (MODULAR: pos_digital_wallet)
+--------------------------------------------------------------------------------
+* Resuelve el problema crítico de la escasez de cambio en efectivo (dólares y bolívares).
+* Si una venta genera un vuelto (ej. $3.50 USD), el cajero puede marcar la casilla
+  "Acreditar vuelto a la Billetera Digital del cliente" en lugar de buscar billetes
+  pequeños o dar caramelos.
+* En su próxima visita, el sistema detecta que el cliente tiene saldo acumulado a favor
+  y ofrece un botón para pagar usando su billetera digital con 1 clic.
+* Se puede activar o desactivar desde la configuración de módulos del Gestor de VORA.
+
+
+--------------------------------------------------------------------------------
+21. PANTALLA SECUNDARIA DE CARA AL CLIENTE / DUAL MONITOR (MODULAR: pos_customer_display)
+--------------------------------------------------------------------------------
+* Permite mostrar una segunda pantalla dirigida al cliente que está en el mostrador.
+* Muestra en tiempo real:
+  - Cada producto que el cajero va escaneando con su precio y descuento.
+  - El total general a pagar en Dólares ($) y en Bolívares (VES) a la tasa oficial BCV.
+  - Código QR dinámico de Pago Móvil con el monto exacto para que el cliente escanee
+    desde su teléfono y pague al instante sin teclear datos.
+* Botón "Extender a Monitor 2" para proyectar la ventana en el monitor físico del cliente.
+* Configurable y modular: se puede prender o apagar desde el Gestor de VORA.
+
+
+--------------------------------------------------------------------------------
+22. ENVÍO DE COMPROBANTE POR WHATSAPP EN 1-CLIC (MODULAR: pos_whatsapp_receipt)
+--------------------------------------------------------------------------------
+* Ahorra papel térmico y moderniza la experiencia del cliente.
+* Al confirmar una venta o consultar el comprobante, aparece un botón verde
+  "Enviar comprobante digital por WhatsApp".
+* Abre de inmediato el chat de WhatsApp con el número del cliente y un mensaje
+  perfectamente formateado con el número de venta, fecha, desglose de artículos,
+  totales en USD/VES y saldo en billetera digital.
+* Funciona sin necesidad de imprimir ni gastar rollos de papel.
+
+
+--------------------------------------------------------------------------------
+23. VENTA POR PESO Y BÁSCULAS/BALANZAS ELECTRÓNICAS (MODULAR: pos_scale_weighing)
+--------------------------------------------------------------------------------
+* Diseñado para carnicerías, charcuterías, verdulerías y supermercados.
+* Soporta productos vendidos por Kilos o Gramos (ej. Queso Llanero, Jamón Superior).
+* Modal interactivo de balanza electrónica:
+  - Botón de Tara rápida a 0.000 Kg.
+  - Botones de peso frecuente (+250g, +500g, +1.000kg).
+  - Cálculo automático e instantáneo del precio según el peso exacto colocado.
+  - Compatible con códigos de barras de balanza (prefijos 20 y 28).
+
+
+--------------------------------------------------------------------------------
+24. ASIGNACIÓN DE ASESORES DE VENTA Y COMISIONES (MODULAR: pos_sales_commissions)
+--------------------------------------------------------------------------------
+* Permite vincular a cada venta el asesor de mostrador o vendedor responsable.
+* En la pantalla de cobro se despliega un selector con el equipo de ventas
+  (ej. Elena Morales - 3%, Carlos Delgado - 4%).
+* Registra el porcentaje de comisión correspondiente a cada venta para el cálculo
+  de nómina e incentivos del personal.
+* Queda reflejado en el ticket y en el historial de ventas.
+
+
+--------------------------------------------------------------------------------
+25. MOTOR DE PROMOCIONES Y COMBOS AUTOMÁTICOS (MODULAR: pos_promotions_engine)
+--------------------------------------------------------------------------------
+* Aplica descuentos y ofertas de forma automática sin que el cajero tenga que
+  calcular nada a mano ni recordar fechas de ofertas.
+* Detecta promociones activas como:
+  - "Combo Parrillero": 15% de descuento al llevar Carbón + Salsa BBQ.
+  - "Lunes de Harina Pan": Descuento especial por volumen.
+* Muestra un aviso en el carrito informando al cajero qué combos están activos y
+  cuánto ahorró el cliente.
+* Toda la lógica se activa o desactiva con una sola llave en el Gestor de VORA.
+
 ================================================================================
-Fin del Resumen. Todos los cambios están probados y cargados en la rama feat/vora-pos.
+Fin del Resumen. Todas las funcionalidades están probadas y cargadas en la rama feat/vora-pos.
 ================================================================================
 

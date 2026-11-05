@@ -10,6 +10,9 @@ import {
   Trash2,
   QrCode,
   ShieldAlert,
+  Wallet,
+  UserCheck,
+  Percent,
 } from 'lucide-react';
 import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
@@ -52,7 +55,14 @@ export function PosView06Checkout() {
     isFuncActive,
     isOnline,
     activeTenantSlug,
+    salesReps,
+    selectedSalesRep,
+    setSelectedSalesRep,
   } = usePos();
+
+  // Billetera Digital & Saldo a Favor (pos_digital_wallet)
+  const [depositChangeToWallet, setDepositChangeToWallet] = useState<boolean>(false);
+  const [useCustomerWallet, setUseCustomerWallet] = useState<boolean>(false);
 
   // Pagos aplicados a esta operación
   const [appliedPayments, setAppliedPayments] = useState<Array<{
@@ -91,7 +101,16 @@ export function PosView06Checkout() {
     return sum + (p.changeCurrency === 'USD' ? p.changeAmount : p.changeAmount / exchangeRate);
   }, 0);
 
-  const balanceDueUsd = Math.max(0, Number((totalUsd - totalPaidUsd).toFixed(2)));
+  // Billetera Digital y Saldo a Favor (pos_digital_wallet)
+  const customerWalletUsd =
+    isFuncActive('pos_digital_wallet') && selectedCustomer && selectedCustomer.customer_tier !== 'consumidor_final'
+      ? selectedCustomer.wallet_balance_usd ?? 0
+      : 0;
+
+  const rawPendingUsd = Math.max(0, Number((totalUsd - totalPaidUsd).toFixed(2)));
+  const walletUsedUsd = useCustomerWallet && customerWalletUsd > 0 ? Math.min(customerWalletUsd, rawPendingUsd) : 0;
+
+  const balanceDueUsd = Math.max(0, Number((rawPendingUsd - walletUsedUsd).toFixed(2)));
   const balanceDueVes = Math.max(0, Number((balanceDueUsd * exchangeRate).toFixed(2)));
 
   // Inputs Efectivo
@@ -398,6 +417,10 @@ export function PosView06Checkout() {
       })),
       notes: finalNotes || undefined,
       discount_authorization_id: discountAuthorizedBy ?? undefined,
+      sales_rep_id: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.id : undefined,
+      sales_rep_name: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.name : undefined,
+      wallet_change_deposited_usd: isFuncActive('pos_digital_wallet') && depositChangeToWallet ? totalChangeUsd : undefined,
+      wallet_used_usd: isFuncActive('pos_digital_wallet') && useCustomerWallet ? walletUsedUsd : undefined,
     };
 
     let confirmedSale: PosSale | null = null;
@@ -434,6 +457,10 @@ export function PosView06Checkout() {
         payments: salePayload.payments,
         notes: finalNotes || undefined,
         discountAuthorizationId: discountAuthorizedBy ?? undefined,
+        salesRepId: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.id : undefined,
+        salesRepName: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.name : undefined,
+        walletChangeDepositedUsd: isFuncActive('pos_digital_wallet') && depositChangeToWallet ? totalChangeUsd : undefined,
+        walletUsedUsd: isFuncActive('pos_digital_wallet') && useCustomerWallet ? walletUsedUsd : undefined,
       });
 
       if (!saleResult.ok || !saleResult.sale) {
@@ -507,6 +534,95 @@ export function PosView06Checkout() {
             </p>
           </div>
         </div>
+
+        {/* Asesor de Venta / Comisiones (pos_sales_commissions) */}
+        {isFuncActive('pos_sales_commissions') && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 text-xs">
+            <div className="flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-[#1E6B4E]" />
+              <span className="font-bold text-[#111827]">Asesor / Vendedor comisionable:</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={selectedSalesRep?.id ?? ''}
+                onChange={(e) => {
+                  const rep = salesReps.find((r) => r.id === e.target.value) || null;
+                  setSelectedSalesRep(rep);
+                }}
+                className="rounded-xl border border-[#DCE3DF] bg-white px-3 py-1.5 text-xs font-semibold text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
+              >
+                <option value="">(Sin asesor / Venta directa)</option>
+                {salesReps.map((rep) => (
+                  <option key={rep.id} value={rep.id}>
+                    {rep.name} · ({rep.commission_rate_percent}% comisión)
+                  </option>
+                ))}
+              </select>
+              {selectedSalesRep && (
+                <span className="rounded-full bg-[#DCFCE7] px-2.5 py-1 text-[10px] font-bold text-[#14532D]">
+                  Comisión: {selectedSalesRep.commission_rate_percent}%
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Billetera Digital: Usar Saldo a Favor (pos_digital_wallet) */}
+        {isFuncActive('pos_digital_wallet') && customerWalletUsd > 0 && (
+          <div className="mt-3 rounded-2xl border border-[#A7F3D0] bg-[#ECFDF5] p-3.5 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="rounded-xl bg-[#10B981] p-1.5 text-white">
+                  <Wallet className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-[#065F46]">
+                    Billetera Digital: Saldo a favor disponible de ${customerWalletUsd.toFixed(2)} USD
+                  </span>
+                  <p className="text-[10px] text-[#047857]">
+                    El cliente dispone de crédito acumulado por vueltos o notas de crédito previas.
+                  </p>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer rounded-xl bg-white border border-[#A7F3D0] px-3.5 py-1.5 text-xs font-bold text-[#065F46] hover:bg-[#D1FAE5]">
+                <input
+                  type="checkbox"
+                  checked={useCustomerWallet}
+                  onChange={(e) => setUseCustomerWallet(e.target.checked)}
+                  className="h-4 w-4 rounded accent-[#059669]"
+                />
+                <span>
+                  {useCustomerWallet
+                    ? `Aplicado: -$${walletUsedUsd.toFixed(2)} USD`
+                    : `Aplicar saldo ($${Math.min(customerWalletUsd, rawPendingUsd).toFixed(2)} USD)`}
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Billetera Digital: Acreditar Vuelto a Favor (pos_digital_wallet) */}
+        {isFuncActive('pos_digital_wallet') && totalChangeUsd > 0 && selectedCustomer && selectedCustomer.customer_tier !== 'consumidor_final' && (
+          <div className="mt-3 rounded-2xl border border-[#93C5FD] bg-[#EFF6FF] p-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-[#1D4ED8]" />
+                <span className="font-bold text-[#1E40AF]">
+                  ¿Acreditar vuelto de ${totalChangeUsd.toFixed(2)} USD a Billetera Digital?
+                </span>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer rounded-xl bg-white border border-[#93C5FD] px-3 py-1.5 text-xs font-bold text-[#1D4ED8] hover:bg-[#DBEAFE]">
+                <input
+                  type="checkbox"
+                  checked={depositChangeToWallet}
+                  onChange={(e) => setDepositChangeToWallet(e.target.checked)}
+                  className="h-4 w-4 rounded accent-[#2563EB]"
+                />
+                <span>Acreditar a favor del cliente (sin dar efectivo)</span>
+              </label>
+            </div>
+          </div>
+        )}
 
         {/* Sección Venta a Crédito / Abono Parcial (DOCX §6 / §15 / CxC) */}
         {balanceDueUsd > 0.05 && isFuncActive('pos_credit_sales') && (

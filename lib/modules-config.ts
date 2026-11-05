@@ -198,6 +198,12 @@ export const CRM_MODULES_CATALOG: Record<string, ModuleDefinition> = {
       { key: 'pos_settings', name: 'Configuración de sede y cajas', description: 'Administración de cajas físicas y límites operativos.', defaultEnabled: true },
       { key: 'pos_credit_sales', name: 'Ventas a crédito y Cuentas por Cobrar (CxC)', description: 'Venta con saldo pendiente diferido, control de plazos y recepción de abonos en mostrador.', defaultEnabled: true },
       { key: 'pos_reports', name: 'Reportes y distribución de cobros', description: 'Métricas financieras en tiempo real y gráficos de venta.', defaultEnabled: true },
+      { key: 'pos_digital_wallet', name: 'Billetera digital y vuelto a favor del cliente', description: 'Acredita el cambio/vuelto en monedero virtual del cliente para compras futuras sin requerir sencillo físico.', defaultEnabled: true },
+      { key: 'pos_customer_display', name: 'Pantalla secundaria de cara al cliente (Dual Screen)', description: 'Vista en vivo para monitor o tablet de cliente con totales, BCV y QR dinámico de cobro.', defaultEnabled: true },
+      { key: 'pos_whatsapp_receipt', name: 'Envío de ticket y factura por WhatsApp', description: 'Despacho con un clic del comprobante térmico digital al WhatsApp del cliente con enlace directo.', defaultEnabled: true },
+      { key: 'pos_scale_weighing', name: 'Venta por peso y básculas electrónicas (Kg/g)', description: 'Tarado y cálculo dinámico de precio por fracción de peso y códigos EAN-13 con peso embebido.', defaultEnabled: true },
+      { key: 'pos_sales_commissions', name: 'Comisiones y asignación de asesores de venta', description: 'Asignación de asesores comerciales por ticket para incentivos y cálculo de comisiones.', defaultEnabled: true },
+      { key: 'pos_promotions_engine', name: 'Motor de promociones automáticas y combos', description: 'Aplicación automática de descuentos por reglas de volumen (combos, 3x2, happy hour).', defaultEnabled: true },
     ],
   },
   'commerce.storefront': {
