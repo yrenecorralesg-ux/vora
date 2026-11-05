@@ -207,6 +207,8 @@ export const CRM_MODULES_CATALOG: Record<string, ModuleDefinition> = {
       { key: 'pos_tenant_isolated_login', name: 'Login independiente por empresa (/t/[slug]/login)', description: 'Portal de autenticación propio para cajeros y supervisores, aislado del Gestor de Gestores y con identidad corporativa.', defaultEnabled: true },
       { key: 'pos_supervisor_panel', name: 'Panel de control del supervisor y gestión de roles', description: 'Gestión de políticas de caja, cambio de PIN supervisor, límites de descuento y asignación de cajeros/asesores.', defaultEnabled: true },
       { key: 'pos_supervisor_users_crud', name: 'Módulo de usuarios y CRUD de personal para supervisores', description: 'Permite al supervisor crear, editar, eliminar y gestionar cajeros, supervisores y asesores de venta del gestor específico.', defaultEnabled: true },
+      { key: 'pos_order_dispatch_kds', name: 'Comandas de despacho y almacén / Pantalla KDS', description: 'Pantalla en vivo para cocina, empaque y bodega con estados: pendiente, en preparación y listo para entrega.', defaultEnabled: true },
+      { key: 'pos_accounting_export', name: 'Exportación contable SENIAT y Libro de Ventas (CSV/Excel)', description: 'Descarga con un clic del Libro Especial de Ventas con desglose de Base Imponible, Exento, IVA 16% e IGTF 3%.', defaultEnabled: true },
     ],
   },
   'commerce.storefront': {

@@ -26,7 +26,18 @@ import { posStore } from '@/lib/pos-service';
 import type { PosShift } from '@/lib/types';
 
 export function PosView16Reports() {
-  const { sales, branches, activeBranchId, exchangeRate, showNotification, shifts, cashMovements, registers } = usePos();
+  const {
+    sales,
+    branches,
+    activeBranchId,
+    exchangeRate,
+    showNotification,
+    shifts,
+    cashMovements,
+    registers,
+    isFuncActive,
+    generateAccountingSalesBookCsv,
+  } = usePos();
 
   // Pestaña activa (Diagrama §8: Ventas, Turnos/Cierres, Cajeros/Cajas)
   const [reportTab, setReportTab] = useState<'ventas' | 'turnos' | 'cajeros'>('ventas');
@@ -143,7 +154,24 @@ export function PosView16Reports() {
   ];
 
   // Exportación
-  const handleExport = (format: 'csv' | 'json') => {
+  const handleExport = (format: 'csv' | 'json' | 'seniat') => {
+    if (format === 'seniat') {
+      if (!isFuncActive('pos_accounting_export')) {
+        showNotification('Módulo inactivo', 'Exportación contable SENIAT inhabilitada en el Gestor de VORA.', 'alert');
+        return;
+      }
+      const csvContent = generateAccountingSalesBookCsv();
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `libro-especial-ventas-seniat-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showNotification('Libro Especial de Ventas', 'Generado archivo CSV oficial SENIAT (con BOM UTF-8 para Excel).', 'success');
+      return;
+    }
+
     if (format === 'json') {
       const data = {
         tenant: 'test1 [mock]',
@@ -287,7 +315,7 @@ export function PosView16Reports() {
               <span>Exportar</span>
               <ChevronDown className="h-3.5 w-3.5 text-[#52635A]" />
             </button>
-            <div className="absolute right-0 top-full mt-1.5 hidden w-36 rounded-2xl border border-[#DCE3DF] bg-white p-1.5 shadow-lg group-hover:block z-20">
+            <div className="absolute right-0 top-full mt-1.5 hidden w-48 rounded-2xl border border-[#DCE3DF] bg-white p-1.5 shadow-lg group-hover:block z-20">
               <button
                 type="button"
                 onClick={() => handleExport('csv')}
@@ -302,6 +330,16 @@ export function PosView16Reports() {
               >
                 Exportar JSON
               </button>
+              {isFuncActive('pos_accounting_export') && (
+                <button
+                  type="button"
+                  onClick={() => handleExport('seniat')}
+                  className="w-full rounded-xl px-3 py-1.5 text-left text-xs font-semibold text-[#1E6B4E] hover:bg-[#1E6B4E]/10 border-t border-[#E5E9E7] mt-1 pt-1.5 flex items-center justify-between"
+                >
+                  <span>Libro Ventas SENIAT</span>
+                  <span className="text-[10px] bg-[#1E6B4E]/20 text-[#1E6B4E] px-1 py-0.5 rounded font-mono font-bold">CSV</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -358,6 +396,35 @@ export function PosView16Reports() {
 
       {reportTab === 'ventas' && (
         <>
+          {/* Banner Libro Especial de Ventas SENIAT (pos_accounting_export) */}
+          {isFuncActive('pos_accounting_export') && (
+            <div className="flex flex-wrap items-center justify-between gap-4 rounded-3xl border border-[#1E6B4E]/30 bg-[#1E6B4E]/5 p-5 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#1E6B4E] text-white shadow-xs">
+                  <FileText className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-[#111827]">Libro Especial de Ventas SENIAT</h3>
+                    <span className="rounded-md bg-[#1E6B4E]/15 px-2 py-0.5 text-[10px] font-bold text-[#1E6B4E]">
+                      Providencia SNAT/2014/0032
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#52635A]">
+                    Descarga del Libro Especial de Ventas en formato oficial CSV (con codificación UTF-8 BOM y delimitador &quot;;&quot;) listo para abrir en Microsoft Excel.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleExport('seniat')}
+                className="flex items-center gap-2 rounded-2xl bg-[#1E6B4E] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition hover:bg-[#144D37]"
+              >
+                <Download className="h-4 w-4" />
+                <span>Exportar Libro de Ventas (.CSV)</span>
+              </button>
+            </div>
+          )}
 
       {/* 4 Tarjetas de Métricas Clave (Idénticas al Mockup del PDF) */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

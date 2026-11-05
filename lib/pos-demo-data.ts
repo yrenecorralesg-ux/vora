@@ -20,6 +20,7 @@ import type {
   PosAuditEvent,
   PosPromotion,
   PosSalesRep,
+  PosDispatchOrder,
 } from './types';
 
 export const MOCK_TENANT_ID = 't0000000-0000-0000-0000-000000000001';
@@ -410,6 +411,56 @@ export const MOCK_PROMOTIONS: PosPromotion[] = [
     trigger_skus: ['ZD-402'],
     required_quantity: 3,
     is_active: true,
+  },
+];
+
+export const MOCK_DISPATCH_ORDERS: PosDispatchOrder[] = [
+  {
+    id: 'dsp-001',
+    order_number: 'DSP-101',
+    sale_id: 'sale-001',
+    sale_number: 'VNT-2026-0001',
+    branch_id: 'b0000000-0000-0000-0000-000000000001',
+    customer_name: 'Ana López [mock]',
+    created_at: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
+    status: 'en_preparacion',
+    station: 'almacen',
+    prepared_by: 'Luis P. [mock]',
+    items: [
+      { sku: 'ZD-402', name: 'Zapatos Deportivos Runner Pro', quantity: 1, completed: true },
+      { sku: 'CMB-001', name: 'Combo Parrillero Premium', quantity: 2, completed: false },
+    ],
+  },
+  {
+    id: 'dsp-002',
+    order_number: 'DSP-102',
+    sale_id: 'sale-002',
+    sale_number: 'VNT-2026-0002',
+    branch_id: 'b0000000-0000-0000-0000-000000000001',
+    customer_name: 'Distribuidora San José C.A.',
+    created_at: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
+    status: 'pendiente',
+    station: 'empaque',
+    items: [
+      { sku: 'Q-LLAN-01', name: 'Queso Blanco Llanero (Kg)', quantity: 1.25, notes: 'Empaque al vacío' },
+      { sku: 'JAM-SUP-01', name: 'Jamón Cocido Superior (Kg)', quantity: 0.5, notes: 'Rebanado fino' },
+    ],
+  },
+  {
+    id: 'dsp-003',
+    order_number: 'DSP-100',
+    sale_id: 'sale-000',
+    sale_number: 'VNT-2026-0000',
+    branch_id: 'b0000000-0000-0000-0000-000000000001',
+    customer_name: 'Consumidor Final',
+    created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
+    status: 'listo',
+    station: 'almacen',
+    prepared_by: 'María C. [mock]',
+    completed_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
+    items: [
+      { sku: 'GC-010', name: 'Gorra Clásica Urbana', quantity: 1, completed: true },
+    ],
   },
 ];
 

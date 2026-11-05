@@ -367,6 +367,45 @@ Diseño de impresión adaptable:
 * Respaldado por endpoint API específico: /api/t/[slug]/pos/users con fallback híbrido.
 * 100% modular y configurable con interruptor on/off en el Gestor de Gestores.
 
+
+--------------------------------------------------------------------------------
+29. PANTALLA DE DESPACHO Y ALMACÉN KDS KANBAN (MODULAR: pos_order_dispatch_kds)
+--------------------------------------------------------------------------------
+* Módulo visual (POS-20) accesible desde el menú lateral ("Despacho & KDS") para el
+  equipo de empaque, almacén, barra o cocina.
+* Se auto-encola de forma inmediata en tiempo real tras confirmarse cualquier venta
+  en caja que contenga mercancía física (excluyendo automáticamente servicios).
+* Tablero Kanban interactivo con 3 columnas de estado:
+  - Pendientes (por empaquetar o despachar).
+  - En Preparación (con registro del encargado de empaque).
+  - Listos para Entrega en Mostrador / Retiro por Cliente.
+* Temporizadores en vivo tipo semáforo que indican los minutos transcurridos desde
+  la venta (verde normal, ámbar advertencia, rojo demora).
+* Checklist interactivo por producto en cada comanda para tachar artículos conforme
+  se colocan en la bolsa o paquete.
+* Filtro rápido por estación (Almacén Central, Cocina/Barra, Mostrador de Despacho).
+* 100% modular y configurable con interruptor de activación/desactivación en el
+  Gestor de Gestores.
+
+
+--------------------------------------------------------------------------------
+30. EXPORTACIÓN DEL LIBRO ESPECIAL DE VENTAS SENIAT (MODULAR: pos_accounting_export)
+--------------------------------------------------------------------------------
+* Generación oficial del Libro de Ventas exigido por la providencia administrativa
+  SNAT/2014/0032 del SENIAT para cierres mensuales o quincenales.
+* Disponible directamente en el Reporte de Ventas (POS-16) y en el Historial de Comprobantes (POS-13).
+* Formato CSV estructurado con codificación UTF-8 con BOM (\uFEFF) y delimitador
+  de punto y coma (;) para garantizar apertura directa en Microsoft Excel sin dañar
+  acentos, caracteres especiales ni montos decimales con comas en español de Venezuela.
+* Columnas fiscales oficiales:
+  - Operación N°, Fecha de Factura, RIF / Cédula del Cliente, Nombre o Razón Social.
+  - Número de Factura Fiscal / Comprobante, Número de Control Fiscal.
+  - Total Ventas con IVA incluido (VES y USD de referencia).
+  - Ventas Exentas / Exoneradas, Base Imponible 16%, Débito Fiscal IVA 16%.
+  - Base Imponible Percibida IGTF y Débito IGTF 3%.
+  - IVA Retenido por Comprador (Contribuyentes Especiales).
+* 100% modular y configurable con interruptor on/off en el Gestor de Gestores.
+
 ================================================================================
 Fin del Resumen. Todas las funcionalidades están probadas y cargadas en la rama feat/vora-pos.
 ================================================================================

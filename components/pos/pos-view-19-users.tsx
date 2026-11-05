@@ -598,3 +598,4 @@ export function PosView19Users() {
     </div>
   );
 }
+

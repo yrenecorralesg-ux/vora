@@ -105,6 +105,17 @@ export function PosSidebar() {
           },
         ]
       : []),
+    ...(isFuncActive('pos_order_dispatch_kds')
+      ? [
+          {
+            id: 'dispatch_kds',
+            label: 'Despacho & KDS',
+            icon: Boxes,
+            isActive: currentView === 'POS-20',
+            onClick: () => navigateTo('POS-20'),
+          },
+        ]
+      : []),
     ...(isFuncActive('pos_settings')
       ? [
           {

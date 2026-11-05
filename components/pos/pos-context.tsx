@@ -13,6 +13,8 @@ import type {
   PosFiscalIntegration,
   PosPromotion,
   PosSalesRep,
+  PosDispatchOrder,
+  PosDispatchStatus,
 } from '@/lib/types';
 import {
   MOCK_TENANT_ID,
@@ -61,7 +63,8 @@ export type PosViewKey =
   | 'POS-16'
   | 'POS-17'
   | 'POS-18'
-  | 'POS-19';
+  | 'POS-19'
+  | 'POS-20';
 
 interface PosContextType {
   // Contex Switchers
@@ -160,6 +163,14 @@ interface PosContextType {
   toggleStaffUser: (id: string) => boolean;
   updateStaffPin: (id: string, newPin: string) => boolean;
 
+  // Comandas y Despacho KDS (pos_order_dispatch_kds)
+  dispatchOrders: PosDispatchOrder[];
+  updateDispatchStatus: (orderId: string, status: PosDispatchStatus, preparedBy?: string) => boolean;
+  toggleDispatchItem: (orderId: string, itemSku: string) => boolean;
+
+  // Exportación Contable SENIAT (pos_accounting_export)
+  generateAccountingSalesBookCsv: (params?: { startDate?: string; endDate?: string }) => string;
+
   // Notification Toast Message (Pure Typography)
   notification: { title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null;
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
@@ -232,12 +243,15 @@ export function PosProvider({
     pos_tenant_isolated_login: true,
     pos_supervisor_panel: true,
     pos_supervisor_users_crud: true,
+    pos_order_dispatch_kds: true,
+    pos_accounting_export: true,
   });
 
   // Estado nuevas capacidades
   const [selectedSalesRep, setSelectedSalesRep] = useState<PosSalesRep | null>(posStore.salesReps[0] ?? null);
   const [isCustomerDisplayOpen, setIsCustomerDisplayOpen] = useState<boolean>(false);
   const [staffUsers, setStaffUsers] = useState<PosMockUser[]>(posStore.users);
+  const [dispatchOrders, setDispatchOrders] = useState<PosDispatchOrder[]>(posStore.dispatchOrders);
 
   const isFuncActive = (funcKey: string): boolean => {
     if (!isModuleEnabled) return false;
@@ -408,6 +422,27 @@ export function PosProvider({
       showNotification('Error al eliminar', res.error || 'No se pudo eliminar el usuario.', 'critical');
     }
     return res;
+  };
+
+  const updateDispatchStatus = (orderId: string, status: PosDispatchStatus, preparedBy?: string) => {
+    const ok = posStore.updateDispatchStatus(orderId, status, preparedBy);
+    if (ok) {
+      setDispatchOrders([...posStore.dispatchOrders]);
+      showNotification('Comanda actualizada', `Pedido ${orderId} marcado como "${status}".`, 'success');
+    }
+    return ok;
+  };
+
+  const toggleDispatchItem = (orderId: string, itemSku: string) => {
+    const ok = posStore.toggleDispatchItem(orderId, itemSku);
+    if (ok) {
+      setDispatchOrders([...posStore.dispatchOrders]);
+    }
+    return ok;
+  };
+
+  const generateAccountingSalesBookCsv = (params?: { startDate?: string; endDate?: string }): string => {
+    return posStore.generateAccountingSalesBookCsv(params);
   };
 
   // Cart operations
@@ -758,6 +793,10 @@ export function PosProvider({
         deleteUser,
         toggleStaffUser,
         updateStaffPin,
+        dispatchOrders,
+        updateDispatchStatus,
+        toggleDispatchItem,
+        generateAccountingSalesBookCsv,
       }}
     >
       {children}

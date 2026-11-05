@@ -1,13 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, FileText, RotateCcw, ArrowLeft, Filter, DollarSign, CheckCircle2, AlertCircle, X } from 'lucide-react';
+import { Search, FileText, RotateCcw, ArrowLeft, Filter, DollarSign, CheckCircle2, AlertCircle, X, Download } from 'lucide-react';
 import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
 import type { PosSale } from '@/lib/types';
 
 export function PosView13History() {
-  const { sales, activeUser, activeBranch, registers, setLastConfirmedSale, navigateTo, shifts, activeShift, showNotification } = usePos();
+  const {
+    sales,
+    activeUser,
+    activeBranch,
+    registers,
+    setLastConfirmedSale,
+    navigateTo,
+    shifts,
+    activeShift,
+    showNotification,
+    isFuncActive,
+    generateAccountingSalesBookCsv,
+  } = usePos();
 
   const [selectedRegister, setSelectedRegister] = useState<string>('all');
   const [selectedShift, setSelectedShift] = useState<string>('all');
@@ -54,6 +66,22 @@ export function PosView13History() {
     navigateTo('POS-14');
   };
 
+  const handleExportSeniat = () => {
+    if (!isFuncActive('pos_accounting_export')) {
+      showNotification('Módulo inactivo', 'Exportación contable SENIAT inhabilitada.', 'alert');
+      return;
+    }
+    const csvContent = generateAccountingSalesBookCsv();
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `libro-especial-ventas-seniat-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showNotification('Libro Especial de Ventas', 'Exportado formato SENIAT (CSV compatible con Excel) exitosamente.', 'success');
+  };
+
   return (
     <div className="space-y-6">
       {/* Cabecera con Bordes Redondeados */}
@@ -67,6 +95,17 @@ export function PosView13History() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          {isFuncActive('pos_accounting_export') && (
+            <button
+              type="button"
+              onClick={handleExportSeniat}
+              className="flex items-center gap-1.5 rounded-2xl border border-[#1E6B4E] bg-[#1E6B4E]/10 px-3.5 py-2 text-xs font-bold text-[#1E6B4E] hover:bg-[#1E6B4E]/20 transition"
+              title="Descargar Libro Especial de Ventas SENIAT en CSV"
+            >
+              <Download className="h-4 w-4" />
+              <span>Libro SENIAT</span>
+            </button>
+          )}
           <div className="text-right text-xs">
             <span className="font-bold text-[#111827]">{filteredSales.length} operaciones</span>
             <p className="text-[10px] text-[#52635A]">registradas</p>

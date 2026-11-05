@@ -112,3 +112,4 @@ export async function DELETE(
     return NextResponse.json({ ok: false, error: err.message || 'Error al eliminar usuario.' }, { status: 500 });
   }
 }
+

@@ -557,3 +557,28 @@ export interface PosAuditEvent {
   correlation_id?: string | null;
   created_at: string;
 }
+
+export type PosDispatchStatus = 'pendiente' | 'en_preparacion' | 'listo' | 'entregado';
+
+export interface PosDispatchOrderItem {
+  sku: string;
+  name: string;
+  quantity: number;
+  notes?: string;
+  completed?: boolean;
+}
+
+export interface PosDispatchOrder {
+  id: string;
+  order_number: string;
+  sale_id: string;
+  sale_number: string;
+  branch_id: string;
+  customer_name: string;
+  created_at: string;
+  status: PosDispatchStatus;
+  station: 'almacen' | 'cocina' | 'empaque';
+  items: PosDispatchOrderItem[];
+  prepared_by?: string;
+  completed_at?: string;
+}

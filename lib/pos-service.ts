@@ -26,6 +26,7 @@ import {
   MOCK_AUDIT_EVENTS,
   MOCK_SALES_REPS,
   MOCK_PROMOTIONS,
+  MOCK_DISPATCH_ORDERS,
   type PosMockUser,
 } from './pos-demo-data';
 import type {
@@ -47,6 +48,8 @@ import type {
   PosAuditEvent,
   PosPromotion,
   PosSalesRep,
+  PosDispatchOrder,
+  PosDispatchStatus,
 } from './types';
 import { TheFactoryHkaProvider } from './pos-hka-provider';
 import { casheaProvider, CasheaPosProvider } from './pos-cashea-provider';
@@ -67,6 +70,106 @@ class PosInMemoryStore {
   salesReps: PosSalesRep[] = [...MOCK_SALES_REPS];
   promotions: PosPromotion[] = [...MOCK_PROMOTIONS];
   users: PosMockUser[] = [...MOCK_USERS];
+  dispatchOrders: PosDispatchOrder[] = [...MOCK_DISPATCH_ORDERS];
+
+  // Métodos de Despacho y Almacén (pos_order_dispatch_kds)
+  updateDispatchStatus(orderId: string, status: PosDispatchStatus, preparedBy?: string): boolean {
+    const order = this.dispatchOrders.find((o) => o.id === orderId);
+    if (!order) return false;
+    order.status = status;
+    if (preparedBy) order.prepared_by = preparedBy;
+    if (status === 'listo' || status === 'entregado') {
+      order.completed_at = new Date().toISOString();
+    }
+    return true;
+  }
+
+  toggleDispatchItem(orderId: string, itemSku: string): boolean {
+    const order = this.dispatchOrders.find((o) => o.id === orderId);
+    if (!order) return false;
+    const item = order.items.find((i) => i.sku === itemSku);
+    if (!item) return false;
+    item.completed = !item.completed;
+    return true;
+  }
+
+  // Exportación Contable SENIAT (pos_accounting_export)
+  generateAccountingSalesBookCsv(params?: { startDate?: string; endDate?: string }): string {
+    const headers = [
+      'Nro_Operacion',
+      'Fecha_Comprobante',
+      'Nro_Factura_Comprobante',
+      'Nro_Control_Fiscal',
+      'Tipo_Transaccion',
+      'Tipo_Documento_Cliente',
+      'RIF_Cedula_Cliente',
+      'Nombre_Razon_Social_Comprador',
+      'Total_Ventas_USD',
+      'Tipo_Cambio_BCV',
+      'Total_Ventas_VES_Con_IVA',
+      'Ventas_Exentas_VES',
+      'Base_Imponible_16_VES',
+      'IVA_16_VES',
+      'Base_Imponible_IGTF_USD',
+      'IGTF_3_USD',
+      'Metodos_Pago',
+      'Estado_Comercial',
+    ];
+
+    let filteredSales = this.sales;
+    if (params?.startDate) {
+      filteredSales = filteredSales.filter((s) => s.created_at >= params.startDate!);
+    }
+    if (params?.endDate) {
+      filteredSales = filteredSales.filter((s) => s.created_at <= params.endDate!);
+    }
+
+    const rows = filteredSales.map((s, idx) => {
+      const docNum = s.fiscal_request?.fiscal_invoice_number || s.document?.internal_number || s.sale_number;
+      const controlNum = s.fiscal_request?.fiscal_control_number || 'N/A';
+      const clientDocType = s.customer?.document_type || 'V';
+      const clientDocNum = s.customer?.document_number || '00000000';
+      const clientName = (s.customer?.legal_name || 'Consumidor Final').replace(/;/g, ',');
+      const rate = s.exchange_rate_snapshot || this.settings.active_exchange_rate;
+
+      const totalVes = s.total_ves;
+      const taxVes = Number((s.tax_total_usd * rate).toFixed(2));
+      const baseVes = Number((s.subtotal_usd * rate).toFixed(2));
+      const exemptVes = 0.0;
+
+      const payments = s.payments || [];
+      const cashUsdPayment = payments.find((p) => p.method === 'efectivo' && p.currency === 'USD');
+      const baseIgtfUsd = cashUsdPayment ? cashUsdPayment.amount_applied : 0;
+      const igtfUsd = Number((baseIgtfUsd * 0.03).toFixed(2));
+
+      const paymentMethods = payments
+        .map((p) => `${p.method.toUpperCase()}(${p.amount_applied}${p.currency})`)
+        .join(' + ');
+
+      return [
+        idx + 1,
+        new Date(s.confirmed_at || s.created_at).toLocaleDateString('es-VE'),
+        `"${docNum}"`,
+        `"${controlNum}"`,
+        '01-REG',
+        clientDocType,
+        clientDocNum,
+        `"${clientName}"`,
+        s.total_usd.toFixed(2),
+        rate.toFixed(2),
+        totalVes.toFixed(2),
+        exemptVes.toFixed(2),
+        baseVes.toFixed(2),
+        taxVes.toFixed(2),
+        baseIgtfUsd.toFixed(2),
+        igtfUsd.toFixed(2),
+        `"${paymentMethods}"`,
+        s.commercial_status.toUpperCase(),
+      ].join(';');
+    });
+
+    return '\uFEFF' + [headers.join(';'), ...rows].join('\r\n');
+  }
 
   // Métodos de Supervisión y Control de Roles
   updateSupervisorConfig(params: {
@@ -579,6 +682,30 @@ class PosInMemoryStore {
     };
 
     this.sales.unshift(newSale);
+
+    // Encolar comanda de despacho / almacén KDS si hay productos físicos (pos_order_dispatch_kds)
+    const physicalItems = params.lines.filter((l) => !l.isService);
+    if (physicalItems.length > 0) {
+      const dispatchId = `dsp-${Date.now()}`;
+      const dispatchOrder: PosDispatchOrder = {
+        id: dispatchId,
+        order_number: `DSP-${String(this.dispatchOrders.length + 101).padStart(3, '0')}`,
+        sale_id: newSale.id,
+        sale_number: newSale.sale_number,
+        branch_id: params.branchId,
+        customer_name: customer?.legal_name || 'Consumidor Final',
+        created_at: new Date().toISOString(),
+        status: 'pendiente',
+        station: 'almacen',
+        items: physicalItems.map((pi) => ({
+          sku: pi.sku,
+          name: pi.name,
+          quantity: pi.quantity,
+          completed: false,
+        })),
+      };
+      this.dispatchOrders.unshift(dispatchOrder);
+    }
 
     this.addAudit({
       branch_id: params.branchId,
