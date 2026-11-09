@@ -1,0 +1,403 @@
+================================================================================
+                    VORA POS — PUNTO DE VENTA PROFESIONAL
+        DOCUMENTO MAESTRO DE FUNCIONALIDADES Y REQUERIMIENTOS CUBIERTOS
+================================================================================
+Producto: VORA POS (Punto de Venta Multi-Tenant & Omnicanal)
+Entorno: Plataforma Empresarial VORA
+Versión: 2.0.0 (Rama: feat/vora-pos)
+Estado del Módulo: 100% Operativo y Verificado (0 Errores TypeScript)
+
+================================================================================
+ÍNDICE GENERAL
+================================================================================
+1. ARQUITECTURA GENERAL Y ACCESO AL SISTEMA
+2. VISTAS OPERATIVAS (POS-01 A POS-20)
+3. TODAS LAS FUNCIONALIDADES IMPLEMENTADAS (DESCRIPCIÓN DETALLADA)
+   3.1.  Venta Rápida y Catálogo Visual de Productos
+   3.2.  Apertura de Turno con Fondo Fijo de Caja (USD y VES)
+   3.3.  Cierre de Turno con Arqueo a Ciegas (Blind Count)
+   3.4.  Bloqueo de Cierre con Ventas en Espera (Regla Antifraude)
+   3.5.  Ventas en Espera / Multiticket (Pausar y Reanudar)
+   3.6.  Pasarela de Cobro y Pagos Mixtos Multimoneda
+   3.7.  Débito Inmediato C2P con Validación OTP SMS
+   3.8.  Pago Móvil Interbancario con Validación de Referencia
+   3.9.  Financiamiento en Cuotas Cashea (Ventas >= $25 USD)
+   3.10. Billetera Digital y Saldo a Favor del Cliente (Solución de Cambio)
+   3.11. Cuentas por Cobrar (CxC), Ventas a Crédito y Abonos Parciales
+   3.12. Gestión de Clientes y Validación Estricta de RIF SENIAT
+   3.13. Lector de Código de Barras USB y Búsqueda Predictiva
+   3.14. Venta por Peso y Básculas/Balanzas Electrónicas
+   3.15. Motor de Promociones y Combos Automáticos
+   3.16. Asignación de Asesores de Venta y Comisiones
+   3.17. Comprobantes Térmicos de 80mm e Impresión A4 Carta
+   3.18. Envío de Comprobante por WhatsApp en 1-Clic
+   3.19. Pantalla Secundaria de Cara al Cliente (QR Pago Móvil Dinámico)
+   3.20. Tasa Oficial BCV en Tiempo Real y Sincronización Automática
+   3.21. Devoluciones Totales/Parciales y Notas de Crédito
+   3.22. Retiros y Ajustes de Efectivo con PIN Obligatorio
+   3.23. Reporte Financiero de Ventas y Rendimiento por Hora
+   3.24. Reporte de Turnos, Arqueos y Auditoría de Cajeros
+   3.25. Configuración Fiscal SENIAT y The Factory HKA (Cortes X y Z)
+   3.26. Exportación Contable del Libro Especial de Ventas SENIAT (CSV/Excel)
+   3.27. Pantalla de Despacho y Almacén KDS Kanban en Tiempo Real (POS-20)
+   3.28. Autenticación y Login Aislado por Empresa (/t/[slug]/login)
+   3.29. Sistema de Roles de Personal (Cajero, Supervisor, Asesor, Admin)
+   3.30. Panel de Control y Políticas de Seguridad del Supervisor
+   3.31. Módulo Independiente de Usuarios y CRUD de Personal (POS-19)
+   3.32. Conexión Híbrida Supabase RPC con Modo Offline de Contingencia
+4. CONTROL DE MODULARIDAD TOTAL DESDE EL GESTOR DE GESTORES
+5. ATAJOS DE TECLADO Y TECLAS RÁPIDAS
+6. MAPA DE ARCHIVOS DEL MÓDULO POS
+
+================================================================================
+1. ARQUITECTURA GENERAL Y ACCESO AL SISTEMA
+================================================================================
+El módulo VORA POS está estructurado como una Single Page Application (SPA) de alto
+rendimiento dentro de Next.js 14 App Router, diseñada para responder de forma
+instantánea en mostrador.
+
+* Acceso Directo por Empresa: `/t/[slug]/pos`
+* Portal de Acceso para Personal: `/t/[slug]/login`
+* Conexión con Gestor Central: `/admin/tenants/[id]` (Pestaña "Módulos")
+* Modo de Renderizado: Cliente ('use client') con Context API centralizado,
+  sincronización con backend Supabase RPC y motor en memoria de respaldo.
+* Bimoneda Nativa: Todos los cálculos se efectúan en Dólares ($ USD) y Bolívares
+  (Bs. VES) calculados a la tasa oficial del BCV del día.
+
+================================================================================
+2. VISTAS OPERATIVAS (POS-01 A POS-20)
+================================================================================
+El sistema cubre al 100% todas las pantallas planificadas en el diseño original
+más las pantallas añadidas para supervisión y despacho:
+
+[POS-01] Tablero de Control / Dashboard Operativo y Resumen del Día.
+[POS-02] Apertura de Turno y Declaración de Fondo Inicial de Caja.
+[POS-03] Catálogo Visual de Productos, Búsqueda y Control de Stock.
+[POS-04] Carrito de Compras Bimoneda con Descuentos en Línea.
+[POS-05] Selector y Registro Rápido de Clientes con Validación RIF.
+[POS-06] Checkout Multimoneda y Pasarela de Pagos Mixtos.
+[POS-07] Modal de Débito Inmediato C2P interbancario.
+[POS-08] Modal de Pago Móvil con verificación de referencia.
+[POS-09] Modal de Financiamiento Cashea con confirmación remota.
+[POS-10] Modal de Billetera Digital y Saldo a Favor.
+[POS-11] Confirmación de Venta Exitosa y Cálculo de Vueltos.
+[POS-12] Generador y Vista Previa de Documentos (Ticket 80mm y Hoja A4).
+[POS-13] Historial de Ventas, Trazabilidad y Abonos a Cuentas por Cobrar.
+[POS-14] Procesamiento de Devoluciones y Emisión de Notas de Crédito.
+[POS-15] Cierre de Turno con Arqueo a Ciegas y Control de Cuadre.
+[POS-16] Reportes Financieros, Turnos, Cajeros y Libro SENIAT.
+[POS-17] Configuración de Sede, Cajas y Sincronización Tasa BCV.
+[POS-18] Configuración de Impresora Fiscal SENIAT (Cortes X y Z).
+[POS-19] Módulo de Personal y CRUD de Usuarios para Supervisores.
+[POS-20] Pantalla de Despacho y Almacén KDS Kanban en Tiempo Real.
+
+================================================================================
+3. TODAS LAS FUNCIONALIDADES IMPLEMENTADAS (DESCRIPCIÓN DETALLADA)
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1. VENTA RÁPIDA Y CATÁLOGO VISUAL DE PRODUCTOS
+--------------------------------------------------------------------------------
+* Cuadrícula de productos con fotografía, nombre, código SKU, precio bimoneda
+  ($ y Bs.) e indicador visual de inventario en tiempo real.
+* Filtros rápidos por categorías de mercancía (ej. Ropa, Alimentos, etc.).
+* Insignias de disponibilidad: Verde (Disponible), Amarillo (Bajo Stock <= 5) y
+  Rojo (Agotado, bloqueando que se agregue si el stock es cero).
+* Carrito interactivo con actualización ágil de cantidades (+ / -), botón para
+  eliminar ítems, notas por pedido y descuentos autorizados.
+
+--------------------------------------------------------------------------------
+3.2. APERTURA DE TURNO CON FONDO FIJO DE CAJA (USD Y VES)
+--------------------------------------------------------------------------------
+* Obligatoriedad de abrir turno antes de poder cobrar cualquier venta.
+* Declaración discriminada del fondo de caja inicial: efectivo en Dólares ($) y
+  efectivo en Bolívares (Bs.).
+* Asignación automática de caja física, cajero activo y marca de tiempo exacta.
+* Registro inmutable en base de datos para trazabilidad del arqueo.
+
+--------------------------------------------------------------------------------
+3.3. CIERRE DE TURNO CON ARQUEO A CIEGAS (BLIND COUNT)
+--------------------------------------------------------------------------------
+* Mecanismo antifraude estricto para dueños de negocio: el cajero debe ingresar
+  el dinero físico real que tiene en la gaveta SIN ver lo que el sistema espera.
+* Al enviar el conteo, el sistema compara y calcula automáticamente el balance:
+  - Cuadrado exacto ($0.00).
+  - Faltante de dinero (resaltado en rojo).
+  - Sobrante de dinero (resaltado en ámbar).
+* Genera el acta formal de cierre de turno lista para imprimir o archivar.
+
+--------------------------------------------------------------------------------
+3.4. BLOQUEO DE CIERRE CON VENTAS EN ESPERA (REGLA ANTIFRAUDE)
+--------------------------------------------------------------------------------
+* El sistema impide que un cajero cierre su turno si dejó ventas pausadas o en
+  espera en el mostrador.
+* Muestra una advertencia indicando cuántas órdenes están pendientes y desactiva
+  el botón de cierre definitivo hasta que sean cobradas o descartadas.
+
+--------------------------------------------------------------------------------
+3.5. VENTAS EN ESPERA / MULTITICKET (PAUSAR Y REANUDAR)
+--------------------------------------------------------------------------------
+* Permite atender filas rápidas sin perder tiempo si un cliente olvidó dinero
+  o busca otro producto.
+* Botón "Pausar Venta" que guarda el carrito completo en memoria y libera la caja.
+* Soporte para múltiples tickets en espera en simultáneo con contador visible.
+* Reanudación en 1-clic que restaura los artículos, notas y cliente seleccionado.
+
+--------------------------------------------------------------------------------
+3.6. PASARELA DE COBRO Y PAGOS MIXTOS MULTIMONEDA
+--------------------------------------------------------------------------------
+* Cobro combinado en una sola transacción: permite fraccionar el pago entre
+  múltiples métodos (ej. una parte en efectivo USD, otra en Pago Móvil Bs. y otra en tarjeta).
+* Monedas simultáneas: Dólares ($) y Bolívares (Bs.) calculados con tasa BCV.
+* Cálculo automático del vuelto o cambio a devolver en ambas monedas.
+
+--------------------------------------------------------------------------------
+3.7. DÉBITO INMEDIATO C2P CON VALIDACIÓN OTP SMS
+--------------------------------------------------------------------------------
+* Cobro digital interbancario instantáneo debitando directamente la cuenta del comprador.
+* Selector de banco emisor, campo de número telefónico, cédula y código de seguridad (Token OTP).
+* Registro de aprobación bancaria inmediata en el comprobante.
+
+--------------------------------------------------------------------------------
+3.8. PAGO MÓVIL INTERBANCARIO CON VALIDACIÓN DE REFERENCIA
+--------------------------------------------------------------------------------
+* Cobro por Pago Móvil interbancario con cálculo exacto en Bolívares.
+* Validación del número de referencia bancaria (4 a 6 dígitos).
+* Desglose del monto percibido y tasa oficial del día.
+
+--------------------------------------------------------------------------------
+3.9. FINANCIAMIENTO EN CUOTAS CASHEA (VENTAS >= $25 USD)
+--------------------------------------------------------------------------------
+* Activación automática para compras iguales o superiores a $25.00 USD.
+* Validación de cédula del cliente en la plataforma Cashea.
+* Envío de solicitud remota al celular del comprador para confirmación en su app.
+* Liquidación automática registrando el cobro de la cuota inicial y el 95% al negocio.
+
+--------------------------------------------------------------------------------
+3.10. BILLETERA DIGITAL Y SALDO A FAVOR DEL CLIENTE (SOLUCIÓN DE CAMBIO)
+--------------------------------------------------------------------------------
+* Resuelve el problema del vuelto o cambio en efectivo (dólares o bolívares).
+* Si una venta genera vuelto, el cajero puede marcar la casilla "Acreditar a Billetera Digital".
+* El saldo queda acreditado en la cuenta del cliente y en sus próximas visitas
+  aparece como método de pago para descontarlo con 1 clic.
+
+--------------------------------------------------------------------------------
+3.11. CUENTAS POR COBRAR (CXC), VENTAS A CRÉDITO Y ABONOS PARCIALES
+--------------------------------------------------------------------------------
+* Permite despachar ventas con pago diferido o crédito comercial.
+* Exige cliente identificado con cédula/RIF (bloquea crédito a consumidor final).
+* Fijación de plazo de pago (7, 15, 30 días o contra entrega) y fecha de vencimiento.
+* Desde el Historial (POS-13), permite ver el saldo deudor y registrar abonos
+  parciales o totales en efectivo, pago móvil o tarjeta.
+
+--------------------------------------------------------------------------------
+3.12. GESTIÓN DE CLIENTES Y VALIDACIÓN ESTRICTA DE RIF SENIAT
+--------------------------------------------------------------------------------
+* Buscador en tiempo real de clientes registrados y opción de "Consumidor Final".
+* Modal para dar de alta clientes nuevos en segundos desde el mostrador.
+* Algoritmo de validación de formato legal SENIAT:
+  - Jurídico/Gubernamental (J y G): 9 dígitos exactos y dirección fiscal obligatoria.
+  - Persona Natural (V y E): 6 a 9 dígitos numéricos.
+* Previene errores de timbrado fiscal (errores 422) ante The Factory HKA / SENIAT.
+
+--------------------------------------------------------------------------------
+3.13. LECTOR DE CÓDIGO DE BARRAS USB Y BÚSQUEDA PREDICTIVA
+--------------------------------------------------------------------------------
+* Compatible con cualquier pistola lectora láser USB estándar sin controladores extra.
+* Detección de lectura y adición inmediata del producto al carrito.
+* Modal de escaneo y búsqueda manual en pantalla si el código impreso está deteriorado.
+
+--------------------------------------------------------------------------------
+3.14. VENTA POR PESO Y BÁSCULAS/BALANZAS ELECTRÓNICAS
+--------------------------------------------------------------------------------
+* Soporte nativo para artículos vendidos por peso (kilos o gramos: charcutería, carnicería, verduras).
+* Modal de balanza digital: botón de Tara a 0.000 Kg, botones de peso rápido (+250g, +500g, +1Kg)
+  y cálculo matemático exacto del precio.
+* Compatible con códigos de barras de balanza de supermercado (prefijos 20 y 28).
+
+--------------------------------------------------------------------------------
+3.15. MOTOR DE PROMOCIONES Y COMBOS AUTOMÁTICOS
+--------------------------------------------------------------------------------
+* Aplica descuentos automáticos en tiempo real al detectar combinaciones de productos en el carrito.
+* Informa al cajero mediante un aviso visual qué ofertas están activas y cuánto ahorró el cliente.
+* Configuración modular con interruptor de encendido/apagado en el Gestor.
+
+--------------------------------------------------------------------------------
+3.16. ASIGNACIÓN DE ASESORES DE VENTA Y COMISIONES
+--------------------------------------------------------------------------------
+* Selector de vendedor o asesor de mostrador en la pantalla de cobro.
+* Asignación del porcentaje de comisión del empleado sobre la venta.
+* Registro del asesor en el ticket y en los reportes de nómina comercial.
+
+--------------------------------------------------------------------------------
+3.17. COMPROBANTES TÉRMICOS DE 80mm E IMPRESIÓN A4 CARTA
+--------------------------------------------------------------------------------
+* Formato dual conmutable con 1 clic:
+  - Ticket Térmico de 80mm: optimizado para impresoras de rollo de punto de venta.
+  - Hoja A4 / Carta: optimizado para notas de entrega formales y facturación comercial.
+* Soporte nativo de impresión directa (Ctrl+P / window.print()) y descarga en PDF.
+
+--------------------------------------------------------------------------------
+3.18. ENVÍO DE COMPROBANTE POR WHATSAPP EN 1-CLIC
+--------------------------------------------------------------------------------
+* Botón en la pantalla de venta confirmada y en el visualizador de comprobantes.
+* Abre automáticamente la API de WhatsApp con el teléfono del cliente y un mensaje
+  perfectamente redactado con los ítems comprados, totales en USD/VES y saldo en billetera.
+* Elimina el gasto innecesario de rollos de papel térmico.
+
+--------------------------------------------------------------------------------
+3.19. PANTALLA SECUNDARIA DE CARA AL CLIENTE (QR PAGO MÓVIL DINÁMICO)
+--------------------------------------------------------------------------------
+* Ventana secundaria sincronizada en tiempo real para proyectar en el segundo monitor.
+* Muestra al comprador los artículos que se van pasando por caja con precio y descuento.
+* Genera dinámicamente un Código QR de Pago Móvil con el monto exacto en Bolívares
+  para que el cliente escanee desde su celular y pague sin teclear datos.
+
+--------------------------------------------------------------------------------
+3.20. TASA OFICIAL BCV EN TIEMPO REAL Y SINCRONIZACIÓN AUTOMÁTICA
+--------------------------------------------------------------------------------
+* Conexión directa a DolarApi / BCV para obtener la tasa oficial del día al cargar.
+* Botón "Sync" en la cabecera superior para forzar la actualización con 1 clic.
+* Historial de fecha y hora de la última sincronización en la configuración.
+
+--------------------------------------------------------------------------------
+3.21. DEVOLUCIONES TOTALES/PARCIALES Y NOTAS DE CRÉDITO
+--------------------------------------------------------------------------------
+* Procesamiento de devoluciones totales o parciales por ítem desde el historial.
+* Reincorporación automática de la mercancía devuelta al stock de inventario.
+* Exigencia obligatoria de autorización por PIN de supervisor.
+* Emisión del comprobante legal de Nota de Crédito con referencia al ticket original.
+
+--------------------------------------------------------------------------------
+3.22. RETIROS Y AJUSTES DE EFECTIVO CON PIN OBLIGATORIO
+--------------------------------------------------------------------------------
+* Los egresos o extracciones de dinero de la gaveta están bloqueados para cajeros.
+* Requieren seleccionar al supervisor de turno e ingresar su clave PIN de 4 dígitos.
+* Todo movimiento queda registrado en la auditoría con monto, motivo y supervisor.
+
+--------------------------------------------------------------------------------
+3.23. REPORTE FINANCIERO DE VENTAS Y RENDIMIENTO POR HORA
+--------------------------------------------------------------------------------
+* Métricas financieras del día: Ventas totales, ticket promedio y unidades vendidas.
+* Gráfico de ventas por hora con detección de horas pico y distribución horaria.
+* Desglose porcentual de ingresos por método de pago y ranking de productos más vendidos.
+
+--------------------------------------------------------------------------------
+3.24. REPORTE DE TURNOS, ARQUEOS Y AUDITORÍA DE CAJEROS
+--------------------------------------------------------------------------------
+* Historial de aperturas y cierres de turno de todas las cajas físicas.
+* Comparativa entre cajeros: volumen de venta, tickets cobrados y consistencia de caja.
+* Modal para ver el desglose del arqueo ciego e imprimir el informe de auditoría.
+
+--------------------------------------------------------------------------------
+3.25. CONFIGURACIÓN FISCAL SENIAT Y THE FACTORY HKA (CORTES X Y Z)
+--------------------------------------------------------------------------------
+* Parámetros de comunicación con el impresor fiscal digital: serial, RIF y token.
+* Ejecución directa de los reportes fiscales obligatorios:
+  - Reporte X: Corte parcial de arqueo fiscal sin reiniciar la jornada.
+  - Reporte Z: Cierre fiscal diario obligatorio con transmisión al SENIAT.
+
+--------------------------------------------------------------------------------
+3.26. EXPORTACIÓN CONTABLE DEL LIBRO ESPECIAL DE VENTAS SENIAT (CSV/EXCEL)
+--------------------------------------------------------------------------------
+* Generación con 1 clic del Libro Especial de Ventas bajo la Providencia SNAT/2014/0032.
+* Descarga directa en formato CSV con codificación UTF-8 con BOM (\uFEFF) y delimitador
+  de punto y coma (;) para garantizar apertura directa en Microsoft Excel sin desconfiguración.
+* Columnas oficiales: Operación, Fecha, RIF/Cédula, Razón Social, Factura, Control,
+  Total Ventas con IVA (VES/USD), Tasa BCV, Exento, Base 16%, Débito IVA 16%,
+  Base Percibida IGTF y Débito IGTF 3%.
+
+--------------------------------------------------------------------------------
+3.27. PANTALLA DE DESPACHO Y ALMACÉN KDS KANBAN EN TIEMPO REAL (POS-20)
+--------------------------------------------------------------------------------
+* Pantalla operativa para cocina, empaque, barra o almacén en el menú lateral.
+* Auto-encolado en tiempo real: toda venta confirmada con productos físicos entra
+  al tablero de inmediato.
+* Columnas Kanban: Pendiente, En Preparación y Listo para Entrega.
+* Temporizadores en vivo tipo semáforo con minutos transcurridos y checklist por producto.
+
+--------------------------------------------------------------------------------
+3.28. AUTENTICACIÓN Y LOGIN AISLADO POR EMPRESA (/t/[slug]/login)
+--------------------------------------------------------------------------------
+* Portal de acceso directo independiente para cada empresa con su logotipo y colores.
+* Aísla al personal operativo del portal general y del panel Super Admin.
+* Validación de membresía y selector rápido demo para pruebas con 1 clic.
+
+--------------------------------------------------------------------------------
+3.29. SISTEMA DE ROLES DE PERSONAL (CAJERO, SUPERVISOR, ASESOR, ADMIN)
+--------------------------------------------------------------------------------
+* Cuatro roles operativos con permisos específicos:
+  - Cajero: Cobro, apertura y conteo ciego de su propia caja.
+  - Supervisor: Aprobaciones por PIN, políticas de tienda y gestión de usuarios.
+  - Asesor de Venta: Atención de mostrador y acumulación de comisiones.
+  - Administrador de Tienda: Control integral de la sucursal.
+
+--------------------------------------------------------------------------------
+3.30. PANEL DE CONTROL Y POLÍTICAS DE SEGURIDAD DEL SUPERVISOR
+--------------------------------------------------------------------------------
+* Panel dentro de Configuración para supervisores autorizados:
+  - Modificación de la Clave PIN Maestra de Supervisor.
+  - Fijación del límite máximo de descuento permitido al cajero sin PIN (ej. 5%).
+  - Interruptores de políticas: exigir PIN para anular, para retiros, para devoluciones
+    y obligatoriedad de arqueo ciego.
+  - Directorio interactivo de empleados con cambio de PIN individual.
+
+--------------------------------------------------------------------------------
+3.31. MÓDULO INDEPENDIENTE DE USUARIOS Y CRUD DE PERSONAL (POS-19)
+--------------------------------------------------------------------------------
+* Vista completa en la barra lateral ("Personal & Roles") para gestión de empleados:
+  - Crear usuarios con asignación de rol, caja física, correo, PIN y comisión.
+  - Editar datos, cambiar claves PIN y activar/suspender personal con 1 clic.
+  - Eliminar usuarios con validación de seguridad (bloquea si tiene turno abierto).
+  - Respaldado por endpoint API REST dedicado: `/api/t/[slug]/pos/users`.
+
+--------------------------------------------------------------------------------
+3.32. CONEXIÓN HÍBRIDA SUPABASE RPC CON MODO OFFLINE DE CONTINGENCIA
+--------------------------------------------------------------------------------
+* Conexión directa a procedimientos almacenados en PostgreSQL:
+  `vora_pos_confirm_sale`, `vora_pos_open_shift`, `vora_pos_close_shift`.
+* Fallback automático al almacén local en memoria si se corta la conexión o se
+  está fuera de línea, asegurando que la tienda nunca deje de vender.
+
+================================================================================
+4. CONTROL DE MODULARIDAD TOTAL DESDE EL GESTOR DE GESTORES
+================================================================================
+Todas las funcionalidades descritas cuentan con llaves modulares independientes
+registradas en `lib/modules-config.ts` y controlables desde `/admin/tenants/[id]`:
+
+* Botones de selección masiva rápida:
+  - "✓ Seleccionar todos los módulos"
+  - "✕ Deseleccionar módulos"
+  - "✓ Seleccionar todas las funciones" (activa todas las funciones de VORA POS en 1 clic)
+  - "✕ Deseleccionar funciones"
+* Botones de selección masiva por módulo específico:
+  - "✓ Seleccionar todas" / "✕ Deseleccionar todas" en la cabecera de VORA POS.
+
+================================================================================
+5. ATAJOS DE TECLADO Y TECLAS RÁPIDAS
+================================================================================
+* F1: Iniciar Nueva Venta / Ir al Carrito
+* F2: Buscar Clientes
+* F4: Pausar Venta Actual (Venta en Espera)
+* F8: Abrir Pasarela de Cobro / Checkout
+* F10: Cerrar Turno y Arqueo Ciego
+* Esc: Cerrar modales / Volver al catálogo
+
+================================================================================
+6. MAPA DE ARCHIVOS DEL MÓDULO POS
+================================================================================
+* Entrada Principal: `app/t/[slug]/pos/page.tsx`
+* Login Independiente: `app/t/[slug]/login/page.tsx`
+* API Usuarios CRUD: `app/api/t/[slug]/pos/users/route.ts`
+* API Features POS: `app/api/t/[slug]/pos/features/route.ts`
+* Contexto y Lógica: `components/pos/pos-context.tsx`
+* Vistas POS: `components/pos/pos-view-01-dashboard.tsx` a `pos-view-20-dispatch-kds.tsx`
+* Pantalla Cliente: `components/pos/pos-customer-display-modal.tsx`
+* Capa de Servicios: `lib/pos-service.ts`
+* Tipos de Datos: `lib/types.ts`
+* Catálogo de Módulos: `lib/modules-config.ts`
+* Semilla de Datos: `lib/pos-demo-data.ts`
+
+================================================================================
+Fin del Documento Maestro VORA POS.
+================================================================================
