@@ -204,13 +204,13 @@ export function PosSidebar() {
           </div>
         </div>
 
-        {/* Enlace Volver al CRM */}
+        {/* Enlace Volver al Gestor */}
         <Link
-          href={`/t/${activeTenantSlug}`}
+          href="/admin/tenants"
           className="flex items-center gap-2.5 rounded-2xl px-3.5 py-2 text-xs font-semibold text-[#A9BEA5] transition hover:bg-[#1E6B4E]/30 hover:text-white"
         >
           <ArrowLeft className="h-4 w-4 shrink-0" />
-          <span>Volver al CRM</span>
+          <span>Volver al Gestor</span>
         </Link>
 
         {/* Botón Cerrar Sesión */}

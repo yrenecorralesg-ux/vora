@@ -349,7 +349,7 @@ function ResumenTab(props: TenantTabsProps) {
         <div className="flex flex-wrap items-center gap-2">
           <TenantStatusActions tenant={tenant} />
           <Button asChild variant="outline">
-            <Link href={`/t/${tenant.slug}?preview=1`}>
+            <Link href={`/t/${tenant.slug}/pos`} target="_blank">
               <ExternalLink className="mr-2 h-4 w-4" />
               Vista previa
             </Link>
@@ -1085,7 +1085,7 @@ function BrandingTab({
         </div>
 
         <Button asChild variant="outline">
-          <Link href={`/t/${tenant.slug}?preview=1`} target="_blank">
+          <Link href={`/t/${tenant.slug}/pos`} target="_blank">
             <ExternalLink className="mr-2 h-4 w-4" />
             Abrir portal empresarial
           </Link>

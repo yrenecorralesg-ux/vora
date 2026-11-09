@@ -112,8 +112,8 @@ export function CoreSetupPanel({
         <p className="mt-2 break-all text-sm">
           Subdominio reservado: <strong>{tenantHostname(slug)}</strong>
         </p>
-        <Link className="text-sm underline" href={`/t/${slug}`}>
-          Abrir portal provisional
+        <Link className="text-sm underline" href={`/t/${slug}/pos`} target="_blank">
+          Abrir sistema de la empresa (POS)
         </Link>
         <Button
           className="ml-3"

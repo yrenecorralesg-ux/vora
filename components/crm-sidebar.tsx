@@ -49,7 +49,7 @@ const PosBadgeIcon = () => <span className="font-mono text-[10px] font-bold">POS
 
 export const ALL_CRM_MODULES: CrmNavItem[] = [
   { featureKey: 'commerce.pos', label: 'VORA POS', href: '/t/[slug]/pos', icon: PosBadgeIcon },
-  { featureKey: 'crm.dashboard', label: 'Resumen', href: '/t/[slug]', icon: LayoutDashboard },
+  { featureKey: 'crm.dashboard', label: 'Resumen', href: '/t/[slug]/pos', icon: LayoutDashboard },
   { featureKey: 'crm.customers', label: 'Clientes', href: '/t/[slug]/customers', icon: Users },
   { featureKey: 'capture.fairs', label: 'Captura en feria', href: '/t/[slug]/capture', icon: Store },
   { featureKey: 'crm.segments', label: 'Segmentos', href: '/t/[slug]/segments', icon: PieChart },
