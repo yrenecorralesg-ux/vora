@@ -120,11 +120,70 @@ export function TenantModulesConfig({
     }
   }
 
+  async function handleToggleAllModules(newEnabled: boolean) {
+    setFeedback(null);
+    setFeaturesList((prev) => prev.map((f) => ({ ...f, enabled: newEnabled })));
+    try {
+      await Promise.all(
+        featuresList.map((f) =>
+          fetch(`/api/t/${slug}/modules`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              feature_key: f.key,
+              enabled: newEnabled,
+              config: f.config ?? { functions: {} },
+            }),
+          }),
+        ),
+      );
+      setFeedback({
+        ok: true,
+        message: newEnabled ? 'Todos los módulos han sido activados.' : 'Todos los módulos han sido desactivados.',
+      });
+      router.refresh();
+    } catch {
+      setFeedback({ ok: false, message: 'Error al actualizar algunos módulos.' });
+    }
+  }
+
+  async function handleToggleAllFunctions(moduleKey: string, newEnabled: boolean) {
+    const target = featuresList.find((f) => f.key === moduleKey);
+    if (!target) return;
+    const nextFuncs: Record<string, boolean> = {};
+    for (const fn of target.functions) {
+      nextFuncs[fn.key] = newEnabled;
+    }
+    const newConfig = { ...target.config, functions: nextFuncs };
+    setFeaturesList((prev) =>
+      prev.map((f) => (f.key === moduleKey ? { ...f, config: newConfig } : f)),
+    );
+    try {
+      await fetch(`/api/t/${slug}/modules`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          feature_key: moduleKey,
+          enabled: target.enabled,
+          config: newConfig,
+        }),
+      });
+      setFeedback({
+        ok: true,
+        message: newEnabled
+          ? `Todas las funciones de "${target.name}" fueron activadas.`
+          : `Todas las funciones de "${target.name}" fueron desactivadas.`,
+      });
+    } catch {
+      // Background save
+    }
+  }
+
   const enabledCount = featuresList.filter((f) => f.enabled).length;
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
+      <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 text-[#5136db]">
             <Boxes className="h-5 w-5" />
@@ -136,9 +195,29 @@ export function TenantModulesConfig({
             </CardDescription>
           </div>
         </div>
-        <Badge className="bg-purple-100 text-[#5136db] border-purple-200 text-xs font-semibold">
-          {enabledCount} de {featuresList.length} activos
-        </Badge>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleToggleAllModules(true)}
+            className="text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            ✓ Seleccionar todos los módulos
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => handleToggleAllModules(false)}
+            className="text-xs font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            ✕ Deseleccionar módulos
+          </Button>
+          <Badge className="bg-purple-100 text-[#5136db] border-purple-200 text-xs font-semibold ml-1">
+            {enabledCount} de {featuresList.length} activos
+          </Badge>
+        </div>
       </CardHeader>
 
       {feedback && (
@@ -199,10 +278,29 @@ export function TenantModulesConfig({
               {/* Sub-functions dropdown */}
               {isExpanded && funcs.length > 0 && (
                 <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/70 p-3 space-y-2">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Funciones específicas de {f.name}
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/60 pb-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Funciones de {f.name} ({enabledFuncsCount}/{funcs.length} activas)
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAllFunctions(f.key, true)}
+                        className="text-xs font-semibold text-[#1E6B4E] hover:underline cursor-pointer"
+                      >
+                        ✓ Seleccionar todas
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAllFunctions(f.key, false)}
+                        className="text-xs font-semibold text-rose-600 hover:underline cursor-pointer"
+                      >
+                        ✕ Deseleccionar todas
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 pt-1">
                     {funcs.map((fn) => {
                       const isActive = f.config?.functions?.[fn.key] ?? fn.defaultEnabled;
                       return (
