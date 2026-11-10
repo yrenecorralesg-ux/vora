@@ -401,3 +401,4 @@ registradas en `lib/modules-config.ts` y controlables desde `/admin/tenants/[id]
 ================================================================================
 Fin del Documento Maestro VORA POS.
 ================================================================================
+

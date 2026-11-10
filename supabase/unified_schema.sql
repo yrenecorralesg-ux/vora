@@ -423,7 +423,7 @@ BEGIN
   RETURNING * INTO t;
 
   INSERT INTO tenant_domains (tenant_id, hostname, domain_type, is_primary)
-  VALUES (t.id, p_slug || '.vora.venesoftca.com', 'subdomain', true);
+  VALUES (t.id, p_slug || '.ekoscrm.ekossolutions.com', 'subdomain', true);
 
   INSERT INTO tenant_branding (tenant_id, primary_color, secondary_color, accent_color, login_background_color, font_family)
   VALUES (t.id, '#285C49', '#A9BEA5', '#C97857', '#F6F2E9', 'Inter');

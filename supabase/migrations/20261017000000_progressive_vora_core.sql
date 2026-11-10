@@ -86,7 +86,7 @@ BEGIN
  OR p_slug IN ('www','admin','api','auth','login','app','mail','support','billing','status','t') THEN RAISE EXCEPTION 'Nombre o subdominio inválido'; END IF;
  INSERT INTO tenants(commercial_name,legal_name,tax_id,slug,infrastructure_mode,country,currency,timezone)
  VALUES(trim(p_name),nullif(trim(p_legal),''),nullif(trim(p_tax_id),''),p_slug,p_mode,'VE','USD','America/Caracas') RETURNING * INTO t;
- INSERT INTO tenant_domains(tenant_id,hostname,domain_type,is_primary) VALUES(t.id,p_slug||'.vora.venesoftca.com','subdomain',true);
+ INSERT INTO tenant_domains(tenant_id,hostname,domain_type,is_primary) VALUES(t.id,p_slug||'.ekoscrm.ekossolutions.com','subdomain',true);
  INSERT INTO tenant_branding(tenant_id,primary_color,secondary_color,accent_color,login_background_color,font_family)
  VALUES(t.id,'#285C49','#A9BEA5','#C97857','#F6F2E9','Inter');
  INSERT INTO platform_audit_logs(actor_id,tenant_id,action,resource,resource_id,details)
@@ -163,7 +163,7 @@ GRANT SELECT ON public.tenant_workspaces TO authenticated;
 GRANT ALL ON public.tenant_workspaces TO service_role;
 -- Backfill the standard domain only when it is not already claimed.
 INSERT INTO public.tenant_domains(tenant_id,hostname,domain_type,is_primary)
-SELECT id,slug||'.vora.venesoftca.com','subdomain',NOT EXISTS(SELECT 1 FROM public.tenant_domains d WHERE d.tenant_id=tenants.id AND d.is_primary)
+SELECT id,slug||'.ekoscrm.ekossolutions.com','subdomain',NOT EXISTS(SELECT 1 FROM public.tenant_domains d WHERE d.tenant_id=tenants.id AND d.is_primary)
 FROM public.tenants WHERE length(slug)<=63 ON CONFLICT(hostname) DO NOTHING;
 
 CREATE FUNCTION public.vora_validate_readiness(p_tenant uuid) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$

@@ -1,25 +1,36 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import { VORA_DOMAIN, validTenantSlug } from '@/lib/core-config';
+import {
+  VORA_DOMAIN,
+  validTenantSlug,
+  resolveTenantSlugFromHost,
+} from '@/lib/core-config';
+
 export async function middleware(request: NextRequest) {
-  const hostname = request.nextUrl.hostname.toLowerCase(),
-    suffix = `.${VORA_DOMAIN}`;
-  const slug = hostname.endsWith(suffix)
-    ? hostname.slice(0, -suffix.length)
-    : null;
+  const hostname = request.nextUrl.hostname.toLowerCase();
+  const slug = resolveTenantSlugFromHost(hostname);
   let pathname = request.nextUrl.pathname;
+
   if (slug !== null && !validTenantSlug(slug))
     return new NextResponse('Empresa no encontrada.', { status: 404 });
   if (slug && pathname.startsWith('/admin'))
     return NextResponse.redirect(new URL(pathname, `https://${VORA_DOMAIN}`));
-  // Challenge is deliberately reachable while domain verification is pending.
-  if (pathname === '/api/tenant-domain-check') return NextResponse.next();
+
+  // Challenge and public tenant branding are reachable before login.
+  if (
+    pathname === '/api/tenant-domain-check' ||
+    /^\/api\/t\/[^/]+\/branding$/.test(pathname)
+  ) {
+    return NextResponse.next();
+  }
+
   if (
     slug &&
     pathname.startsWith('/api/t/') &&
     !pathname.startsWith(`/api/t/${slug}/`)
   )
     return new NextResponse('Sin acceso.', { status: 403 });
+
   if (
     slug &&
     !pathname.startsWith('/api/') &&
@@ -37,12 +48,14 @@ export async function middleware(request: NextRequest) {
     if (!pathname.startsWith('/t/'))
       pathname = `/t/${slug}${pathname === '/' ? '' : pathname}`;
   }
+
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-vora-path', pathname);
   requestHeaders.set(
     'x-vora-preview',
     request.nextUrl.searchParams.get('preview') === '1' ? '1' : '0',
   );
+
   const destination = request.nextUrl.clone();
   destination.pathname = pathname;
   const makeResponse = () =>
@@ -51,6 +64,7 @@ export async function middleware(request: NextRequest) {
           request: { headers: requestHeaders },
         })
       : NextResponse.next({ request: { headers: requestHeaders } });
+
   let response = makeResponse();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -79,6 +93,12 @@ export async function middleware(request: NextRequest) {
       },
     },
   );
+
+  const isTenantLogin = /^\/t\/[^/]+\/login(\/|$)/.test(pathname);
+  if (isTenantLogin) {
+    return response;
+  }
+
   if (
     pathname.startsWith('/admin') ||
     pathname.startsWith('/t/') ||
@@ -87,15 +107,27 @@ export async function middleware(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (
-      !user &&
-      (pathname.startsWith('/admin') || pathname.startsWith('/t/'))
-    ) {
+
+    const tenantMatch = pathname.match(/^\/t\/([^/]+)/);
+    const targetSlug = tenantMatch?.[1] ?? slug;
+    const posSessionSlug = request.cookies.get('vora_pos_session')?.value;
+    const hasPosSession =
+      Boolean(targetSlug) && posSessionSlug === targetSlug;
+
+    if (!user && !hasPosSession && pathname.startsWith('/admin')) {
       const login = request.nextUrl.clone();
       login.pathname = '/login';
       login.search = '';
       return NextResponse.redirect(login);
     }
+
+    if (!user && !hasPosSession && pathname.startsWith('/t/')) {
+      const login = request.nextUrl.clone();
+      login.pathname = targetSlug ? `/t/${targetSlug}/login` : '/login';
+      login.search = '';
+      return NextResponse.redirect(login);
+    }
+
     if (user && pathname === '/login') {
       const url = request.nextUrl.clone();
       url.pathname = '/select-tenant';
@@ -103,8 +135,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
   }
+
   return response;
 }
+
 export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2?)$).*)',
