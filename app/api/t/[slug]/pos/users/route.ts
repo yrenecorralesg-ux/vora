@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { posStore } from '@/lib/pos-service';
+import { authorizeTenantApi } from '@/lib/tenant-api-auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   try {
     // Si hay Supabase configurado, intentar consultar tenant_memberships
     const supabase = getSupabaseServerClient();
@@ -37,6 +41,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     if (!body.name || !body.pin) {
@@ -64,6 +71,9 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     if (!body.id) {
@@ -94,6 +104,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get('id');

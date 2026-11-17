@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { posStore } from '@/lib/pos-service';
+import { authorizeTenantApi } from '@/lib/tenant-api-auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string; saleId: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   const sale = posStore.sales.find((s) => s.id === params.saleId || s.sale_number === params.saleId);
 
   if (!sale) {

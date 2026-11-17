@@ -1,10 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { casheaProvider } from '@/lib/pos-service';
+import { authorizeTenantApi } from '@/lib/tenant-api-auth';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   try {
     const status = await casheaProvider.validateConnection();
     return NextResponse.json({
@@ -23,6 +27,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   try {
     const body = await request.json();
     const action = body.action || 'create_intent';

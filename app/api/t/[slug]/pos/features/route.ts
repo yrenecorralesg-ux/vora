@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { CRM_MODULES_CATALOG } from '@/lib/modules-config';
+import { authorizeTenantApi } from '@/lib/tenant-api-auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,6 +10,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   try {
     const supabase = getSupabaseServiceClient();
 

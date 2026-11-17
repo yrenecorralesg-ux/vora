@@ -6,7 +6,7 @@ import { usePos } from './pos-context';
 import { posStore, hkaProvider } from '@/lib/pos-service';
 
 export function PosView12DocumentPdf() {
-  const { lastConfirmedSale, activeBranch, showNotification, navigateTo, isFuncActive } = usePos();
+  const { lastConfirmedSale, activeBranch, showNotification, navigateTo, isFuncActive, activeTenantSlug } = usePos();
   const [fiscalSale, setFiscalSale] = useState(lastConfirmedSale ?? posStore.sales[0]);
   const [fiscalLoading, setFiscalLoading] = useState(false);
   const [providerMessage, setProviderMessage] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function PosView12DocumentPdf() {
     setProviderMessage(null);
 
     try {
-      const res = await fetch('/api/t/test1/pos/fiscal', {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/fiscal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -61,7 +61,7 @@ export function PosView12DocumentPdf() {
     setProviderMessage(null);
 
     try {
-      const res = await fetch('/api/t/test1/pos/fiscal', {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/fiscal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,7 +89,7 @@ export function PosView12DocumentPdf() {
     setProviderMessage(null);
 
     try {
-      const res = await fetch('/api/t/test1/pos/fiscal', {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/fiscal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

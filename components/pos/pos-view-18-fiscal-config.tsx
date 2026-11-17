@@ -19,7 +19,7 @@ function CasheaIcon({ className = 'h-4 w-4' }: { className?: string }) {
 }
 
 export function PosView18FiscalConfig() {
-  const { activeBranch, activeUser, showNotification, navigateTo } = usePos();
+  const { activeBranch, activeUser, showNotification, navigateTo, activeTenantSlug } = usePos();
   const integration = posStore.fiscalIntegration;
 
   const [companyRif, setCompanyRif] = useState(integration.company_rif ?? 'J-502258027');
@@ -50,7 +50,7 @@ export function PosView18FiscalConfig() {
     setTestResultHka(null);
 
     try {
-      const res = await fetch('/api/t/test1/pos/fiscal', {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/fiscal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'validate' }),
@@ -74,7 +74,7 @@ export function PosView18FiscalConfig() {
     setTestResultCashea(null);
 
     try {
-      const res = await fetch('/api/t/test1/pos/cashea', {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/cashea`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'validate' }),

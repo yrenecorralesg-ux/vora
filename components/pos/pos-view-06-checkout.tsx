@@ -162,7 +162,7 @@ export function PosView06Checkout() {
 
     setGeneratingCashea(true);
     try {
-      const res = await fetch('/api/t/test1/pos/cashea', {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/cashea`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

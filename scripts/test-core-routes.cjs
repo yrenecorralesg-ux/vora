@@ -43,6 +43,20 @@ async function main() {
       assert.equal(response.status,403);
     });
   }
+  // Every POS and Warehouse handler must reject anonymous calls before touching data.
+  const tenantApiMocks = { ...anonymous, 'server-only': {}, '@/lib/pos-service': { posStore: {}, hkaProvider: {}, casheaProvider: {} } };
+  const walk = (dir) => !fs.existsSync(path.join(root, dir)) ? [] : fs.readdirSync(path.join(root, dir), { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? walk(`${dir}/${e.name}`) : e.name === 'route.ts' ? [`${dir}/${e.name}`] : []);
+  for (const route of [...walk('app/api/t/[slug]/pos'), ...walk('app/api/t/[slug]/warehouse')]) {
+    const handlers = load(route, tenantApiMocks);
+    for (const method of ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].filter((m) => handlers[m])) {
+      await test(`anonymous ${method} blocked: ${route}`, async () => {
+        const init = method === 'GET' ? {} : { method, body: '{}' };
+        const r = await handlers[method](new NextRequest('https://vora.venesoftca.com/api/test', init), { params: { slug: 'pepito', id: 'x', saleId: 'x' } });
+        assert.equal(r.status, 401);
+      });
+    }
+  }
   const signed = { ...anonymous, '@/lib/auth':{...anonymous['@/lib/auth'],requireSuperAdmin:async()=>({id:'admin'})} };
   await test('reserved subdomain rejected before database access',async()=>{
     const r=await load('app/api/admin/tenants/route.ts',signed).POST(new Request('https://vora.venesoftca.com/api/admin/tenants',{method:'POST',body:JSON.stringify({commercial_name:'Admin',slug:'admin'})}));assert.equal(r.status,400);
@@ -71,6 +85,17 @@ async function main() {
   await test('domain challenge is reachable before login',async()=>{
     const r=await middleware(new NextRequest('https://pepito.vora.venesoftca.com/api/tenant-domain-check'));
     assert.equal(r.headers.get('x-middleware-next'),'1');
+  });
+  await test('forged POS session cookie does not bypass login',async()=>{
+    const anonMw=load('middleware.ts',{'@supabase/ssr':{createServerClient:()=>({auth:{getUser:async()=>({data:{user:null}})}})}}).middleware;
+    const r=await anonMw(new NextRequest('https://vora.venesoftca.com/t/pepito/pos',{headers:{cookie:'vora_pos_session=pepito'}}));
+    assert.equal(r.status,307);
+    assert.equal(new URL(r.headers.get('location')).pathname,'/t/pepito/login');
+  });
+  await test('tenant login and public branding stay reachable before login',async()=>{
+    const anonMw=load('middleware.ts',{'@supabase/ssr':{createServerClient:()=>({auth:{getUser:async()=>({data:{user:null}})}})}}).middleware;
+    assert.equal((await anonMw(new NextRequest('https://vora.venesoftca.com/t/pepito/login'))).headers.get('x-middleware-next'),'1');
+    assert.equal((await anonMw(new NextRequest('https://vora.venesoftca.com/api/t/pepito/branding'))).headers.get('x-middleware-next'),'1');
   });
   console.log(`${passed} route and middleware tests passed`);
 }

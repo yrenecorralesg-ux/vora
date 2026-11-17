@@ -110,18 +110,15 @@ export async function middleware(request: NextRequest) {
 
     const tenantMatch = pathname.match(/^\/t\/([^/]+)/);
     const targetSlug = tenantMatch?.[1] ?? slug;
-    const posSessionSlug = request.cookies.get('vora_pos_session')?.value;
-    const hasPosSession =
-      Boolean(targetSlug) && posSessionSlug === targetSlug;
 
-    if (!user && !hasPosSession && pathname.startsWith('/admin')) {
+    if (!user && pathname.startsWith('/admin')) {
       const login = request.nextUrl.clone();
       login.pathname = '/login';
       login.search = '';
       return NextResponse.redirect(login);
     }
 
-    if (!user && !hasPosSession && pathname.startsWith('/t/')) {
+    if (!user && pathname.startsWith('/t/')) {
       const login = request.nextUrl.clone();
       login.pathname = targetSlug ? `/t/${targetSlug}/login` : '/login';
       login.search = '';

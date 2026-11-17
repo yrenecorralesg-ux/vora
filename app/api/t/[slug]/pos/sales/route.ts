@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { posStore } from '@/lib/pos-service';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
+import { authorizeTenantApi } from '@/lib/tenant-api-auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -9,6 +10,9 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   const { searchParams } = new URL(request.url);
   const branchId = searchParams.get('branch_id');
   const shiftId = searchParams.get('shift_id');
@@ -53,6 +57,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
   try {
     const payload = await request.json();
 
