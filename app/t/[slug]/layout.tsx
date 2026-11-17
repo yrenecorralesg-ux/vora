@@ -5,6 +5,7 @@ import { Ban, ShieldAlert } from 'lucide-react';
 import { requireSession, isSuperAdmin } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { CrmSidebar } from '@/components/crm-sidebar';
+import { ModuleRail } from '@/components/module-rail';
 import { canPreviewTenant } from '@/lib/tenant-preview';
 import { getFontFamily } from '@/lib/fonts';
 
@@ -167,8 +168,17 @@ export default async function TenantCrmLayout({
 
   const userRole = membership?.role ?? (admin ? 'super_admin' : 'member');
 
-  const isPos = headers().get('x-vora-path')?.startsWith(`/t/${params.slug}/pos`);
-  if (isPos) {
+  // Selector POS ↔ Warehouse, común a todo el portal de la empresa.
+  const rail = (
+    <ModuleRail slug={tenant.slug} tenantId={tenant.id} enabledFeatures={enabledFeatures} isSuperAdmin={admin} />
+  );
+
+  // POS y Warehouse usan su propia barra lateral: sin el menú del CRM.
+  const vPath = headers().get('x-vora-path') ?? '';
+  const ownShell = [`/t/${params.slug}/pos`, `/t/${params.slug}/warehouse`].some(
+    (p) => vPath === p || vPath.startsWith(`${p}/`),
+  );
+  if (ownShell) {
     return (
       <div
         className="min-h-screen bg-[#F6F2E9]"
@@ -179,7 +189,10 @@ export default async function TenantCrmLayout({
           fontFamily: getFontFamily(branding?.font_family),
         } as React.CSSProperties}
       >
-        {children}
+        <div className="flex min-h-screen">
+          {rail}
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
       </div>
     );
   }
@@ -195,6 +208,7 @@ export default async function TenantCrmLayout({
   return (
     <div className="min-h-screen bg-[#f1f3f9]" style={wrapperStyle}>
       <div className="flex min-h-screen">
+        {rail}
         <CrmSidebar
           tenantId={tenant.id}
           slug={tenant.slug}

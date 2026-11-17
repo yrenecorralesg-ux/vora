@@ -68,6 +68,10 @@ export async function GET(
       defaultFuncs[fn.key] = fn.defaultEnabled;
     }
 
+    // Warehouse activo: el menú "Inventario" del POS abre el módulo en lugar de la vista demo.
+    const whFeature = (tfRows || []).find((f) => f.feature_key === 'warehouse.inventory');
+    const isWarehouseEnabled = Boolean(whFeature?.enabled);
+
     const tenantFuncs = posFeature?.config?.functions || {};
     const finalFunctions = { ...defaultFuncs, ...tenantFuncs };
 
@@ -76,6 +80,7 @@ export async function GET(
       tenant_id: tenant.id,
       tenant_name: tenant.commercial_name,
       is_module_enabled: isModuleEnabled,
+      is_warehouse_enabled: isWarehouseEnabled,
       functions: finalFunctions,
     });
   } catch (err: any) {

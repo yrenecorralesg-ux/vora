@@ -8,7 +8,7 @@ export interface ModuleFunction {
 export interface ModuleDefinition {
   key: string;
   name: string;
-  category: 'crm' | 'integration' | 'channel' | 'automation' | 'analytics' | 'commerce' | 'finance' | 'fiscal';
+  category: 'crm' | 'integration' | 'channel' | 'automation' | 'analytics' | 'commerce' | 'finance' | 'fiscal' | 'warehouse';
   description: string;
   href: string;
   functions: ModuleFunction[];
@@ -234,6 +234,56 @@ export const CRM_MODULES_CATALOG: Record<string, ModuleDefinition> = {
   'fiscal.venezuela': {
     key: 'fiscal.venezuela', name: 'VORA Fiscal', category: 'fiscal',
     description: 'Configuración tributaria venezolana, libros y reportes.', href: '/t/[slug]/fiscal',
+    functions: [],
+  },
+
+
+  /* ------------------------------------------------------------------ */
+  /*  Warehouse                                                           */
+  /* ------------------------------------------------------------------ */
+  'warehouse.inventory': {
+    key: 'warehouse.inventory',
+    name: 'VORA Warehouse · Inventario',
+    category: 'warehouse',
+    description: 'Catálogo unificado, almacenes, entradas, salidas, ajustes con aprobación, kardex, importaciones y escaneo.',
+    href: '/t/[slug]/warehouse',
+    functions: [
+      { key: 'wh_imports', name: 'Importación Excel/CSV', description: 'Plantillas, validación por fila y aplicación idempotente (WH-19 a WH-22, WH-27).', defaultEnabled: true },
+      { key: 'wh_scanner', name: 'Escaneo de códigos', description: 'Lector USB/Bluetooth tipo teclado o entrada manual (WH-23).', defaultEnabled: true },
+      { key: 'wh_pos_integration', name: 'Integración POS', description: 'Descuento y reverso de stock por ventas POS (WH-14).', defaultEnabled: true },
+      { key: 'wh_reports', name: 'Reportes Warehouse', description: 'Valorización, rotación y movimientos exportables (WH-11).', defaultEnabled: true },
+    ],
+  },
+  'warehouse.suppliers': {
+    key: 'warehouse.suppliers',
+    name: 'VORA Warehouse · Proveedores',
+    category: 'warehouse',
+    description: 'Perfiles de proveedores y condiciones comerciales.',
+    href: '/t/[slug]/warehouse/suppliers',
+    functions: [],
+  },
+  'warehouse.purchasing': {
+    key: 'warehouse.purchasing',
+    name: 'VORA Warehouse · Compras',
+    category: 'warehouse',
+    description: 'Ordenes de compra, recepciones parciales y documentos de proveedor.',
+    href: '/t/[slug]/warehouse/purchasing',
+    functions: [],
+  },
+  'warehouse.locations': {
+    key: 'warehouse.locations',
+    name: 'VORA Warehouse · Ubicaciones',
+    category: 'warehouse',
+    description: 'Ubicaciones internas (bins) y transferencias entre almacenes.',
+    href: '/t/[slug]/warehouse/locations',
+    functions: [],
+  },
+  'warehouse.traceability': {
+    key: 'warehouse.traceability',
+    name: 'VORA Warehouse · Trazabilidad',
+    category: 'warehouse',
+    description: 'Lotes, numeros de serie y alertas de vencimiento.',
+    href: '/t/[slug]/warehouse/traceability',
     functions: [],
   },
 };

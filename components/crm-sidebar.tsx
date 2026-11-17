@@ -18,6 +18,8 @@ import {
   Megaphone,
   Sparkles,
   FileText,
+  Warehouse,
+  Truck,
   Menu,
   X,
 } from 'lucide-react';
@@ -61,6 +63,9 @@ export const ALL_CRM_MODULES: CrmNavItem[] = [
   { featureKey: 'crm.tasks', label: 'Seguimiento', href: '/t/[slug]/tasks', icon: ListTodo },
   { featureKey: 'crm.campaigns', label: 'Campañas', href: '/t/[slug]/campaigns', icon: Megaphone },
   { featureKey: 'analytics.repurchase_pilot', label: 'Predictivo', href: '/t/[slug]/predictive', icon: Sparkles },
+  // — Warehouse —
+  { featureKey: 'warehouse.inventory', label: 'Inventario', href: '/t/[slug]/warehouse', icon: Warehouse },
+  { featureKey: 'warehouse.suppliers', label: 'Proveedores', href: '/t/[slug]/warehouse/suppliers', icon: Truck },
   { featureKey: 'integration.siigo', label: 'Facturación SIIGO', href: '/t/[slug]/siigo', icon: FileText },
 ];
 
@@ -231,3 +236,4 @@ export function CrmSidebar({
     </>
   );
 }
+

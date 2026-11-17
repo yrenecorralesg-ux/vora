@@ -133,6 +133,7 @@ interface PosContextType {
 
   // Feature Flags from Gestor / Admin Panel
   isModuleEnabled: boolean;
+  isWarehouseEnabled: boolean;
   posFeatures: Record<string, boolean>;
   isFuncActive: (funcKey: string) => boolean;
   reloadTenantFeatures: () => Promise<void>;
@@ -214,6 +215,7 @@ export function PosProvider({
 
   // Modularidad & Feature Flags configurables desde el Gestor VORA
   const [isModuleEnabled, setIsModuleEnabled] = useState<boolean>(true);
+  const [isWarehouseEnabled, setIsWarehouseEnabled] = useState<boolean>(false);
   const [posFeatures, setPosFeatures] = useState<Record<string, boolean>>({
     pos_sales: true,
     pos_shifts: true,
@@ -265,6 +267,7 @@ export function PosProvider({
       const data = await res.json();
       if (data.ok) {
         setIsModuleEnabled(Boolean(data.is_module_enabled));
+        setIsWarehouseEnabled(Boolean(data.is_warehouse_enabled));
         if (data.functions) {
           setPosFeatures(data.functions);
         }
@@ -775,6 +778,7 @@ export function PosProvider({
         offlineQueueCount,
         scanBarcode,
         isModuleEnabled,
+        isWarehouseEnabled,
         posFeatures,
         isFuncActive,
         reloadTenantFeatures,
