@@ -34,7 +34,7 @@ export function PosView13History() {
   const [paymentAmountUsd, setPaymentAmountUsd] = useState<string>('');
   const [debtPayMethod, setDebtPayMethod] = useState<'efectivo' | 'pago_movil' | 'tarjeta'>('efectivo');
   const [debtRef, setDebtRef] = useState<string>('');
-  const [debtNotes, setDebtNotes] = useState<string>('Abono en mostrador [mock]');
+  const [debtNotes, setDebtNotes] = useState<string>('Abono en mostrador');
 
   const filteredSales = sales.filter((s) => {
     if (selectedRegister !== 'all' && s.register_id !== selectedRegister) return false;
@@ -413,7 +413,7 @@ export function PosView13History() {
                 if (res.ok) {
                   showNotification(
                     'Abono Registrado',
-                    `Abono de $${amount.toFixed(2)} USD procesado con éxito [mock]. Saldo restante: $${res.sale?.balance_due_usd.toFixed(2)} USD.`,
+                    `Abono de $${amount.toFixed(2)} USD procesado con éxito. Saldo restante: $${res.sale?.balance_due_usd.toFixed(2)} USD.`,
                     'success',
                   );
                   setDebtSale(null);

@@ -45,7 +45,7 @@ export async function POST(
       event_type: 'autorizacion_supervisor',
       entity_type: 'pos_authorizations',
       entity_id: authId,
-      description: `Autorización de ${operationType} por ${supervisor.name}: ${reason} [mock]`,
+      description: `Autorización de ${operationType} por ${supervisor.name}: ${reason}`,
       metadata: { limitSnapshot },
       correlation_id: null,
     });

@@ -19,7 +19,7 @@ export function PosView02OpenShift() {
 
   const [openingUsd, setOpeningUsd] = useState<string>('50.00');
   const [openingVes, setOpeningVes] = useState<string>('500.00');
-  const [notes, setNotes] = useState<string>('Apertura regular de turno matutino [mock].');
+  const [notes, setNotes] = useState<string>('Apertura regular de turno matutino.');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isCurrentRegisterOpen = Boolean(activeShift && activeShift.status === 'abierto');
@@ -55,7 +55,7 @@ export function PosView02OpenShift() {
     refreshActiveShift();
     showNotification(
       'Turno aperturado exitosamente',
-      `Turno abierto en ${registers.find((r) => r.id === activeRegisterId)?.name} con fondo de $${usdVal} USD y ${vesVal} VES [mock].`,
+      `Turno abierto en ${registers.find((r) => r.id === activeRegisterId)?.name} con fondo de $${usdVal} USD y ${vesVal} VES.`,
       'success',
     );
     navigateTo('POS-03-04');

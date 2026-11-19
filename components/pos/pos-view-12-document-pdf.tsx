@@ -6,7 +6,7 @@ import { usePos } from './pos-context';
 import { posStore, hkaProvider } from '@/lib/pos-service';
 
 export function PosView12DocumentPdf() {
-  const { lastConfirmedSale, activeBranch, showNotification, navigateTo, isFuncActive, activeTenantSlug } = usePos();
+  const { lastConfirmedSale, activeBranch, showNotification, navigateTo, isFuncActive, activeTenantSlug, tenantName, activeUser } = usePos();
   const [fiscalSale, setFiscalSale] = useState(lastConfirmedSale ?? posStore.sales[0]);
   const [fiscalLoading, setFiscalLoading] = useState(false);
   const [providerMessage, setProviderMessage] = useState<string | null>(null);
@@ -241,7 +241,7 @@ export function PosView12DocumentPdf() {
             {/* Datos de Empresa */}
             <div className="mt-6 border-b border-[#E5E9E7] pb-4">
               <h2 className="text-lg font-black uppercase text-[#111827]">
-                VORA RETAIL PILOTO TEST1 C.A. [mock]
+                {tenantName ? tenantName.toUpperCase() : 'VORA RETAIL C.A.'}
               </h2>
               <p className="text-xs font-bold text-[#52635A]">RIF: J-50123987-1</p>
               <p className="text-xs text-[#52635A]">{activeBranch.fiscal_address}</p>
@@ -264,7 +264,7 @@ export function PosView12DocumentPdf() {
                   {new Date(fiscalSale.confirmed_at ?? fiscalSale.created_at).toLocaleString('es-VE')}
                 </p>
                 <span className="mt-2 block font-bold text-[#52635A]">CAJERO RESPONSABLE:</span>
-                <p className="text-[#111827]">María C. [mock]</p>
+                <p className="text-[#111827]">{activeUser.name}</p>
               </div>
             </div>
 
@@ -274,7 +274,7 @@ export function PosView12DocumentPdf() {
                 DATOS DEL RECEPTOR
               </span>
               <p className="mt-1 font-bold text-[#111827]">
-                {fiscalSale.customer?.legal_name ?? 'Consumidor Final [mock]'}
+                {fiscalSale.customer?.legal_name ?? 'Consumidor Final'}
               </p>
               <p className="text-[#52635A]">
                 Documento Cédula / RIF:{' '}
@@ -417,7 +417,7 @@ export function PosView12DocumentPdf() {
                 onClick={handleSimulateTimeout}
                 className="w-full rounded-2xl border border-[#C97857] bg-white py-2.5 text-xs font-bold uppercase tracking-wider text-[#C97857] hover:bg-[#FEF3C7]"
               >
-                Simular Timeout de red HKA [mock]
+                Simular Timeout de red HKA
               </button>
 
               <button

@@ -77,7 +77,7 @@ export function PosView0304SaleCart() {
   const [requestedDiscountPercent, setRequestedDiscountPercent] = useState<number>(0);
   const [supervisorId, setSupervisorId] = useState(MOCK_USERS[2].id);
   const [supervisorPin, setSupervisorPin] = useState('');
-  const [supervisorReason, setSupervisorReason] = useState('Campaña de fidelización autorizada en mostrador [mock]');
+  const [supervisorReason, setSupervisorReason] = useState('Campaña de fidelización autorizada en mostrador');
   const [supervisorError, setSupervisorError] = useState<string | null>(null);
 
   // Modal de Pesaje en Balanza (pos_scale_weighing)
@@ -225,7 +225,7 @@ export function PosView0304SaleCart() {
       setDiscountAuthorizedBy(authName);
       showNotification(
         'Descuento Aprobado',
-        `Descuento del ${requestedDiscountPercent}% autorizado por ${authName} [mock].`,
+        `Descuento del ${requestedDiscountPercent}% autorizado por ${authName}.`,
         'success',
       );
     }
@@ -1030,7 +1030,7 @@ export function PosView0304SaleCart() {
                       addToCart(weighingProduct, weight);
                       showNotification(
                         'Producto Pesado',
-                        `${weighingProduct.name} (${weight.toFixed(3)} Kg) agregado al carrito [mock].`,
+                        `${weighingProduct.name} (${weight.toFixed(3)} Kg) agregado al carrito.`,
                         'success',
                       );
                       setWeighingProduct(null);

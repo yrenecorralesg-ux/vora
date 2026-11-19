@@ -131,7 +131,7 @@ export function PosView06Checkout() {
   const [c2pLoading, setC2pLoading] = useState(false);
 
   // Inputs Tarjeta
-  const [cardTerminal, setCardTerminal] = useState('POS-Banesco-01 [mock]');
+  const [cardTerminal, setCardTerminal] = useState('POS-Banesco-01');
   const [cardAmountVes, setCardAmountVes] = useState<string>(balanceDueVes.toFixed(2));
   const [cardLast4, setCardLast4] = useState('');
   const [cardApproval, setCardApproval] = useState('');

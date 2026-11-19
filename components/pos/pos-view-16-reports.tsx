@@ -37,6 +37,9 @@ export function PosView16Reports() {
     registers,
     isFuncActive,
     generateAccountingSalesBookCsv,
+    activeTenantSlug,
+    activeUser,
+    activeRegister,
   } = usePos();
 
   // Pestaña activa (Diagrama §8: Ventas, Turnos/Cierres, Cajeros/Cajas)
@@ -174,7 +177,7 @@ export function PosView16Reports() {
 
     if (format === 'json') {
       const data = {
-        tenant: 'test1 [mock]',
+        tenant: activeTenantSlug || 'VORA',
         fecha_corte: new Date().toISOString(),
         sede: selectedBranchId === 'all' ? 'Todas las sedes' : branches.find((b) => b.id === selectedBranchId)?.name,
         resumen: {
@@ -211,7 +214,7 @@ export function PosView16Reports() {
       a.download = `reporte-ventas-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
     }
-    showNotification('Reporte descargado', `Archivo ${format.toUpperCase()} generado correctamente [mock].`, 'success');
+    showNotification('Reporte descargado', `Archivo ${format.toUpperCase()} generado correctamente.`, 'success');
   };
 
   const formatCurrency = (amountUsd: number) => {
@@ -741,7 +744,7 @@ export function PosView16Reports() {
             <div className="mt-4 space-y-3.5 text-xs">
               <div className="flex items-center justify-between rounded-2xl bg-[#F6F5F0] p-3">
                 <span className="font-semibold text-[#52635A]">Cajero activo:</span>
-                <span className="font-bold text-[#111827]">María C. [mock] (Caja 01)</span>
+                <span className="font-bold text-[#111827]">{activeUser.name} ({activeRegister.name})</span>
               </div>
               <div className="flex items-center justify-between rounded-2xl bg-[#F6F5F0] p-3">
                 <span className="font-semibold text-[#52635A]">Apertura de turno:</span>
@@ -981,25 +984,25 @@ export function PosView16Reports() {
               {[
                 {
                   id: 'u0000000-0000-0000-0000-000000000001',
-                  name: 'María C. [mock]',
+                  name: 'María Contreras',
                   role: 'Cajera Principal',
-                  salesCount: 8,
-                  revenueUsd: 780.0,
+                  salesCount: 0,
+                  revenueUsd: 0.0,
                   discrepanciesUsd: 0.0,
                   badgeColor: 'bg-emerald-50 border-emerald-200 text-emerald-800',
                 },
                 {
                   id: 'u0000000-0000-0000-0000-000000000002',
-                  name: 'Carlos R. [mock]',
+                  name: 'Carlos Rodríguez',
                   role: 'Cajero / Supervisor',
-                  salesCount: 4,
-                  revenueUsd: 470.0,
+                  salesCount: 0,
+                  revenueUsd: 0.0,
                   discrepanciesUsd: 0.0,
                   badgeColor: 'bg-blue-50 border-blue-200 text-blue-800',
                 },
                 {
                   id: 'u0000000-0000-0000-0000-000000000003',
-                  name: 'Admin General [mock]',
+                  name: 'Admin General',
                   role: 'Administrador de Sede',
                   salesCount: 0,
                   revenueUsd: 0.0,
@@ -1256,7 +1259,7 @@ export function PosView16Reports() {
               <button
                 type="button"
                 onClick={() => {
-                  showNotification('Impresión de arqueo', `Comprobante de turno #${selectedShiftForDetail.id.slice(0, 8)} enviado a impresora [mock].`, 'success');
+                  showNotification('Impresión de arqueo', `Comprobante de turno #${selectedShiftForDetail.id.slice(0, 8)} enviado a impresora.`, 'success');
                 }}
                 className="flex items-center gap-1.5 rounded-xl bg-[#144D37] px-4 py-2 text-xs font-bold text-white hover:bg-[#1E6B4E]"
               >

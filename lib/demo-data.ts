@@ -530,7 +530,7 @@ export const campaignStatusLabel: Record<DemoCampaign['estado'], string> = {
 };
 
 
-/* --------------------------- VORA POS [mock] ------------------------------ */
+/* --------------------------- VORA POS ------------------------------ */
 
 export {
   MOCK_TENANT_ID as posMockTenantId,

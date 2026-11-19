@@ -37,7 +37,7 @@ export function PosView15ShiftClosure() {
   const [movType, setMovType] = useState<'ingreso_efectivo' | 'retiro_efectivo' | 'ajuste_caja' | 'cambio_saldo_inicial'>('ingreso_efectivo');
   const [movCurrency, setMovCurrency] = useState<'USD' | 'VES'>('USD');
   const [movAmount, setMovAmount] = useState<string>('20.00');
-  const [movReason, setMovReason] = useState<string>('Dotación de cambio para caja [mock]');
+  const [movReason, setMovReason] = useState<string>('Dotación de cambio para caja');
 
   // Autorización de Supervisor para movimientos (Diagrama §5)
   const supervisors = staffUsers.filter(
@@ -134,7 +134,7 @@ export function PosView15ShiftClosure() {
     refreshActiveShift();
     showNotification(
       'Movimiento registrado',
-      `${movType}: ${amt} ${movCurrency}${authorizedById ? ' (Autorizado por supervisor)' : ''} [mock].`,
+      `${movType}: ${amt} ${movCurrency}${authorizedById ? ' (Autorizado por supervisor)' : ''}.`,
       'success',
     );
   };
@@ -176,7 +176,7 @@ export function PosView15ShiftClosure() {
     }
 
     refreshActiveShift();
-    showNotification('Turno cerrado', 'Cierre inmutable de turno ejecutado con éxito [mock].', 'success');
+    showNotification('Turno cerrado', 'Cierre inmutable de turno ejecutado con éxito.', 'success');
   };
 
   return (

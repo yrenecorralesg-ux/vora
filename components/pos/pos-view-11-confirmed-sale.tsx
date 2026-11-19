@@ -6,7 +6,7 @@ import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
 
 export function PosView11ConfirmedSale() {
-  const { lastConfirmedSale, navigateTo, showNotification, isFuncActive } = usePos();
+  const { lastConfirmedSale, navigateTo, showNotification, isFuncActive, activeUser } = usePos();
   const [replayNotice, setReplayNotice] = useState<string | null>(null);
 
   if (!lastConfirmedSale) {
@@ -34,11 +34,11 @@ export function PosView11ConfirmedSale() {
 
     if (res.ok && res.idempotentReplay) {
       setReplayNotice(
-        `Idempotencia exitosa comprobada: El backend reconoció la llave "${lastConfirmedSale.idempotency_key}" y devolvió la venta ${lastConfirmedSale.sale_number} sin duplicar cobros ni existencias [mock].`,
+        `Idempotencia exitosa comprobada: El backend reconoció la llave "${lastConfirmedSale.idempotency_key}" y devolvió la venta ${lastConfirmedSale.sale_number} sin duplicar cobros ni existencias.`,
       );
       showNotification(
         'Idempotencia verificada',
-        `Reintento bloqueado. Retornó la misma venta ${lastConfirmedSale.sale_number} [mock].`,
+        `Reintento bloqueado. Retornó la misma venta ${lastConfirmedSale.sale_number}.`,
         'success',
       );
     }
@@ -128,7 +128,7 @@ export function PosView11ConfirmedSale() {
           <div className="flex justify-between items-center">
             <span className="text-[#52635A]">Cajero responsable</span>
             <span className="font-semibold text-[#111827]">
-              María C. [mock]
+              {activeUser.name}
             </span>
           </div>
 

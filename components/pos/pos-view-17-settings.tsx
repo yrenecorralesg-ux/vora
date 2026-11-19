@@ -22,7 +22,10 @@ import type { PosPaymentMethod } from '@/lib/types';
 export function PosView17Settings() {
   const {
     settings,
+    branches,
     registers,
+    addBranch,
+    addRegister,
     activeBranch,
     activeUser,
     showNotification,
@@ -65,9 +68,17 @@ export function PosView17Settings() {
   const [newStaffPin, setNewStaffPin] = useState('1111');
   const [newStaffCommission, setNewStaffCommission] = useState('3.0');
 
+  // Nueva Sede / Sucursal
+  const [showNewBranchForm, setShowNewBranchForm] = useState(false);
+  const [newBranchCode, setNewBranchCode] = useState('');
+  const [newBranchName, setNewBranchName] = useState('');
+  const [newBranchAddress, setNewBranchAddress] = useState('');
+  const [newBranchPhone, setNewBranchPhone] = useState('');
+
   // Nueva Caja
   const [newRegCode, setNewRegCode] = useState('');
   const [newRegName, setNewRegName] = useState('');
+  const [targetBranchId, setTargetBranchId] = useState(activeBranch.id);
   const [showNewRegForm, setShowNewRegForm] = useState(false);
 
   const isStoreAdminOrSuper =
@@ -91,7 +102,7 @@ export function PosView17Settings() {
     e.preventDefault();
     const rateVal = parseFloat(exchangeRateInput);
     if (isNaN(rateVal) || rateVal <= 0) {
-      showNotification('Tasa inválida', 'La tasa debe ser mayor a cero [mock].', 'critical');
+      showNotification('Tasa inválida', 'La tasa debe ser mayor a cero.', 'critical');
       return;
     }
 
@@ -111,37 +122,56 @@ export function PosView17Settings() {
       event_type: 'actualizacion_parametros_pos',
       entity_type: 'pos_settings',
       entity_id: settings.id,
-      description: `Parámetros operativos de ${activeBranch.name} actualizados [mock]`,
+      description: `Parámetros operativos de ${activeBranch.name} actualizados`,
       metadata: { maxDiscount, allowPartial, rateVal, exchangeRateApiUrl, autoFetchRate, activeMethods },
     });
 
     showNotification(
       'Configuración guardada',
-      'Parámetros operativos de sede, API de tasa BCV y límites de descuento actualizados en el sistema [mock].',
+      'Parámetros operativos de sede, API de tasa BCV y límites de descuento actualizados en el sistema.',
       'success',
     );
+  };
+
+  const handleCreateBranch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBranchCode.trim() || !newBranchName.trim()) return;
+
+    const created = addBranch({
+      tenant_id: activeBranch.tenant_id,
+      code: newBranchCode.trim().toUpperCase(),
+      name: newBranchName.trim(),
+      fiscal_address: newBranchAddress.trim() || 'Dirección fiscal no especificada',
+      phone: newBranchPhone.trim() || '+58 212 000 0000',
+      timezone: 'America/Caracas',
+      is_primary: false,
+      status: 'active',
+    });
+
+    setNewBranchCode('');
+    setNewBranchName('');
+    setNewBranchAddress('');
+    setNewBranchPhone('');
+    setShowNewBranchForm(false);
+    showNotification('Sede registrada', `Nueva sede ${created.name} (${created.code}) agregada exitosamente.`, 'success');
   };
 
   const handleCreateRegister = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRegCode.trim() || !newRegName.trim()) return;
 
-    const newReg = {
-      id: `reg-${Date.now()}`,
-      tenant_id: 't-demo',
-      branch_id: activeBranch.id,
+    const created = addRegister({
+      tenant_id: activeBranch.tenant_id,
+      branch_id: targetBranchId || activeBranch.id,
       code: newRegCode.trim().toUpperCase(),
-      name: `${newRegName.trim()} [mock]`,
-      status: 'active' as const,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
+      name: newRegName.trim(),
+      status: 'active',
+    });
 
-    posStore.registers.push(newReg);
     setNewRegCode('');
     setNewRegName('');
     setShowNewRegForm(false);
-    showNotification('Caja registrada', `Nueva caja física ${newReg.code} agregada a ${activeBranch.name} [mock].`, 'success');
+    showNotification('Caja registrada', `Nueva caja física ${created.code} agregada exitosamente.`, 'success');
   };
 
   const handleSaveSupervisorPolicies = (e: React.FormEvent) => {
@@ -375,11 +405,92 @@ export function PosView17Settings() {
           </form>
         </div>
 
-        {/* Cajas Físicas en Sede (5 cols) */}
+        {/* Sedes y Cajas Físicas (5 cols) */}
         <div className="space-y-4 lg:col-span-5">
+          {/* Card Sedes y Sucursales */}
           <div className="rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-sm">
             <div className="flex items-center justify-between pb-3 border-b border-[#E5E9E7]">
-              <h2 className="text-base font-bold text-[#111827]">Cajas físicas registradas</h2>
+              <div>
+                <h2 className="text-base font-bold text-[#111827]">Sedes y Sucursales</h2>
+                <p className="text-[10px] text-[#52635A]">Puntos de venta operativos de la empresa</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewBranchForm(!showNewBranchForm)}
+                className="rounded-xl border border-[#DCE3DF] bg-[#F6F5F0] px-3 py-1 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF]"
+              >
+                + Nueva sede
+              </button>
+            </div>
+
+            {showNewBranchForm && (
+              <form onSubmit={handleCreateBranch} className="mt-4 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-4 text-xs space-y-2">
+                <input
+                  type="text"
+                  required
+                  placeholder="Código (Ej: CCS-02, VAL-02)"
+                  value={newBranchCode}
+                  onChange={(e) => setNewBranchCode(e.target.value)}
+                  className="w-full rounded-xl border border-[#DCE3DF] bg-white p-2"
+                />
+                <input
+                  type="text"
+                  required
+                  placeholder="Nombre de la sede (Ej: Sucursal Chacao)"
+                  value={newBranchName}
+                  onChange={(e) => setNewBranchName(e.target.value)}
+                  className="w-full rounded-xl border border-[#DCE3DF] bg-white p-2"
+                />
+                <input
+                  type="text"
+                  placeholder="Dirección fiscal"
+                  value={newBranchAddress}
+                  onChange={(e) => setNewBranchAddress(e.target.value)}
+                  className="w-full rounded-xl border border-[#DCE3DF] bg-white p-2"
+                />
+                <input
+                  type="text"
+                  placeholder="Teléfono de contacto"
+                  value={newBranchPhone}
+                  onChange={(e) => setNewBranchPhone(e.target.value)}
+                  className="w-full rounded-xl border border-[#DCE3DF] bg-white p-2"
+                />
+                <button
+                  type="submit"
+                  className="w-full rounded-xl bg-[#1E6B4E] py-2 text-xs font-bold text-white hover:bg-[#16523B]"
+                >
+                  Confirmar creación de sede
+                </button>
+              </form>
+            )}
+
+            <div className="mt-4 space-y-2">
+              {branches.map((b) => (
+                <div key={b.id} className="flex items-center justify-between rounded-2xl border border-[#E5E9E7] bg-[#FDFDFD] p-3 text-xs">
+                  <div className="min-w-0 pr-2">
+                    <span className="font-bold text-[#111827] block truncate">{b.name}</span>
+                    <span className="text-[10px] text-[#52635A] block truncate">{b.fiscal_address}</span>
+                  </div>
+                  <div className="flex flex-col items-end gap-1 shrink-0">
+                    <span className="text-[10px] font-mono font-bold text-[#52635A]">{b.code}</span>
+                    {b.id === activeBranch.id && (
+                      <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[9px] font-bold text-[#14532D]">
+                        Activa
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Card Cajas Físicas */}
+          <div className="rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-sm">
+            <div className="flex items-center justify-between pb-3 border-b border-[#E5E9E7]">
+              <div>
+                <h2 className="text-base font-bold text-[#111827]">Cajas físicas registradas</h2>
+                <p className="text-[10px] text-[#52635A]">Terminales de punto de venta</p>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowNewRegForm(!showNewRegForm)}
@@ -391,6 +502,17 @@ export function PosView17Settings() {
 
             {showNewRegForm && (
               <form onSubmit={handleCreateRegister} className="mt-4 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-4 text-xs space-y-2">
+                <select
+                  value={targetBranchId}
+                  onChange={(e) => setTargetBranchId(e.target.value)}
+                  className="w-full rounded-xl border border-[#DCE3DF] bg-white p-2 font-semibold text-[#111827]"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      Sede: {b.name} ({b.code})
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="text"
                   required
@@ -402,7 +524,7 @@ export function PosView17Settings() {
                 <input
                   type="text"
                   required
-                  placeholder="Nombre de la caja"
+                  placeholder="Nombre de la caja (Ej: Caja 03 - Mostrador)"
                   value={newRegName}
                   onChange={(e) => setNewRegName(e.target.value)}
                   className="w-full rounded-xl border border-[#DCE3DF] bg-white p-2"
@@ -417,17 +539,22 @@ export function PosView17Settings() {
             )}
 
             <div className="mt-4 space-y-2">
-              {registers.map((r) => (
-                <div key={r.id} className="flex items-center justify-between rounded-2xl border border-[#E5E9E7] bg-[#FDFDFD] p-3 text-xs">
-                  <div>
-                    <span className="font-bold text-[#111827] block">{r.name}</span>
-                    <span className="text-[10px] text-[#52635A]">Código: {r.code}</span>
+              {registers.map((r) => {
+                const branchObj = branches.find((b) => b.id === r.branch_id);
+                return (
+                  <div key={r.id} className="flex items-center justify-between rounded-2xl border border-[#E5E9E7] bg-[#FDFDFD] p-3 text-xs">
+                    <div>
+                      <span className="font-bold text-[#111827] block">{r.name}</span>
+                      <span className="text-[10px] text-[#52635A]">
+                        Código: {r.code} {branchObj ? `• ${branchObj.name}` : ''}
+                      </span>
+                    </div>
+                    <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-[10px] font-bold text-[#14532D]">
+                      {r.status}
+                    </span>
                   </div>
-                  <span className="rounded-full bg-[#DCFCE7] px-2.5 py-0.5 text-[10px] font-bold text-[#14532D]">
-                    {r.status}
-                  </span>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

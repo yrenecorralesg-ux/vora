@@ -56,7 +56,7 @@ export async function POST(
         event_type: 'actualizacion_configuracion',
         entity_type: 'pos_settings',
         entity_id: posStore.settings.id,
-        description: 'Actualización de parámetros operativos de sede POS [mock]',
+        description: 'Actualización de parámetros operativos de sede POS',
         metadata: body,
       });
 
@@ -78,7 +78,7 @@ export async function POST(
         event_type: 'estado_caja',
         entity_type: 'pos_registers',
         entity_id: reg.id,
-        description: `Caja ${reg.name} actualizada a estado ${reg.status} [mock]`,
+        description: `Caja ${reg.name} actualizada a estado ${reg.status}`,
         metadata: { status: reg.status },
       });
 

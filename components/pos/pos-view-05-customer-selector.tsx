@@ -19,7 +19,7 @@ export function PosView05CustomerSelector() {
   const [legalName, setLegalName] = useState('');
   const [phone, setPhone] = useState('0414-');
   const [email, setEmail] = useState('');
-  const [fiscalAddress, setFiscalAddress] = useState('Caracas, Venezuela [mock]');
+  const [fiscalAddress, setFiscalAddress] = useState('Caracas, Venezuela');
   const [rifError, setRifError] = useState<string | null>(null);
 
   // Validador de RIF SENIAT / Cédula (DOCX §5 / Facturación HKA)
@@ -64,7 +64,7 @@ export function PosView05CustomerSelector() {
     setSelectedCustomer(c);
     showNotification(
       'Cliente seleccionado',
-      `${c.legal_name} (${c.document_type}-${c.document_number}) vinculado a la venta actual [mock].`,
+      `${c.legal_name} (${c.document_type}-${c.document_number}) vinculado a la venta actual.`,
       'success',
     );
     navigateTo('POS-03-04');
@@ -73,7 +73,7 @@ export function PosView05CustomerSelector() {
   const handleSelectConsumidorFinal = () => {
     const cf = customers.find((c) => c.customer_tier === 'consumidor_final') ?? customers[customers.length - 1];
     setSelectedCustomer(cf);
-    showNotification('Consumidor final asignado', 'Operación asociada a Consumidor Final no fiscal [mock].', 'alert');
+    showNotification('Consumidor final asignado', 'Operación asociada a Consumidor Final no fiscal.', 'alert');
     navigateTo('POS-03-04');
   };
 
@@ -98,7 +98,7 @@ export function PosView05CustomerSelector() {
     const created = posStore.addCustomer({
       document_type: docType,
       document_number: docNumber.trim().replace(/[\s\.-]/g, ''),
-      legal_name: `${legalName.trim()} [mock]`,
+      legal_name: legalName.trim(),
       phone: phone.trim() || null,
       email: email.trim() || null,
       fiscal_address: fiscalAddress.trim() || null,
@@ -110,7 +110,7 @@ export function PosView05CustomerSelector() {
     setShowNewForm(false);
     showNotification(
       'Cliente Creado',
-      `${created.legal_name} (${rifCheck.formatted}) registrado y validado ante SENIAT [mock].`,
+      `${created.legal_name} (${rifCheck.formatted}) registrado y validado ante SENIAT.`,
       'success',
     );
     navigateTo('POS-03-04');

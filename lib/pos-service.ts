@@ -60,17 +60,27 @@ class PosInMemoryStore {
   registers: PosRegister[] = [...MOCK_REGISTERS];
   customers: PosCustomer[] = [...MOCK_CUSTOMERS];
   products: PosProduct[] = [...MOCK_PRODUCTS];
-  shifts: PosShift[] = MOCK_SHIFTS_HISTORY.map((s) => ({ ...s }));
-  cashMovements: PosCashMovement[] = [...MOCK_CASH_MOVEMENTS];
-  sales: PosSale[] = [...MOCK_SALES_HISTORY];
-  returns: PosSaleReturn[] = [...MOCK_RETURNS_HISTORY];
+  shifts: PosShift[] = [];
+  cashMovements: PosCashMovement[] = [];
+  sales: PosSale[] = [];
+  returns: PosSaleReturn[] = [];
   settings: PosSettings = { ...MOCK_SETTINGS };
   fiscalIntegration: PosFiscalIntegration = { ...MOCK_FISCAL_INTEGRATION };
-  auditEvents: PosAuditEvent[] = [...MOCK_AUDIT_EVENTS];
+  auditEvents: PosAuditEvent[] = [];
   salesReps: PosSalesRep[] = [...MOCK_SALES_REPS];
   promotions: PosPromotion[] = [...MOCK_PROMOTIONS];
   users: PosMockUser[] = [...MOCK_USERS];
-  dispatchOrders: PosDispatchOrder[] = [...MOCK_DISPATCH_ORDERS];
+  dispatchOrders: PosDispatchOrder[] = [];
+
+  addBranch(branch: PosBranch): PosBranch {
+    this.branches.push(branch);
+    return branch;
+  }
+
+  addRegister(register: PosRegister): PosRegister {
+    this.registers.push(register);
+    return register;
+  }
 
   // Métodos de Despacho y Almacén (pos_order_dispatch_kds)
   updateDispatchStatus(orderId: string, status: PosDispatchStatus, preparedBy?: string): boolean {
@@ -323,7 +333,7 @@ class PosInMemoryStore {
       event_type: 'apertura_turno',
       entity_type: 'pos_shifts',
       entity_id: newShift.id,
-      description: `Apertura confirmada de turno para ${params.cashierName} [mock]`,
+      description: `Apertura confirmada de turno para ${params.cashierName}`,
       metadata: { openingUsd: params.openingUsd, openingVes: params.openingVes },
     });
 
@@ -372,7 +382,7 @@ class PosInMemoryStore {
       event_type: 'movimiento_caja',
       entity_type: 'pos_cash_movements',
       entity_id: movement.id,
-      description: `${params.movementType} de ${params.amount} ${params.currency}: ${params.reason} [mock]`,
+      description: `${params.movementType} de ${params.amount} ${params.currency}: ${params.reason}`,
       metadata: params,
     });
 
@@ -427,7 +437,7 @@ class PosInMemoryStore {
       event_type: 'cierre_turno',
       entity_type: 'pos_shifts',
       entity_id: shift.id,
-      description: `Cierre definitivo de turno en caja con arqueo sellado [mock]`,
+      description: `Cierre definitivo de turno en caja con arqueo sellado`,
       metadata: { expected: shift.expected_totals, declared: params.declared, diff: differences },
     });
 
@@ -714,7 +724,7 @@ class PosInMemoryStore {
       event_type: 'venta_confirmada',
       entity_type: 'pos_sales',
       entity_id: newSale.id,
-      description: `Venta ${saleNum} confirmada. Comprobante Interno ${docNum} [mock]`,
+      description: `Venta ${saleNum} confirmada. Comprobante Interno ${docNum}`,
       metadata: { totalUsd, totalVes, paymentsCount: salePayments.length },
       correlation_id: params.correlationId,
     });
@@ -842,7 +852,7 @@ class PosInMemoryStore {
       event_type: 'devolucion_reverso',
       entity_type: 'pos_sale_returns',
       entity_id: returnRecord.id,
-      description: `Devolución ${returnNumber} procesada para venta ${sale.sale_number} [mock]`,
+      description: `Devolución ${returnNumber} procesada para venta ${sale.sale_number}`,
       metadata: { totalRefundUsd, totalRefundVes, method: params.refundMethod },
     });
 
@@ -948,7 +958,7 @@ class PosInMemoryStore {
       event_type: 'abono_cxc',
       entity_type: 'pos_sales',
       entity_id: sale.id,
-      description: `Abono a cuenta por cobrar registrado por $${appliedUsd.toFixed(2)} USD en venta ${sale.sale_number} [mock]`,
+      description: `Abono a cuenta por cobrar registrado por $${appliedUsd.toFixed(2)} USD en venta ${sale.sale_number}`,
       metadata: { appliedUsd, remainingDueUsd: sale.balance_due_usd, method: params.paymentMethod },
     });
 

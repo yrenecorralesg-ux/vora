@@ -24,6 +24,7 @@ import {
   type PosMockUser,
 } from '@/lib/pos-demo-data';
 import { posStore } from '@/lib/pos-service';
+import { getSupabaseClient } from '@/lib/supabase-client';
 
 export interface ParkedSale {
   id: string;
@@ -192,6 +193,10 @@ interface PosContextType {
   notification: { title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null;
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
   clearNotification: () => void;
+
+  // Sedes y Cajas
+  addBranch: (branch: Omit<PosBranch, 'id' | 'created_at' | 'updated_at'>) => PosBranch;
+  addRegister: (register: Omit<PosRegister, 'id' | 'created_at' | 'updated_at'>) => PosRegister;
 }
 
 const PosContext = createContext<PosContextType | null>(null);
@@ -246,12 +251,14 @@ export function PosProvider({
   const [currentView, setCurrentView] = useState<PosViewKey>('POS-01');
 
   // Operational State synced from store
+  const [branches, setBranches] = useState<PosBranch[]>(posStore.branches);
+  const [registers, setRegisters] = useState<PosRegister[]>(posStore.registers);
   const [activeShift, setActiveShift] = useState<PosShift | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartNotes, setCartNotes] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(posStore.customers[0] ?? null);
   const [discountAuthorizedBy, setDiscountAuthorizedBy] = useState<string | null>(null);
-  const [lastConfirmedSale, setLastConfirmedSale] = useState<PosSale | null>(posStore.sales[0] ?? null);
+  const [lastConfirmedSale, setLastConfirmedSale] = useState<PosSale | null>(null);
   const [notification, setNotification] = useState<{ title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null>(null);
 
   // Multiticket / Ventas en Espera
@@ -366,9 +373,67 @@ export function PosProvider({
     reloadProducts();
   }, [activeTenantSlug]);
 
-  const activeBranch = posStore.branches.find((b) => b.id === activeBranchId) ?? posStore.branches[0];
-  const activeUser = MOCK_USERS.find((u) => u.id === activeUserId) ?? MOCK_USERS[0];
-  const activeRegister = posStore.registers.find((r) => r.id === activeRegisterId) ?? posStore.registers[0];
+  useEffect(() => {
+    async function initSessionUser() {
+      try {
+        const supabase = getSupabaseClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const email = user.email || '';
+          const name = user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0] || 'Operador';
+          setStaffUsers((prev) => {
+            const existing = prev.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+            if (existing) {
+              setActiveUserId(existing.id);
+              return prev;
+            }
+            const authUserEntry: PosMockUser = {
+              id: user.id,
+              name,
+              email,
+              role: 'pos_store_admin',
+              assignedBranchId: activeBranchId,
+              pin: '0000',
+              is_active: true,
+            };
+            setActiveUserId(authUserEntry.id);
+            return [authUserEntry, ...prev];
+          });
+        }
+      } catch (err) {
+        console.warn('[pos-context] error loading session user', err);
+      }
+    }
+    initSessionUser();
+  }, []);
+
+  const addBranch = (data: Omit<PosBranch, 'id' | 'created_at' | 'updated_at'>): PosBranch => {
+    const newBranch: PosBranch = {
+      ...data,
+      id: `b-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    posStore.addBranch(newBranch);
+    setBranches([...posStore.branches]);
+    return newBranch;
+  };
+
+  const addRegister = (data: Omit<PosRegister, 'id' | 'created_at' | 'updated_at'>): PosRegister => {
+    const newReg: PosRegister = {
+      ...data,
+      id: `r-${Date.now()}`,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    posStore.addRegister(newReg);
+    setRegisters([...posStore.registers]);
+    return newReg;
+  };
+
+  const activeBranch = branches.find((b) => b.id === activeBranchId) ?? branches[0] ?? posStore.branches[0];
+  const activeUser = staffUsers.find((u) => u.id === activeUserId) ?? staffUsers[0] ?? MOCK_USERS[0];
+  const activeRegister = registers.find((r) => r.id === activeRegisterId) ?? registers[0] ?? posStore.registers[0];
 
   const refreshActiveShift = () => {
     const shift = posStore.getOpenShift(activeRegisterId);
@@ -872,8 +937,10 @@ export function PosProvider({
         refreshExchangeRate,
         isFetchingExchangeRate,
         settings: posStore.settings,
-        branches: posStore.branches,
-        registers: posStore.registers,
+        branches,
+        registers,
+        addBranch,
+        addRegister,
         products,
         reloadProducts,
         stockPolicy,

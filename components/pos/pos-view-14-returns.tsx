@@ -27,7 +27,7 @@ export function PosView14Returns() {
   // Selección de devolución
   const [returnType, setReturnType] = useState<'devolucion_parcial' | 'anulacion_total'>('devolucion_parcial');
   const [quantitiesToReturn, setQuantitiesToReturn] = useState<Record<string, number>>({});
-  const [reason, setReason] = useState('Cambio por defecto o solicitud de cliente en mostrador [mock]');
+  const [reason, setReason] = useState('Cambio por defecto o solicitud de cliente en mostrador');
   const [notes, setNotes] = useState('');
   const [refundMethod, setRefundMethod] = useState<'efectivo_usd' | 'efectivo_ves' | 'reverso_electronico' | 'nota_credito_interna'>('efectivo_usd');
 
