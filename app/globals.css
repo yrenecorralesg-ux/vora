@@ -152,3 +152,66 @@
     animation: none;
   }
 }
+
+/* Tenant Dynamic Branding Styles & Color Overrides */
+[data-tenant-root] {
+  --crm-primary: #144D37;
+  --crm-secondary: #1E6B4E;
+  --crm-accent: #A9BEA5;
+}
+
+[data-tenant-root] .bg-\[\#144D37\] {
+  background-color: var(--crm-primary) !important;
+}
+[data-tenant-root] .bg-\[\#1E6B4E\] {
+  background-color: var(--crm-secondary) !important;
+}
+[data-tenant-root] .hover\:bg-\[\#16523B\]:hover {
+  background-color: color-mix(in srgb, var(--crm-secondary) 85%, black) !important;
+}
+[data-tenant-root] .hover\:bg-\[\#1E6B4E\]:hover {
+  background-color: var(--crm-secondary) !important;
+}
+[data-tenant-root] .hover\:bg-\[\#1E6B4E\]\/40:hover {
+  background-color: color-mix(in srgb, var(--crm-secondary) 40%, transparent) !important;
+}
+[data-tenant-root] .hover\:bg-\[\#1E6B4E\]\/30:hover {
+  background-color: color-mix(in srgb, var(--crm-secondary) 30%, transparent) !important;
+}
+[data-tenant-root] .text-\[\#1E6B4E\] {
+  color: var(--crm-secondary) !important;
+}
+[data-tenant-root] .border-\[\#1E6B4E\] {
+  border-color: var(--crm-secondary) !important;
+}
+[data-tenant-root] .border-\[\#1E6B4E\]\/30 {
+  border-color: color-mix(in srgb, var(--crm-secondary) 30%, transparent) !important;
+}
+[data-tenant-root] .border-\[\#1E6B4E\]\/40 {
+  border-color: color-mix(in srgb, var(--crm-secondary) 40%, transparent) !important;
+}
+[data-tenant-root] .text-\[\#A9BEA5\] {
+  color: var(--crm-accent) !important;
+}
+[data-tenant-root] .bg-\[\#0E3B2A\] {
+  background-color: color-mix(in srgb, var(--crm-primary) 70%, black) !important;
+}
+[data-tenant-root] .bg-\[\#DCFCE7\] {
+  background-color: color-mix(in srgb, var(--crm-secondary) 15%, transparent) !important;
+}
+[data-tenant-root] .text-\[\#14532D\] {
+  color: var(--crm-primary) !important;
+}
+[data-tenant-root] .hover\:border-\[\#1E6B4E\]:hover {
+  border-color: var(--crm-secondary) !important;
+}
+[data-tenant-root] .focus\:border-\[\#1E6B4E\]:focus {
+  border-color: var(--crm-secondary) !important;
+}
+[data-tenant-root] .focus-within\:border-\[\#1E6B4E\]:focus-within {
+  border-color: var(--crm-secondary) !important;
+}
+[data-tenant-root] .accent-\[\#1E6B4E\] {
+  accent-color: var(--crm-secondary) !important;
+}
+

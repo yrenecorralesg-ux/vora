@@ -171,6 +171,7 @@ export default async function TenantCrmLayout({
   if (isPos) {
     return (
       <div
+        data-tenant-root
         className="min-h-screen bg-[#F6F2E9]"
         style={{
           '--crm-primary': primaryColor,
@@ -193,7 +194,7 @@ export default async function TenantCrmLayout({
   } as React.CSSProperties;
 
   return (
-    <div className="min-h-screen bg-[#f1f3f9]" style={wrapperStyle}>
+    <div data-tenant-root className="min-h-screen bg-[#f1f3f9]" style={wrapperStyle}>
       <div className="flex min-h-screen">
         <CrmSidebar
           tenantId={tenant.id}
@@ -211,7 +212,7 @@ export default async function TenantCrmLayout({
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-y-auto">
           <main className="flex-1 p-4 pt-16 sm:p-5 sm:pt-16 md:pt-5 lg:p-6">
-                        {(admin || ['tenant_admin', 'admin'].includes(userRole)) && (
+            {(admin || ['tenant_admin', 'admin'].includes(userRole)) && (
               <a
                 href={`/t/${tenant.slug}/subscription`}
                 className="mb-4 inline-block text-sm underline"
@@ -219,7 +220,7 @@ export default async function TenantCrmLayout({
                 Suscripción y Pago Móvil
               </a>
             )}
-                        {children}
+            {children}
           </main>
         </div>
       </div>

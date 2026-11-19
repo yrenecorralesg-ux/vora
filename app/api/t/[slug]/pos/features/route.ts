@@ -16,10 +16,10 @@ export async function GET(
   try {
     const supabase = getSupabaseServiceClient();
 
-    // 1. Resolver tenant por slug
+    // 1. Resolver tenant por slug con su branding
     const { data: tenant } = await supabase
       .from('tenants')
-      .select('id, commercial_name, slug')
+      .select('id, commercial_name, slug, country, currency, tenant_branding(*)')
       .eq('slug', params.slug)
       .maybeSingle();
 
@@ -28,6 +28,10 @@ export async function GET(
       return NextResponse.json({
         ok: true,
         tenant_id: null,
+        tenant_name: 'VORA POS',
+        country: 'VE',
+        currency: 'USD',
+        branding: null,
         is_module_enabled: true,
         functions: {
           pos_sales: true,
@@ -71,10 +75,17 @@ export async function GET(
     const tenantFuncs = posFeature?.config?.functions || {};
     const finalFunctions = { ...defaultFuncs, ...tenantFuncs };
 
+    const rawBranding = Array.isArray(tenant.tenant_branding)
+      ? tenant.tenant_branding[0]
+      : tenant.tenant_branding;
+
     return NextResponse.json({
       ok: true,
       tenant_id: tenant.id,
       tenant_name: tenant.commercial_name,
+      country: tenant.country || 'VE',
+      currency: tenant.currency || 'USD',
+      branding: rawBranding || null,
       is_module_enabled: isModuleEnabled,
       functions: finalFunctions,
     });
