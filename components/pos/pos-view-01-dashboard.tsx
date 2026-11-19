@@ -22,7 +22,11 @@ export function PosView01Dashboard() {
     navigateTo,
     sales,
     showNotification,
+    tenantBranding,
   } = usePos();
+
+  const primaryColor = tenantBranding?.primaryColor || 'var(--crm-primary, #1E6B4E)';
+  const secondaryColor = tenantBranding?.secondaryColor || 'var(--crm-secondary, #1E6B4E)';
 
   const isShiftOpen = activeShift && activeShift.status === 'abierto';
 
@@ -72,7 +76,8 @@ export function PosView01Dashboard() {
         <button
           type="button"
           onClick={handleStartSale}
-          className="group flex flex-col items-center justify-center rounded-3xl bg-[#1E6B4E] p-6 text-white shadow-md transition-all hover:bg-[#16523B] hover:shadow-lg aspect-square"
+          className="group flex flex-col items-center justify-center rounded-3xl p-6 text-white shadow-md transition-all hover:opacity-90 hover:shadow-lg aspect-square"
+          style={{ backgroundColor: primaryColor }}
         >
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 transition group-hover:scale-105">
             <ShoppingCart className="h-8 w-8 text-white" />
@@ -84,10 +89,16 @@ export function PosView01Dashboard() {
         <button
           type="button"
           onClick={() => navigateTo(isShiftOpen ? 'POS-15' : 'POS-02')}
-          className="group flex flex-col items-center justify-center rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs transition-all hover:border-[#1E6B4E] hover:shadow-md aspect-square"
+          className="group flex flex-col items-center justify-center rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs transition-all hover:shadow-md aspect-square"
         >
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#DCFCE7] text-[#14532D] transition group-hover:scale-105">
-            <Coins className="h-8 w-8 text-[#14532D]" />
+          <div
+            className="flex h-14 w-14 items-center justify-center rounded-2xl transition group-hover:scale-105"
+            style={{
+              backgroundColor: `color-mix(in srgb, ${secondaryColor} 15%, transparent)`,
+              color: secondaryColor,
+            }}
+          >
+            <Coins className="h-8 w-8" />
           </div>
           <span className="mt-4 text-sm font-bold text-[#111827]">
             {isShiftOpen ? 'Caja activa' : 'Abrir caja'}
@@ -98,7 +109,7 @@ export function PosView01Dashboard() {
         <button
           type="button"
           onClick={() => navigateTo('POS-03-04')}
-          className="group flex flex-col items-center justify-center rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs transition-all hover:border-[#1E6B4E] hover:shadow-md aspect-square"
+          className="group flex flex-col items-center justify-center rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs transition-all hover:shadow-md aspect-square"
         >
           <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#FEF3C7] text-[#92400E] transition group-hover:scale-105">
             <Package className="h-8 w-8 text-[#C97857]" />
@@ -110,10 +121,16 @@ export function PosView01Dashboard() {
         <button
           type="button"
           onClick={() => navigateTo('POS-05')}
-          className="group flex flex-col items-center justify-center rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs transition-all hover:border-[#1E6B4E] hover:shadow-md aspect-square"
+          className="group flex flex-col items-center justify-center rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs transition-all hover:shadow-md aspect-square"
         >
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E8F5E9] text-[#2E7D32] transition group-hover:scale-105">
-            <Users className="h-8 w-8 text-[#2E7D32]" />
+          <div
+            className="flex h-14 w-14 items-center justify-center rounded-2xl transition group-hover:scale-105"
+            style={{
+              backgroundColor: `color-mix(in srgb, ${primaryColor} 15%, transparent)`,
+              color: primaryColor,
+            }}
+          >
+            <Users className="h-8 w-8" />
           </div>
           <span className="mt-4 text-sm font-bold text-[#111827]">Clientes</span>
         </button>
@@ -165,11 +182,10 @@ export function PosView01Dashboard() {
               Caja - {activeBranch.name}
             </h2>
             <span
-              className={`rounded-full px-3 py-0.5 text-xs font-bold ${
-                isShiftOpen
-                  ? 'border border-[#86EFAC] bg-[#DCFCE7] text-[#14532D]'
-                  : 'border border-[#FDE68A] bg-[#FEF3C7] text-[#92400E]'
-              }`}
+              className={`rounded-full px-3 py-0.5 text-xs font-bold ${isShiftOpen
+                ? 'border border-[#86EFAC] bg-[#DCFCE7] text-[#14532D]'
+                : 'border border-[#FDE68A] bg-[#FEF3C7] text-[#92400E]'
+                }`}
             >
               {isShiftOpen ? 'Abierta' : 'Cerrada'}
             </span>
@@ -273,7 +289,8 @@ export function PosView01Dashboard() {
           <button
             type="button"
             onClick={() => navigateTo('POS-13')}
-            className="flex-1 rounded-2xl bg-[#1E6B4E] py-3.5 text-center text-sm font-bold text-white shadow-md transition hover:bg-[#16523B]"
+            className="flex-1 rounded-2xl py-3.5 text-center text-sm font-bold text-white shadow-md transition hover:opacity-90"
+            style={{ backgroundColor: primaryColor }}
           >
             Ver detalle de ventas
           </button>

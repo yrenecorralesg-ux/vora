@@ -28,12 +28,28 @@ export async function GET(
   const { data: branding } = await service
     .from('tenant_branding')
     .select(
-      'logo_url, primary_color, secondary_color, accent_color, font_family, login_background_color',
+      'logo_url, favicon_url, banner_url, primary_color, secondary_color, accent_color, font_family, login_background_color',
     )
     .eq('tenant_id', tenant.id)
     .maybeSingle();
 
   return NextResponse.json({
-    branding: { commercial_name: tenant.commercial_name, ...(branding ?? {}) },
+    ok: true,
+    branding: {
+      commercial_name: tenant.commercial_name,
+      primary_color: branding?.primary_color ?? '#285C49',
+      secondary_color: branding?.secondary_color ?? '#A9BEA5',
+      accent_color: branding?.accent_color ?? '#C97857',
+      login_background_color: branding?.login_background_color ?? '#F6F2E9',
+      font_family: branding?.font_family ?? 'Poppins',
+      logo_url: branding?.logo_url ?? null,
+      favicon_url: branding?.favicon_url ?? null,
+      banner_url: branding?.banner_url ?? null,
+    },
+    tenant: {
+      id: tenant.id,
+      commercial_name: tenant.commercial_name,
+      slug: params.slug,
+    },
   });
 }

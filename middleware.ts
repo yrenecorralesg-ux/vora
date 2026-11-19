@@ -1,36 +1,25 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
-import {
-  VORA_DOMAIN,
-  validTenantSlug,
-  resolveTenantSlugFromHost,
-} from '@/lib/core-config';
-
+import { VORA_DOMAIN, validTenantSlug } from '@/lib/core-config';
 export async function middleware(request: NextRequest) {
-  const hostname = request.nextUrl.hostname.toLowerCase();
-  const slug = resolveTenantSlugFromHost(hostname);
+  const hostname = request.nextUrl.hostname.toLowerCase(),
+    suffix = `.${VORA_DOMAIN}`;
+  const slug = hostname.endsWith(suffix)
+    ? hostname.slice(0, -suffix.length)
+    : null;
   let pathname = request.nextUrl.pathname;
-
   if (slug !== null && !validTenantSlug(slug))
     return new NextResponse('Empresa no encontrada.', { status: 404 });
   if (slug && pathname.startsWith('/admin'))
     return NextResponse.redirect(new URL(pathname, `https://${VORA_DOMAIN}`));
-
-  // Challenge and public tenant branding are reachable before login.
-  if (
-    pathname === '/api/tenant-domain-check' ||
-    /^\/api\/t\/[^/]+\/branding$/.test(pathname)
-  ) {
-    return NextResponse.next();
-  }
-
+  // Challenge is deliberately reachable while domain verification is pending.
+  if (pathname === '/api/tenant-domain-check') return NextResponse.next();
   if (
     slug &&
     pathname.startsWith('/api/t/') &&
     !pathname.startsWith(`/api/t/${slug}/`)
   )
     return new NextResponse('Sin acceso.', { status: 403 });
-
   if (
     slug &&
     !pathname.startsWith('/api/') &&
@@ -48,23 +37,20 @@ export async function middleware(request: NextRequest) {
     if (!pathname.startsWith('/t/'))
       pathname = `/t/${slug}${pathname === '/' ? '' : pathname}`;
   }
-
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-vora-path', pathname);
   requestHeaders.set(
     'x-vora-preview',
     request.nextUrl.searchParams.get('preview') === '1' ? '1' : '0',
   );
-
   const destination = request.nextUrl.clone();
   destination.pathname = pathname;
   const makeResponse = () =>
     pathname !== request.nextUrl.pathname
       ? NextResponse.rewrite(destination, {
-          request: { headers: requestHeaders },
-        })
+        request: { headers: requestHeaders },
+      })
       : NextResponse.next({ request: { headers: requestHeaders } });
-
   let response = makeResponse();
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -93,12 +79,6 @@ export async function middleware(request: NextRequest) {
       },
     },
   );
-
-  const isTenantLogin = /^\/t\/[^/]+\/login(\/|$)/.test(pathname);
-  if (isTenantLogin) {
-    return response;
-  }
-
   if (
     pathname.startsWith('/admin') ||
     pathname.startsWith('/t/') ||
@@ -132,10 +112,8 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
   }
-
   return response;
 }
-
 export const config = {
   matcher: [
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2?)$).*)',

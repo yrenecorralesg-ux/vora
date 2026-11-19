@@ -66,8 +66,22 @@ export type PosViewKey =
   | 'POS-19'
   | 'POS-20';
 
+export interface PosTenantBranding {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  loginBgColor: string;
+  fontFamily: string;
+  logoUrl: string | null;
+  bannerUrl: string | null;
+}
+
 interface PosContextType {
-  // Contex Switchers
+  // Context Switchers & Tenant Meta
+  tenantName: string;
+  tenantCurrency: string;
+  tenantCountry: string;
+  tenantBranding: PosTenantBranding;
   activeTenantSlug: string;
   setActiveTenantSlug: (slug: string) => void;
   activeBranchId: string;
@@ -183,11 +197,47 @@ const PosContext = createContext<PosContextType | null>(null);
 export function PosProvider({
   children,
   initialSlug,
+  initialTenant,
+  initialBranding,
 }: {
   children: React.ReactNode;
   initialSlug: string;
+  initialTenant?: {
+    id?: string;
+    commercial_name?: string;
+    currency?: string;
+    country?: string;
+  } | null;
+  initialBranding?: {
+    primary_color?: string;
+    secondary_color?: string;
+    accent_color?: string;
+    login_background_color?: string;
+    font_family?: string;
+    logo_url?: string | null;
+    banner_url?: string | null;
+  } | null;
 }) {
+  const isSolee = (initialSlug || '').toLowerCase() === 'solee';
   const [activeTenantSlug, setActiveTenantSlug] = useState<string>(initialSlug || MOCK_TENANT_SLUG);
+  const [tenantName, setTenantName] = useState<string>(
+    initialTenant?.commercial_name || (isSolee ? 'SOLEÉ' : initialSlug || MOCK_TENANT_SLUG)
+  );
+  const [tenantCurrency, setTenantCurrency] = useState<string>(
+    initialTenant?.currency || 'USD'
+  );
+  const [tenantCountry, setTenantCountry] = useState<string>(
+    initialTenant?.country || 'VE'
+  );
+  const [tenantBranding, setTenantBranding] = useState<PosTenantBranding>({
+    primaryColor: initialBranding?.primary_color || (isSolee ? '#4a1d6e' : '#285C49'),
+    secondaryColor: initialBranding?.secondary_color || (isSolee ? '#63DCE5' : '#A9BEA5'),
+    accentColor: initialBranding?.accent_color || (isSolee ? '#00AFEF' : '#C97857'),
+    loginBgColor: initialBranding?.login_background_color || '#F6F2E9',
+    fontFamily: initialBranding?.font_family || 'Poppins',
+    logoUrl: initialBranding?.logo_url || null,
+    bannerUrl: initialBranding?.banner_url || null,
+  });
   const [activeBranchId, setActiveBranchId] = useState<string>('b0000000-0000-0000-0000-000000000001');
   const [activeUserId, setActiveUserId] = useState<string>('u0000000-0000-0000-0000-000000000001');
   const [activeRegisterId, setActiveRegisterId] = useState<string>('r0000000-0000-0000-0000-000000000001');
@@ -268,6 +318,20 @@ export function PosProvider({
       if (data.ok) {
         setIsModuleEnabled(Boolean(data.is_module_enabled));
         setIsWarehouseEnabled(Boolean(data.is_warehouse_enabled));
+        if (data.tenant_name) setTenantName(data.tenant_name);
+        if (data.currency) setTenantCurrency(data.currency);
+        if (data.country) setTenantCountry(data.country);
+        if (data.branding) {
+          setTenantBranding({
+            primaryColor: data.branding.primary_color || '#285C49',
+            secondaryColor: data.branding.secondary_color || '#A9BEA5',
+            accentColor: data.branding.accent_color || '#C97857',
+            loginBgColor: data.branding.login_background_color || '#F6F2E9',
+            fontFamily: data.branding.font_family || 'Poppins',
+            logoUrl: data.branding.logo_url || null,
+            bannerUrl: data.branding.banner_url || null,
+          });
+        }
         if (data.functions) {
           setPosFeatures(data.functions);
         }
@@ -728,6 +792,10 @@ export function PosProvider({
   return (
     <PosContext.Provider
       value={{
+        tenantName,
+        tenantCurrency,
+        tenantCountry,
+        tenantBranding,
         activeTenantSlug,
         setActiveTenantSlug,
         activeBranchId,
