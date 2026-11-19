@@ -58,6 +58,7 @@ export function PosView06Checkout() {
     salesReps,
     selectedSalesRep,
     setSelectedSalesRep,
+    reloadProducts,
   } = usePos();
 
   // Billetera Digital & Saldo a Favor (pos_digital_wallet)
@@ -472,6 +473,7 @@ export function PosView06Checkout() {
 
     setLastConfirmedSale(confirmedSale);
     clearCart();
+    reloadProducts().catch(() => {});
     showNotification(
       confirmedSale.balance_due_usd > 0 ? 'Venta a Crédito Confirmada' : 'Venta confirmada',
       confirmedSale.balance_due_usd > 0

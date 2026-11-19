@@ -151,6 +151,8 @@ interface PosContextType {
   posFeatures: Record<string, boolean>;
   isFuncActive: (funcKey: string) => boolean;
   reloadTenantFeatures: () => Promise<void>;
+  reloadProducts: () => Promise<void>;
+  stockPolicy: 'warn_and_allow' | 'strict_block' | 'allow_unrestricted';
 
   // Nuevas capacidades diferenciadoras
   salesReps: PosSalesRep[];
@@ -266,6 +268,8 @@ export function PosProvider({
   // Modularidad & Feature Flags configurables desde el Gestor VORA
   const [isModuleEnabled, setIsModuleEnabled] = useState<boolean>(true);
   const [isWarehouseEnabled, setIsWarehouseEnabled] = useState<boolean>(false);
+  const [stockPolicy, setStockPolicy] = useState<'warn_and_allow' | 'strict_block' | 'allow_unrestricted'>('warn_and_allow');
+  const [products, setProducts] = useState<PosProduct[]>(posStore.products);
   const [posFeatures, setPosFeatures] = useState<Record<string, boolean>>({
     pos_sales: true,
     pos_shifts: true,
@@ -311,6 +315,21 @@ export function PosProvider({
     return Boolean(posFeatures[funcKey]);
   };
 
+  const reloadProducts = async () => {
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/products`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.products)) {
+          setProducts(data.products);
+          posStore.products = data.products;
+        }
+      }
+    } catch (err) {
+      console.warn('[pos-context] reloadProducts error:', err);
+    }
+  };
+
   const reloadTenantFeatures = async () => {
     try {
       const res = await fetch(`/api/t/${activeTenantSlug}/pos/features`, { cache: 'no-store' });
@@ -318,6 +337,7 @@ export function PosProvider({
       if (data.ok) {
         setIsModuleEnabled(Boolean(data.is_module_enabled));
         setIsWarehouseEnabled(Boolean(data.is_warehouse_enabled));
+        if (data.stock_policy) setStockPolicy(data.stock_policy);
         if (data.tenant_name) setTenantName(data.tenant_name);
         if (data.currency) setTenantCurrency(data.currency);
         if (data.country) setTenantCountry(data.country);
@@ -343,6 +363,7 @@ export function PosProvider({
 
   useEffect(() => {
     reloadTenantFeatures();
+    reloadProducts();
   }, [activeTenantSlug]);
 
   const activeBranch = posStore.branches.find((b) => b.id === activeBranchId) ?? posStore.branches[0];
@@ -515,8 +536,20 @@ export function PosProvider({
   // Cart operations
   const addToCart = (product: PosProduct, quantity = 1) => {
     if (!product.is_service && product.stock_quantity < quantity) {
-      showNotification('Existencia insuficiente', `No hay existencias suficientes para ${product.sku} [mock]`, 'critical');
-      return;
+      if (stockPolicy === 'strict_block') {
+        showNotification(
+          'Bloqueo de inventario',
+          `Existencias insuficientes para ${product.name} (${product.sku}). Solicitado: ${quantity}, disponible: ${product.stock_quantity}.`,
+          'critical',
+        );
+        return;
+      } else if (stockPolicy === 'warn_and_allow') {
+        showNotification(
+          'Advertencia de sobreventa',
+          `Existencias bajas para ${product.name} (${product.sku}). Disponible: ${product.stock_quantity}. Venta autorizada.`,
+          'alert',
+        );
+      }
     }
 
     setCart((prev) => {
@@ -525,8 +558,20 @@ export function PosProvider({
         const line = prev[existingIdx];
         const newQty = line.quantity + quantity;
         if (!product.is_service && product.stock_quantity < newQty) {
-          showNotification('Límite de almacén alcanzado', `Existencia máxima disponible: ${product.stock_quantity} und. [mock]`, 'critical');
-          return prev;
+          if (stockPolicy === 'strict_block') {
+            showNotification(
+              'Bloqueo de inventario',
+              `Límite de almacén alcanzado. Existencia disponible: ${product.stock_quantity} und.`,
+              'critical',
+            );
+            return prev;
+          } else if (stockPolicy === 'warn_and_allow') {
+            showNotification(
+              'Advertencia de sobreventa',
+              `Límite de stock físico excedido (${newQty}/${product.stock_quantity}). Venta autorizada.`,
+              'alert',
+            );
+          }
         }
         const unitPrice = line.unitPriceUsd;
         const subtotal = Number((unitPrice * newQty).toFixed(2));
@@ -580,10 +625,22 @@ export function PosProvider({
       const line = prev[index];
       if (!line) return prev;
       if (!line.isService && line.productId) {
-        const prod = posStore.products.find((p) => p.id === line.productId);
+        const prod = products.find((p) => p.id === line.productId || p.sku === line.sku);
         if (prod && prod.stock_quantity < quantity) {
-          showNotification('Existencia insuficiente', `Solo quedan ${prod.stock_quantity} unidades físicas en almacén [mock]`, 'alert');
-          return prev;
+          if (stockPolicy === 'strict_block') {
+            showNotification(
+              'Bloqueo de inventario',
+              `Solo quedan ${prod.stock_quantity} unidades físicas en almacén para ${prod.name}.`,
+              'critical',
+            );
+            return prev;
+          } else if (stockPolicy === 'warn_and_allow') {
+            showNotification(
+              'Advertencia de sobreventa',
+              `Cantidad solicitada (${quantity}) excede las existencias físicas (${prod.stock_quantity}).`,
+              'alert',
+            );
+          }
         }
       }
       const subtotal = Number((line.unitPriceUsd * quantity).toFixed(2));
@@ -706,8 +763,9 @@ export function PosProvider({
       return false;
     }
     const clean = code.trim().toLowerCase();
-    const product = posStore.products.find(
+    const product = products.find(
       (p) =>
+        (p.barcode && p.barcode.toLowerCase() === clean) ||
         p.sku.toLowerCase() === clean ||
         p.id.toLowerCase() === clean ||
         p.name.toLowerCase().includes(clean),
@@ -816,7 +874,9 @@ export function PosProvider({
         settings: posStore.settings,
         branches: posStore.branches,
         registers: posStore.registers,
-        products: posStore.products,
+        products,
+        reloadProducts,
+        stockPolicy,
         customers: posStore.customers,
         sales: posStore.sales,
         shifts: posStore.shifts,

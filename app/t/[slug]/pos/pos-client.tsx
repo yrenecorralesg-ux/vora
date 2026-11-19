@@ -55,7 +55,16 @@ export function PosModuleContent() {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#F6F5F0] text-[#111827] print:block print:bg-white">
+    <div
+      data-tenant-root
+      className="flex min-h-screen bg-[#F6F5F0] text-[#111827] print:block print:bg-white"
+      style={{
+        '--crm-primary': tenantBranding.primaryColor,
+        '--crm-secondary': tenantBranding.secondaryColor,
+        '--crm-accent': tenantBranding.accentColor,
+        fontFamily: tenantBranding.fontFamily,
+      } as React.CSSProperties}
+    >
       {/* Modal Pantalla de Cara al Cliente (pos_customer_display) */}
       <PosCustomerDisplayModal />
 

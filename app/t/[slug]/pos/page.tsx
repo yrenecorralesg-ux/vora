@@ -1,11 +1,11 @@
-import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { PosClient } from './pos-client';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export default async function PosPage({ params }: { params: { slug: string } }) {
-  const supabase = getSupabaseServerClient();
+  const supabase = getSupabaseServiceClient();
 
   const { data: tenant } = await supabase
     .from('tenants')

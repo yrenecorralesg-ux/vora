@@ -196,8 +196,17 @@
 [data-tenant-root] .bg-\[\#0E3B2A\] {
   background-color: color-mix(in srgb, var(--crm-primary) 70%, black) !important;
 }
+[data-tenant-root] .bg-\[\#0F2E22\] {
+  background-color: color-mix(in srgb, var(--crm-primary) 80%, black) !important;
+}
+[data-tenant-root] .text-\[\#0F2E22\] {
+  color: var(--crm-primary) !important;
+}
 [data-tenant-root] .bg-\[\#DCFCE7\] {
   background-color: color-mix(in srgb, var(--crm-secondary) 15%, transparent) !important;
+}
+[data-tenant-root] .border-\[\#86EFAC\] {
+  border-color: color-mix(in srgb, var(--crm-secondary) 30%, transparent) !important;
 }
 [data-tenant-root] .text-\[\#14532D\] {
   color: var(--crm-primary) !important;

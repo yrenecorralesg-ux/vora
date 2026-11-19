@@ -1338,6 +1338,40 @@ function ModulosTab({
                       );
                     })}
                   </div>
+
+                  {f.feature_key === 'warehouse.inventory' && (
+                    <div className="mt-3 rounded-lg border border-slate-200/80 bg-white p-3 shadow-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">
+                            Política de Control de Stock en Punto de Venta (POS)
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            Determina el comportamiento del POS cuando un cajero intenta vender un producto sin stock disponible en Almacén.
+                          </p>
+                        </div>
+                        <select
+                          value={f.config?.pos_stock_policy || 'warn_and_allow'}
+                          disabled={!f.enabled}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFeaturesList((prev) =>
+                              prev.map((item) =>
+                                item.feature_key === f.feature_key
+                                  ? { ...item, config: { ...item.config, pos_stock_policy: val } }
+                                  : item,
+                              ),
+                            );
+                          }}
+                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs focus:border-slate-900 focus:outline-none"
+                        >
+                          <option value="warn_and_allow">Alertar al cajero y permitir sobreventa (Recomendado)</option>
+                          <option value="strict_block">Bloqueo estricto por falta de stock</option>
+                          <option value="allow_unrestricted">Permitir venta sin advertencias</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

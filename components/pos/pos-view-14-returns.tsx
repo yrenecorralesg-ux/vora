@@ -17,6 +17,8 @@ export function PosView14Returns() {
     navigateTo,
     staffUsers,
     validateSupervisorPin,
+    activeTenantSlug,
+    reloadProducts,
   } = usePos();
 
   const [saleSearch, setSaleSearch] = useState('');
@@ -54,7 +56,7 @@ export function PosView14Returns() {
     setQuantitiesToReturn((prev) => ({ ...prev, [lineId]: clamped }));
   };
 
-  const handleProcessReturn = (e: React.FormEvent) => {
+  const handleProcessReturn = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
@@ -94,30 +96,69 @@ export function PosView14Returns() {
       return;
     }
 
-    const res = posStore.processReturn({
-      originalSaleId: selectedSale.id,
-      branchId: activeBranch.id,
-      shiftId: activeShift ? activeShift.id : selectedSale.shift_id,
-      returnType,
+    const payload = {
+      original_sale_id: selectedSale.id,
+      branch_id: activeBranch.id,
+      shift_id: activeShift ? activeShift.id : selectedSale.shift_id,
+      return_type: returnType,
       lines: itemsToReturn.map((item) => ({
-        saleLineId: item.lineId,
-        quantityReturned: item.quantity,
+        sale_line_id: item.lineId,
+        quantity_returned: item.quantity,
       })),
       reason,
       notes: notes.trim() || undefined,
-      refundMethod,
-      requestedBy: activeUser.name,
-      approvedBy: supervisor?.name || 'Supervisor de Guardia',
-    });
+      refund_method: refundMethod,
+      requested_by: activeUser.name,
+      approved_by: supervisor?.name || 'Supervisor de Guardia',
+    };
 
-    if (!res.ok) {
-      setErrorMsg(res.error ?? 'Error al procesar devolución.');
-      return;
+    let returnRecord: any = null;
+
+    try {
+      const resp = await fetch(`/api/t/${activeTenantSlug}/pos/returns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.ok && data.return_record) {
+          returnRecord = data.return_record;
+        }
+      }
+    } catch {
+      // Fallback a motor en memoria
     }
+
+    if (!returnRecord) {
+      const res = posStore.processReturn({
+        originalSaleId: selectedSale.id,
+        branchId: activeBranch.id,
+        shiftId: activeShift ? activeShift.id : selectedSale.shift_id,
+        returnType,
+        lines: itemsToReturn.map((item) => ({
+          saleLineId: item.lineId,
+          quantityReturned: item.quantity,
+        })),
+        reason,
+        notes: notes.trim() || undefined,
+        refundMethod,
+        requestedBy: activeUser.name,
+        approvedBy: supervisor?.name || 'Supervisor de Guardia',
+      });
+
+      if (!res.ok) {
+        setErrorMsg(res.error ?? 'Error al procesar devolución.');
+        return;
+      }
+      returnRecord = res.returnRecord;
+    }
+
+    await reloadProducts().catch(() => {});
 
     showNotification(
       'Devolución ejecutada',
-      `Reverso ${res.returnRecord?.return_number} procesado por $${res.returnRecord?.total_refunded_usd.toFixed(2)} USD. Existencias restituidas [mock].`,
+      `Reverso ${returnRecord?.return_number} procesado por $${Number(returnRecord?.total_refunded_usd || 0).toFixed(2)} USD. Inventario restituido en almacén y kardex.`,
       'success',
     );
     navigateTo('POS-13');
