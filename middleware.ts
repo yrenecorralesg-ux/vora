@@ -98,7 +98,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(login);
     }
 
-    if (!user && pathname.startsWith('/t/')) {
+    if (!user && pathname.startsWith('/t/') && !pathname.endsWith('/login')) {
       const login = request.nextUrl.clone();
       login.pathname = targetSlug ? `/t/${targetSlug}/login` : '/login';
       login.search = '';

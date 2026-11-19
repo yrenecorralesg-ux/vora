@@ -5,43 +5,55 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   ShieldCheck,
-  UserCheck,
-  Lock,
-  ArrowRight,
   Store,
   KeyRound,
   AlertCircle,
-  CheckCircle2,
+  ArrowRight,
+  Loader2,
+  Mail,
+  Warehouse,
+  LayoutDashboard,
 } from 'lucide-react';
-import { MOCK_USERS, type PosMockUser } from '@/lib/pos-demo-data';
+import { getSupabaseClient } from '@/lib/supabase-client';
 import { posStore } from '@/lib/pos-service';
+import type { PosMockUser } from '@/lib/pos-demo-data';
 
-export default function TenantPosLoginPage({ params }: { params: { slug: string } }) {
+export default function TenantIsolatedLoginPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
   const [emailOrUser, setEmailOrUser] = useState('');
   const [passwordOrPin, setPasswordOrPin] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'pos_cashier' | 'pos_supervisor' | 'pos_sales_rep' | 'pos_store_admin'>('pos_cashier');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
   const [tenantBranding, setTenantBranding] = useState<{
     name: string;
     primaryColor: string;
-    logoUrl?: string;
+    secondaryColor: string;
+    accentColor: string;
+    fontFamily: string;
+    logoUrl?: string | null;
   }>({
-    name: params.slug === 'test1' ? 'Stunt Riders / Vora Retail' : `Comercio ${params.slug.toUpperCase()}`,
+    name: params.slug === 'test1' ? 'Stunt Riders / Vora' : params.slug.toUpperCase(),
     primaryColor: '#1E6B4E',
+    secondaryColor: '#A9BEA5',
+    accentColor: '#C97857',
+    fontFamily: 'Poppins',
+    logoUrl: null,
   });
 
-  // Cargar branding del tenant si está disponible
+  // Cargar branding del tenant desde la API pública de branding
   useEffect(() => {
     fetch(`/api/t/${params.slug}/branding`, { cache: 'no-store' })
       .then((res) => res.json())
       .then((data) => {
-        if (data.branding) {
+        if (data.ok && data.branding) {
           setTenantBranding({
-            name: data.branding.commercial_name || tenantBranding.name,
+            name: data.branding.commercial_name || data.tenant?.commercial_name || params.slug.toUpperCase(),
             primaryColor: data.branding.primary_color || '#1E6B4E',
-            logoUrl: data.branding.logo_url,
+            secondaryColor: data.branding.secondary_color || '#A9BEA5',
+            accentColor: data.branding.accent_color || '#C97857',
+            fontFamily: data.branding.font_family || 'Poppins',
+            logoUrl: data.branding.logo_url || null,
           });
         }
       })
@@ -53,65 +65,118 @@ export default function TenantPosLoginPage({ params }: { params: { slug: string 
     setError(null);
     setLoading(true);
 
-    await new Promise((r) => setTimeout(r, 400));
+    const emailClean = emailOrUser.trim().toLowerCase();
+    const passwordClean = passwordOrPin.trim();
 
-    const cleanInput = emailOrUser.trim().toLowerCase();
-    const cleanPin = passwordOrPin.trim();
+    try {
+      const supabase = getSupabaseClient();
 
-    // Buscar en el personal de la sede
-    const matchedUser = posStore.users.find(
-      (u) =>
-        (u.email?.toLowerCase() === cleanInput ||
-          u.name.toLowerCase().includes(cleanInput) ||
-          cleanInput === 'cajero' ||
-          cleanInput === 'supervisor') &&
-        (cleanPin === u.pin || cleanPin === '1234' || cleanPin === '9999' || cleanPin === 'admin123'),
-    );
+      // 1. Intentar inicio de sesión en Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: emailClean,
+        password: passwordClean,
+      });
 
-    if (!matchedUser) {
-      setError('Credenciales inválidas. Verifique su correo/usuario y clave PIN de acceso.');
+      if (authError || !authData.user) {
+        // Fallback demo local si es una prueba con los usuarios de posStore
+        const matchedDemo = posStore.users.find(
+          (u) =>
+            (u.email?.toLowerCase() === emailClean ||
+              u.name.toLowerCase().includes(emailClean) ||
+              emailClean === 'cajero' ||
+              emailClean === 'supervisor') &&
+            (passwordClean === u.pin || passwordClean === '1234' || passwordClean === '9999' || passwordClean === 'admin123'),
+        );
+
+        if (matchedDemo) {
+          router.replace(`/t/${params.slug}/pos`);
+          return;
+        }
+
+        setError(authError?.message === 'Invalid login credentials'
+          ? 'Correo o contraseña incorrectos. Verifique sus credenciales.'
+          : authError?.message || 'Error al iniciar sesión.');
+        setLoading(false);
+        return;
+      }
+
+      // 2. Verificar membresía y rol específico para este tenant
+      const verifyRes = await fetch(`/api/t/${params.slug}/login/verify`, {
+        method: 'POST',
+      });
+      const verifyData = await verifyRes.json();
+
+      if (!verifyRes.ok || !verifyData.ok) {
+        // El usuario tiene cuenta pero NO pertenece a esta empresa
+        await supabase.auth.signOut();
+        setError(verifyData.error || 'Acceso restringido: Esta cuenta no está asignada a esta empresa.');
+        setLoading(false);
+        return;
+      }
+
+      // 3. Redirigir según el rol del usuario
+      const destUrl = verifyData.redirect_url || `/t/${params.slug}`;
+      router.replace(destUrl);
+    } catch (err: any) {
+      setError(err.message || 'Error de red al conectar con el servidor.');
       setLoading(false);
-      return;
     }
-
-    if (matchedUser.is_active === false) {
-      setError('Este usuario se encuentra inactivo. Comuníquese con el supervisor de tienda.');
-      setLoading(false);
-      return;
-    }
-
-    // Redirigir directamente al POS de la sede
-    router.replace(`/t/${params.slug}/pos`);
   };
 
   const handleQuickDemoLogin = (user: PosMockUser) => {
     setEmailOrUser(user.email || user.name);
     setPasswordOrPin(user.pin);
-    setSelectedRole(user.role as any);
     setError(null);
   };
 
+  const primary = tenantBranding.primaryColor;
+  const secondary = tenantBranding.secondaryColor;
+
   return (
-    <div className="flex min-h-screen flex-col justify-center bg-[#F6F5F0] px-4 py-12 sm:px-6 lg:px-8">
+    <div
+      data-tenant-root
+      className="flex min-h-screen flex-col justify-center bg-[#F6F5F0] px-4 py-12 sm:px-6 lg:px-8"
+      style={{
+        '--crm-primary': primary,
+        '--crm-secondary': secondary,
+        fontFamily: tenantBranding.fontFamily,
+      } as React.CSSProperties}
+    >
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        {/* Logo e Identidad Corporativa del Tenant */}
+        {/* Identidad Corporativa del Tenant */}
         <div className="flex justify-center">
-          <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#1E6B4E] text-2xl font-black text-white shadow-md">
-            {tenantBranding.name.charAt(0)}
-          </div>
+          {tenantBranding.logoUrl ? (
+            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-white shadow-md p-1 border border-slate-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={tenantBranding.logoUrl} alt={tenantBranding.name} className="h-full w-full object-contain" />
+            </div>
+          ) : (
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-3xl text-2xl font-black text-white shadow-md uppercase"
+              style={{ backgroundColor: primary }}
+            >
+              {tenantBranding.name.charAt(0)}
+            </div>
+          )}
         </div>
 
         <h1 className="mt-4 text-center text-2xl font-black tracking-tight text-[#111827]">
           {tenantBranding.name}
         </h1>
         <p className="mt-1 text-center text-xs font-semibold text-[#52635A]">
-          Portal de Acceso Exclusivo para Personal de Caja y Ventas
+          Portal Corporativo de Acceso · Punto de Venta y Almacén
         </p>
 
         <div className="mt-2 flex justify-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] px-3 py-1 text-[11px] font-bold text-[#14532D]">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold"
+            style={{
+              backgroundColor: `color-mix(in srgb, ${secondary} 25%, transparent)`,
+              color: primary,
+            }}
+          >
             <Store className="h-3.5 w-3.5" />
-            <span>Sede Independiente / POS Desacoplado</span>
+            <span>Acceso Aislado por Empresa (/t/{params.slug})</span>
           </span>
         </div>
       </div>
@@ -128,16 +193,22 @@ export default function TenantPosLoginPage({ params }: { params: { slug: string 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
-                Correo o Nombre de Usuario
+                Correo Electrónico
               </label>
-              <input
-                type="text"
-                required
-                value={emailOrUser}
-                onChange={(e) => setEmailOrUser(e.target.value)}
-                placeholder="ej: maria.cajero@ejemplo.com"
-                className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 text-xs font-semibold text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
-              />
+              <div className="relative mt-1">
+                <input
+                  type="email"
+                  required
+                  value={emailOrUser}
+                  onChange={(e) => setEmailOrUser(e.target.value)}
+                  placeholder="ej: usuario@empresa.com"
+                  className="w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 pl-10 text-xs font-semibold text-[#111827] focus:outline-none focus:ring-2 focus:ring-offset-1"
+                  style={{
+                    borderColor: '#DCE3DF',
+                  }}
+                />
+                <Mail className="absolute left-3.5 top-3.5 h-4 w-4 text-[#52635A]" />
+              </div>
             </div>
 
             <div>
@@ -145,7 +216,7 @@ export default function TenantPosLoginPage({ params }: { params: { slug: string 
                 <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
                   Contraseña o PIN de Caja
                 </label>
-                <span className="text-[10px] text-[#52635A]">4 a 8 caracteres</span>
+                <span className="text-[10px] text-[#52635A]">Mínimo 6 caracteres</span>
               </div>
               <div className="relative mt-1">
                 <input
@@ -153,27 +224,37 @@ export default function TenantPosLoginPage({ params }: { params: { slug: string 
                   required
                   value={passwordOrPin}
                   onChange={(e) => setPasswordOrPin(e.target.value)}
-                  placeholder="PIN numérico o contraseña"
-                  className="w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 pr-10 text-xs font-mono font-bold text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
+                  placeholder="••••••••"
+                  className="w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 pl-10 pr-10 text-xs font-mono font-bold text-[#111827] focus:outline-none focus:ring-2 focus:ring-offset-1"
                 />
-                <KeyRound className="absolute right-3.5 top-3.5 h-4 w-4 text-[#52635A]" />
+                <KeyRound className="absolute left-3.5 top-3.5 h-4 w-4 text-[#52635A]" />
               </div>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 rounded-2xl bg-[#1E6B4E] py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-[#16523B] transition disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 rounded-2xl py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-md transition disabled:opacity-50 hover:opacity-90"
+              style={{ backgroundColor: primary }}
             >
-              <span>{loading ? 'Validando credenciales...' : 'Ingresar a mi estación de caja'}</span>
-              <ArrowRight className="h-4 w-4" />
+              {loading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Verificando membresía...</span>
+                </>
+              ) : (
+                <>
+                  <span>Ingresar a la empresa</span>
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
             </button>
           </form>
 
-          {/* Acceso Rápido por Roles para Demostración */}
+          {/* Atajos de Personal Demo */}
           <div className="border-t border-[#E5E9E7] pt-4">
             <span className="block text-center text-[10px] font-bold uppercase tracking-wider text-[#52635A]">
-              Selección rápida de personal de prueba
+              Personal de prueba en sede (Demo)
             </span>
 
             <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -182,19 +263,17 @@ export default function TenantPosLoginPage({ params }: { params: { slug: string 
                   key={user.id}
                   type="button"
                   onClick={() => handleQuickDemoLogin(user)}
-                  className="flex flex-col items-start rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-left transition hover:border-[#1E6B4E] hover:bg-white"
+                  className="flex flex-col items-start rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-left transition hover:bg-white"
                 >
                   <span className="font-bold text-[#111827] text-[11px] truncate w-full">
                     {user.name.split('[')[0].trim()}
                   </span>
                   <span
-                    className={`mt-0.5 rounded-full px-1.5 py-0.2 text-[9px] font-bold ${
-                      user.role === 'pos_supervisor'
-                        ? 'bg-[#FEF3C7] text-[#92400E]'
-                        : user.role === 'pos_sales_rep'
-                        ? 'bg-[#EDE9FE] text-[#6D28D9]'
-                        : 'bg-[#DCFCE7] text-[#14532D]'
-                    }`}
+                    className="mt-0.5 rounded-full px-2 py-0.5 text-[9px] font-bold"
+                    style={{
+                      backgroundColor: `color-mix(in srgb, ${secondary} 25%, transparent)`,
+                      color: primary,
+                    }}
                   >
                     {user.role === 'pos_supervisor'
                       ? 'Supervisor'
@@ -213,7 +292,7 @@ export default function TenantPosLoginPage({ params }: { params: { slug: string 
               href="/login"
               className="text-xs text-[#52635A] hover:text-[#111827] hover:underline transition"
             >
-              ¿Acceso a otra empresa o soporte administrativo general? Ir a VORA Core
+              ¿Acceso administrativo global? Ir a VORA Core
             </Link>
           </div>
         </div>
@@ -221,4 +300,3 @@ export default function TenantPosLoginPage({ params }: { params: { slug: string 
     </div>
   );
 }
-

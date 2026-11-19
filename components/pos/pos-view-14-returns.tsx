@@ -154,7 +154,7 @@ export function PosView14Returns() {
       returnRecord = res.returnRecord;
     }
 
-    await reloadProducts().catch(() => {});
+    await reloadProducts().catch(() => { });
 
     showNotification(
       'Devolución ejecutada',

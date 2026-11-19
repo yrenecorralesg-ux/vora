@@ -54,6 +54,10 @@ export function PosView0304SaleCart() {
     promotions,
     staffUsers,
     validateSupervisorPin,
+    activeTenantSlug,
+    reloadProducts,
+    tenantBranding,
+    isWarehouseEnabled,
   } = usePos();
 
   // Filtros de Catálogo
@@ -80,6 +84,63 @@ export function PosView0304SaleCart() {
   const [weighingProduct, setWeighingProduct] = useState<PosProduct | null>(null);
   const [scaleWeightKg, setScaleWeightKg] = useState<string>('0.750');
   const [scaleTareKg, setScaleTareKg] = useState<string>('0.000');
+
+  // Modal Alta Rápida de Producto (Inventario / Warehouse)
+  const [showNewProductModal, setShowNewProductModal] = useState(false);
+  const [newProdSku, setNewProdSku] = useState('');
+  const [newProdName, setNewProdName] = useState('');
+  const [newProdBarcode, setNewProdBarcode] = useState('');
+  const [newProdPrice, setNewProdPrice] = useState('');
+  const [newProdStock, setNewProdStock] = useState('10');
+  const [newProdCategory, setNewProdCategory] = useState('General');
+  const [newProdIsService, setNewProdIsService] = useState(false);
+  const [creatingProduct, setCreatingProduct] = useState(false);
+  const [newProductError, setNewProductError] = useState<string | null>(null);
+
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNewProductError(null);
+    setCreatingProduct(true);
+
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/products`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sku: newProdSku.trim().toUpperCase(),
+          name: newProdName.trim(),
+          barcode: newProdBarcode.trim() || undefined,
+          price_usd: Number(newProdPrice) || 0,
+          initial_stock: Number(newProdStock) || 0,
+          category: newProdCategory.trim() || 'General',
+          is_service: newProdIsService,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error || 'Error al crear producto');
+      }
+
+      await reloadProducts();
+      showNotification('Producto Creado', `Se registró ${data.product.name} en catálogo y almacén.`, 'success');
+
+      setNewProdSku('');
+      setNewProdName('');
+      setNewProdBarcode('');
+      setNewProdPrice('');
+      setNewProdStock('10');
+      setShowNewProductModal(false);
+
+      if (data.product) {
+        addToCart(data.product, 1);
+      }
+    } catch (err: any) {
+      setNewProductError(err.message || 'Error al registrar producto.');
+    } finally {
+      setCreatingProduct(false);
+    }
+  };
 
   // Motor de Promociones Automáticas (pos_promotions_engine)
   const matchedPromo = React.useMemo(() => {
@@ -242,6 +303,19 @@ export function PosView0304SaleCart() {
                 </button>
               </div>
             )}
+
+            <div className="flex items-center border-l border-[#DCE3DF] pl-2">
+              <button
+                type="button"
+                onClick={() => setShowNewProductModal(true)}
+                title="Crear nuevo producto en inventario y almacén"
+                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-white shadow-xs transition hover:opacity-90"
+                style={{ backgroundColor: tenantBranding?.primaryColor || '#144D37' }}
+              >
+                <Plus className="h-4 w-4" />
+                <span className="hidden sm:inline text-[11px]">Nuevo Producto</span>
+              </button>
+            </div>
           </div>
 
           {/* Pastillas de Categorías Redondeadas */}
@@ -968,6 +1042,174 @@ export function PosView0304SaleCart() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Express de Alta de Producto (POS ⇄ Warehouse) */}
+      {showNewProductModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="w-full max-w-lg rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-[#E5E9E7] pb-3">
+              <div>
+                <h3 className="text-base font-extrabold text-[#111827]">
+                  Alta Express de Producto
+                </h3>
+                <p className="text-xs text-[#52635A]">
+                  El producto se registrará en el catálogo unificado y afectará el almacén en vivo.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowNewProductModal(false)}
+                className="rounded-full p-1 text-[#52635A] hover:bg-[#F6F5F0]"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {newProductError && (
+              <div className="mt-3 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                <ShieldAlert className="h-4 w-4 shrink-0" />
+                <span>{newProductError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleCreateProduct} className="mt-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#111827]">
+                    Código SKU *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej: CAS-001"
+                    value={newProdSku}
+                    onChange={(e) => setNewProdSku(e.target.value.toUpperCase())}
+                    className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-mono font-bold text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#111827]">
+                    Código de Barras (Opcional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Escanea o escribe EAN"
+                    value={newProdBarcode}
+                    onChange={(e) => setNewProdBarcode(e.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-mono text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-[#111827]">
+                  Nombre del Producto *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Casco Integral Deportivo"
+                  value={newProdName}
+                  onChange={(e) => setNewProdName(e.target.value)}
+                  className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-semibold text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#111827]">
+                    Precio de Venta ($ USD) *
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required
+                    placeholder="0.00"
+                    value={newProdPrice}
+                    onChange={(e) => setNewProdPrice(e.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-mono font-bold text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#111827]">
+                    Stock Físico Inicial (Und)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="0"
+                    placeholder="10"
+                    value={newProdStock}
+                    disabled={newProdIsService}
+                    onChange={(e) => setNewProdStock(e.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-mono font-bold text-[#111827] focus:border-[#1E6B4E] focus:outline-none disabled:opacity-40"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#111827]">
+                    Categoría
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: Accesorios, Repuestos"
+                    value={newProdCategory}
+                    onChange={(e) => setNewProdCategory(e.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-medium text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
+                  />
+                </div>
+                <div className="flex flex-col justify-end">
+                  <label className="flex items-center gap-2 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-semibold text-[#111827] cursor-pointer hover:bg-white">
+                    <input
+                      type="checkbox"
+                      checked={newProdIsService}
+                      onChange={(e) => setNewProdIsService(e.target.checked)}
+                      className="rounded border-[#DCE3DF] text-[#144D37] focus:ring-[#144D37]"
+                    />
+                    <span>Es un servicio (sin stock)</span>
+                  </label>
+                </div>
+              </div>
+
+              {isWarehouseEnabled && (
+                <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 border border-slate-100 text-[11px] text-slate-600">
+                  <span>Módulo Almacén activo: las existencias ingresarán al Kardex con asentamiento automático.</span>
+                  <a
+                    href={`/t/${activeTenantSlug}/warehouse/catalog/new`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-bold underline text-slate-900 shrink-0 ml-2"
+                  >
+                    Ficha completa
+                  </a>
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#E5E9E7]">
+                <button
+                  type="button"
+                  onClick={() => setShowNewProductModal(false)}
+                  disabled={creatingProduct}
+                  className="rounded-2xl border border-[#DCE3DF] bg-white px-4 py-2.5 text-xs font-bold text-[#111827] hover:bg-[#F6F5F0]"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingProduct}
+                  className="flex items-center gap-2 rounded-2xl px-5 py-2.5 text-xs font-bold text-white shadow-md hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: tenantBranding?.primaryColor || '#144D37' }}
+                >
+                  {creatingProduct ? 'Guardando en almacén...' : 'Crear y agregar a la venta'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

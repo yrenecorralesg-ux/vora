@@ -200,7 +200,7 @@ export function TenantTabs(props: TenantTabsProps) {
         <BaseDeDatosTab database={database} tenantId={tenant.id} />
       </TabsContent>
       <TabsContent value="usuarios" className="mt-6">
-        <div className="space-y-3"><p className="text-sm text-muted-foreground">Asigna el administrador desde Configuración progresiva. La gestión ampliada de usuarios se completará como siguiente entrega.</p><TenantUsersPanel users={props.users} error={props.userDirectoryError} /></div>
+        <TenantUsersPanel users={props.users} error={props.userDirectoryError} tenantId={props.tenant.id} />
       </TabsContent>
       <TabsContent value="dominios" className="mt-6">
         <DominiosTab domains={domains} />
