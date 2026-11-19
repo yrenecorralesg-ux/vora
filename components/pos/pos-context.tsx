@@ -25,6 +25,7 @@ import {
 } from '@/lib/pos-demo-data';
 import { posStore } from '@/lib/pos-service';
 import { getSupabaseClient } from '@/lib/supabase-client';
+import { getOfflineQueue, syncOfflineSales } from '@/lib/pos-offline';
 
 export interface ParkedSale {
   id: string;
@@ -138,6 +139,7 @@ interface PosContextType {
   // Connectivity & Offline
   isOnline: boolean;
   offlineQueueCount: number;
+  triggerSyncOfflineSales: () => Promise<void>;
 
   // Barcode quick scan
   scanBarcode: (code: string) => boolean;
@@ -153,6 +155,9 @@ interface PosContextType {
   isFuncActive: (funcKey: string) => boolean;
   reloadTenantFeatures: () => Promise<void>;
   reloadProducts: () => Promise<void>;
+  reloadBranches: () => Promise<void>;
+  reloadRegisters: () => Promise<void>;
+  reloadCustomers: () => Promise<void>;
   stockPolicy: 'warn_and_allow' | 'strict_block' | 'allow_unrestricted';
 
   // Nuevas capacidades diferenciadoras
@@ -194,9 +199,10 @@ interface PosContextType {
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
   clearNotification: () => void;
 
-  // Sedes y Cajas
+  // Sedes, Cajas y Clientes
   addBranch: (branch: Omit<PosBranch, 'id' | 'created_at' | 'updated_at'>) => PosBranch;
   addRegister: (register: Omit<PosRegister, 'id' | 'created_at' | 'updated_at'>) => PosRegister;
+  addCustomer: (customer: Omit<PosCustomer, 'id' | 'tenant_id' | 'total_purchases_count' | 'total_purchases_usd' | 'last_purchase_at' | 'created_at' | 'updated_at'>) => Promise<PosCustomer>;
 }
 
 const PosContext = createContext<PosContextType | null>(null);
@@ -253,6 +259,7 @@ export function PosProvider({
   // Operational State synced from store
   const [branches, setBranches] = useState<PosBranch[]>(posStore.branches);
   const [registers, setRegisters] = useState<PosRegister[]>(posStore.registers);
+  const [customers, setCustomers] = useState<PosCustomer[]>(posStore.customers);
   const [activeShift, setActiveShift] = useState<PosShift | null>(null);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartNotes, setCartNotes] = useState<string>('');
@@ -337,6 +344,58 @@ export function PosProvider({
     }
   };
 
+  const reloadBranches = async () => {
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/branches`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.branches) && data.branches.length > 0) {
+          setBranches(data.branches);
+          posStore.branches = data.branches;
+          if (!data.branches.some((b: PosBranch) => b.id === activeBranchId)) {
+            setActiveBranchId(data.branches[0].id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[pos-context] reloadBranches error:', err);
+    }
+  };
+
+  const reloadRegisters = async () => {
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/registers`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.registers) && data.registers.length > 0) {
+          setRegisters(data.registers);
+          posStore.registers = data.registers;
+          if (!data.registers.some((r: PosRegister) => r.id === activeRegisterId)) {
+            setActiveRegisterId(data.registers[0].id);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[pos-context] reloadRegisters error:', err);
+    }
+  };
+
+  const reloadCustomers = async () => {
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/customers`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.ok && Array.isArray(data.customers) && data.customers.length > 0) {
+          setCustomers(data.customers);
+          posStore.customers = data.customers;
+          setSelectedCustomer((prev) => prev ?? data.customers[0]);
+        }
+      }
+    } catch (err) {
+      console.warn('[pos-context] reloadCustomers error:', err);
+    }
+  };
+
   const reloadTenantFeatures = async () => {
     try {
       const res = await fetch(`/api/t/${activeTenantSlug}/pos/features`, { cache: 'no-store' });
@@ -371,6 +430,9 @@ export function PosProvider({
   useEffect(() => {
     reloadTenantFeatures();
     reloadProducts();
+    reloadBranches();
+    reloadRegisters();
+    reloadCustomers();
   }, [activeTenantSlug]);
 
   useEffect(() => {
@@ -407,28 +469,143 @@ export function PosProvider({
     initSessionUser();
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const updateOnlineStatus = () => {
+      const online = navigator.onLine;
+      setIsOnline(online);
+      const queue = getOfflineQueue(activeTenantSlug);
+      setOfflineQueueCount(queue.length);
+
+      if (online && queue.length > 0) {
+        syncOfflineSales(activeTenantSlug).then((res) => {
+          setOfflineQueueCount(res.remainingCount);
+          if (res.syncedCount > 0) {
+            setNotification({
+              title: 'Sincronización Offline',
+              detail: `Se sincronizaron ${res.syncedCount} ventas guardadas localmente.`,
+              type: 'success',
+            });
+          }
+        });
+      }
+    };
+
+    updateOnlineStatus();
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, [activeTenantSlug]);
+
+  const triggerSyncOfflineSales = async () => {
+    const res = await syncOfflineSales(activeTenantSlug);
+    setOfflineQueueCount(res.remainingCount);
+    if (res.syncedCount > 0) {
+      setNotification({
+        title: 'Ventas sincronizadas',
+        detail: `Se enviaron ${res.syncedCount} ventas pendientes al servidor.`,
+        type: 'success',
+      });
+    }
+  };
+
   const addBranch = (data: Omit<PosBranch, 'id' | 'created_at' | 'updated_at'>): PosBranch => {
+    const tempId = `b-${Date.now()}`;
     const newBranch: PosBranch = {
       ...data,
-      id: `b-${Date.now()}`,
+      id: tempId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     posStore.addBranch(newBranch);
     setBranches([...posStore.branches]);
+
+    fetch(`/api/t/${activeTenantSlug}/pos/branches`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+      .then((res) => res.json())
+      .then((resData) => {
+        if (resData.ok && resData.branch) {
+          setBranches((prev) =>
+            prev.map((b) => (b.id === tempId ? (resData.branch as PosBranch) : b)),
+          );
+        }
+      })
+      .catch((err) => console.warn('[pos-context] addBranch async error:', err));
+
     return newBranch;
   };
 
   const addRegister = (data: Omit<PosRegister, 'id' | 'created_at' | 'updated_at'>): PosRegister => {
+    const tempId = `r-${Date.now()}`;
     const newReg: PosRegister = {
       ...data,
-      id: `r-${Date.now()}`,
+      id: tempId,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
     posStore.addRegister(newReg);
     setRegisters([...posStore.registers]);
+
+    fetch(`/api/t/${activeTenantSlug}/pos/registers`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+      .then((res) => res.json())
+      .then((resData) => {
+        if (resData.ok && resData.register) {
+          setRegisters((prev) =>
+            prev.map((r) => (r.id === tempId ? (resData.register as PosRegister) : r)),
+          );
+        }
+      })
+      .catch((err) => console.warn('[pos-context] addRegister async error:', err));
+
     return newReg;
+  };
+
+  const addCustomer = async (data: Omit<PosCustomer, 'id' | 'tenant_id' | 'total_purchases_count' | 'total_purchases_usd' | 'last_purchase_at' | 'created_at' | 'updated_at'>): Promise<PosCustomer> => {
+    const tempId = `c-${Date.now()}`;
+    const newCust: PosCustomer = {
+      ...data,
+      id: tempId,
+      tenant_id: activeBranch.tenant_id,
+      total_purchases_count: 0,
+      total_purchases_usd: 0,
+      last_purchase_at: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    posStore.customers.unshift(newCust);
+    setCustomers([...posStore.customers]);
+
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/customers`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        const resData = await res.json();
+        if (resData.ok && resData.customer) {
+          setCustomers((prev) =>
+            prev.map((c) => (c.id === tempId ? (resData.customer as PosCustomer) : c)),
+          );
+          return resData.customer;
+        }
+      }
+    } catch (err) {
+      console.warn('[pos-context] addCustomer async error:', err);
+    }
+    return newCust;
   };
 
   const activeBranch = branches.find((b) => b.id === activeBranchId) ?? branches[0] ?? posStore.branches[0];
@@ -941,10 +1118,14 @@ export function PosProvider({
         registers,
         addBranch,
         addRegister,
+        addCustomer,
         products,
         reloadProducts,
+        reloadBranches,
+        reloadRegisters,
+        reloadCustomers,
         stockPolicy,
-        customers: posStore.customers,
+        customers,
         sales: posStore.sales,
         shifts: posStore.shifts,
         cashMovements: posStore.cashMovements,
@@ -971,6 +1152,7 @@ export function PosProvider({
         deleteParkedSale,
         isOnline,
         offlineQueueCount,
+        triggerSyncOfflineSales,
         scanBarcode,
         isModuleEnabled,
         isWarehouseEnabled,

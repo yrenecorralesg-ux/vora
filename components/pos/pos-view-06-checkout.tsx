@@ -17,6 +17,8 @@ import {
 import { usePos } from './pos-context';
 import { posStore } from '@/lib/pos-service';
 import type { PosSale } from '@/lib/types';
+import { kickCashDrawer } from '@/lib/pos-hardware';
+import { enqueueOfflineSale } from '@/lib/pos-offline';
 
 function CasheaIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -446,6 +448,9 @@ export function PosView06Checkout() {
     }
 
     if (!confirmedSale) {
+      // Encolar de forma segura en local storage para reintento automático
+      enqueueOfflineSale(activeTenantSlug, salePayload);
+
       const saleResult = posStore.confirmSale({
         branchId: activeBranch.id,
         shiftId: activeShift.id,
@@ -469,6 +474,11 @@ export function PosView06Checkout() {
         return;
       }
       confirmedSale = saleResult.sale;
+    }
+
+    // Apertura automática de gaveta RJ11 si hubo cobro en efectivo
+    if (salePayload.payments.some((p) => p.method === 'efectivo')) {
+      kickCashDrawer();
     }
 
     setLastConfirmedSale(confirmedSale);

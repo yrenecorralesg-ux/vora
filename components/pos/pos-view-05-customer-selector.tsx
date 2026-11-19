@@ -1,16 +1,18 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Search, UserPlus, CheckCircle2, ArrowLeft, X, Edit2, ShieldCheck, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, UserPlus, CheckCircle2, ArrowLeft, X, Edit2, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
 import { usePos } from './pos-context';
 import type { PosCustomer } from '@/lib/types';
 import { posStore } from '@/lib/pos-service';
 
 export function PosView05CustomerSelector() {
-  const { customers, selectedCustomer, setSelectedCustomer, navigateTo, showNotification } = usePos();
+  const { customers, selectedCustomer, setSelectedCustomer, navigateTo, showNotification, addCustomer, activeTenantSlug } = usePos();
 
   const [query, setQuery] = useState('');
   const [activeCust, setActiveCust] = useState<PosCustomer>(selectedCustomer ?? customers[0]);
+  const [remoteResults, setRemoteResults] = useState<PosCustomer[]>([]);
+  const [isSearchingRemote, setIsSearchingRemote] = useState(false);
 
   // Formulario nuevo cliente
   const [showNewForm, setShowNewForm] = useState(false);
@@ -60,6 +62,32 @@ export function PosView05CustomerSelector() {
       (c.email && c.email.toLowerCase().includes(query.toLowerCase())),
   );
 
+  useEffect(() => {
+    if (!query.trim() || filtered.length > 0) {
+      setRemoteResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingRemote(true);
+      try {
+        const res = await fetch(`/api/t/${activeTenantSlug}/pos/customers?q=${encodeURIComponent(query.trim())}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.ok && Array.isArray(data.customers)) {
+            setRemoteResults(data.customers);
+          }
+        }
+      } catch (err) {
+        console.warn('remote customer search error', err);
+      } finally {
+        setIsSearchingRemote(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, filtered.length, activeTenantSlug]);
+
+  const displayList = filtered.length > 0 ? filtered : remoteResults;
+
   const handleSelectCustomer = (c: PosCustomer) => {
     setSelectedCustomer(c);
     showNotification(
@@ -77,7 +105,7 @@ export function PosView05CustomerSelector() {
     navigateTo('POS-03-04');
   };
 
-  const handleCreateCustomer = (e: React.FormEvent) => {
+  const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
     setRifError(null);
     if (!docNumber.trim() || !legalName.trim()) return;
@@ -95,7 +123,7 @@ export function PosView05CustomerSelector() {
       return;
     }
 
-    const created = posStore.addCustomer({
+    const created = await addCustomer({
       document_type: docType,
       document_number: docNumber.trim().replace(/[\s\.-]/g, ''),
       legal_name: legalName.trim(),
@@ -147,6 +175,9 @@ export function PosView05CustomerSelector() {
             placeholder="Buscar por nombre, cédula, teléfono o email..."
             className="w-full bg-transparent p-1 text-xs text-[#111827] outline-none placeholder:text-[#52635A]"
           />
+          {isSearchingRemote && (
+            <RefreshCw className="h-4 w-4 animate-spin text-[#1E6B4E]" />
+          )}
         </div>
 
         {/* Contenido en Dos Columnas como el Mockup del PDF */}
@@ -163,7 +194,7 @@ export function PosView05CustomerSelector() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E5E9E7]">
-                  {filtered.map((c) => {
+                  {displayList.map((c) => {
                     const isSelected = activeCust?.id === c.id;
                     return (
                       <tr

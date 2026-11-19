@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ArrowLeft, Monitor } from 'lucide-react';
+import { ArrowLeft, Monitor, WifiOff, CloudUpload } from 'lucide-react';
 import { usePos } from './pos-context';
 
 export function PosHeader() {
@@ -15,6 +15,9 @@ export function PosHeader() {
     isFetchingExchangeRate,
     isFuncActive,
     setIsCustomerDisplayOpen,
+    isOnline,
+    offlineQueueCount,
+    triggerSyncOfflineSales,
   } = usePos();
 
   if (currentView === 'POS-01' && !notification) {
@@ -63,6 +66,23 @@ export function PosHeader() {
 
             {/* Pill Tasa Oficial y Pantalla Cliente en cabecera */}
             <div className="flex items-center gap-2">
+              {!isOnline && (
+                <span className="flex items-center gap-1 rounded-xl border border-[#F87171] bg-[#FEF2F2] px-2.5 py-1 text-[11px] font-bold text-[#B91C1C]">
+                  <WifiOff className="h-3 w-3" />
+                  <span>Offline</span>
+                </span>
+              )}
+              {offlineQueueCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => triggerSyncOfflineSales()}
+                  title="Sincronizar ventas offline pendientes ahora"
+                  className="flex items-center gap-1.5 rounded-xl border border-[#F59E0B] bg-[#FFFBEB] px-2.5 py-1 text-[11px] font-bold text-[#B45309] hover:bg-[#FEF3C7] transition"
+                >
+                  <CloudUpload className="h-3.5 w-3.5" />
+                  <span>Pendientes ({offlineQueueCount})</span>
+                </button>
+              )}
               {isFuncActive('pos_customer_display') && (
                 <button
                   type="button"

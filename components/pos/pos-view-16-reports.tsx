@@ -234,15 +234,15 @@ export function PosView16Reports() {
             {reportTab === 'ventas'
               ? 'Ventas'
               : reportTab === 'turnos'
-              ? 'Control de Turnos y Arqueos'
-              : 'Rendimiento por Cajero y Sede'}
+                ? 'Control de Turnos y Arqueos'
+                : 'Rendimiento por Cajero y Sede'}
           </h1>
           <p className="text-xs font-medium text-[#52635A]">
             {reportTab === 'ventas'
               ? 'Reporte financiero y distribución de cobros en tiempo real'
               : reportTab === 'turnos'
-              ? 'Auditoría a ciegas, aperturas, cierres y arqueos de caja (Diagrama §8)'
-              : 'Comparativo de desempeño de ventas y consistencia de caja (Diagrama §8)'}
+                ? 'Auditoría a ciegas, aperturas, cierres y arqueos de caja (Diagrama §8)'
+                : 'Comparativo de desempeño de ventas y consistencia de caja (Diagrama §8)'}
           </p>
         </div>
 
@@ -290,18 +290,16 @@ export function PosView16Reports() {
             <button
               type="button"
               onClick={() => setCurrencyMode('USD')}
-              className={`rounded-xl px-2.5 py-1 transition ${
-                currencyMode === 'USD' ? 'bg-[#1E6B4E] text-white shadow-xs' : 'text-[#52635A] hover:text-[#111827]'
-              }`}
+              className={`rounded-xl px-2.5 py-1 transition ${currencyMode === 'USD' ? 'bg-[#1E6B4E] text-white shadow-xs' : 'text-[#52635A] hover:text-[#111827]'
+                }`}
             >
               USD ($)
             </button>
             <button
               type="button"
               onClick={() => setCurrencyMode('VES')}
-              className={`rounded-xl px-2.5 py-1 transition ${
-                currencyMode === 'VES' ? 'bg-[#1E6B4E] text-white shadow-xs' : 'text-[#52635A] hover:text-[#111827]'
-              }`}
+              className={`rounded-xl px-2.5 py-1 transition ${currencyMode === 'VES' ? 'bg-[#1E6B4E] text-white shadow-xs' : 'text-[#52635A] hover:text-[#111827]'
+                }`}
             >
               VES (Bs.)
             </button>
@@ -353,11 +351,10 @@ export function PosView16Reports() {
         <button
           type="button"
           onClick={() => setReportTab('ventas')}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition ${
-            reportTab === 'ventas'
-              ? 'bg-[#144D37] text-white shadow-xs'
-              : 'border border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
-          }`}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition ${reportTab === 'ventas'
+            ? 'bg-[#144D37] text-white shadow-xs'
+            : 'border border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
+            }`}
         >
           <TrendingUp className="h-4 w-4" />
           <span>Ventas Generales</span>
@@ -366,18 +363,16 @@ export function PosView16Reports() {
         <button
           type="button"
           onClick={() => setReportTab('turnos')}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition ${
-            reportTab === 'turnos'
-              ? 'bg-[#144D37] text-white shadow-xs'
-              : 'border border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
-          }`}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition ${reportTab === 'turnos'
+            ? 'bg-[#144D37] text-white shadow-xs'
+            : 'border border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
+            }`}
         >
           <Clock className="h-4 w-4" />
           <span>Reporte de Turnos y Arqueos</span>
           <span
-            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-              reportTab === 'turnos' ? 'bg-white/20 text-white' : 'bg-[#E5E9E7] text-[#111827]'
-            }`}
+            className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${reportTab === 'turnos' ? 'bg-white/20 text-white' : 'bg-[#E5E9E7] text-[#111827]'
+              }`}
           >
             {shifts.length}
           </span>
@@ -386,11 +381,10 @@ export function PosView16Reports() {
         <button
           type="button"
           onClick={() => setReportTab('cajeros')}
-          className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition ${
-            reportTab === 'cajeros'
-              ? 'bg-[#144D37] text-white shadow-xs'
-              : 'border border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
-          }`}
+          className={`flex items-center gap-2 rounded-2xl px-4 py-2 text-xs font-bold transition ${reportTab === 'cajeros'
+            ? 'bg-[#144D37] text-white shadow-xs'
+            : 'border border-[#DCE3DF] bg-white text-[#52635A] hover:bg-[#F6F5F0]'
+            }`}
         >
           <Users className="h-4 w-4" />
           <span>Rendimiento por Cajero y Caja</span>
@@ -429,352 +423,350 @@ export function PosView16Reports() {
             </div>
           )}
 
-      {/* 4 Tarjetas de Métricas Clave (Idénticas al Mockup del PDF) */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {/* 1. Ventas Totales */}
-        <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
-          <span className="text-xs font-semibold text-[#52635A]">Ventas totales</span>
-          <p className="mt-2 text-2xl font-black text-[#111827]">
-            {formatCurrency(totalSalesUsd)}
-          </p>
-          <div className="mt-2 flex items-center gap-1 text-xs font-bold text-[#1E6B4E]">
-            <span>↑ +12% vs. ayer</span>
-          </div>
-        </div>
-
-        {/* 2. # de Ventas */}
-        <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
-          <span className="text-xs font-semibold text-[#52635A]"># de ventas</span>
-          <p className="mt-2 text-2xl font-black text-[#111827]">
-            {salesCount}
-          </p>
-          <div className="mt-2 flex items-center gap-1 text-xs font-bold text-[#1E6B4E]">
-            <span>↑ +4%</span>
-          </div>
-        </div>
-
-        {/* 3. Ticket Promedio */}
-        <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
-          <span className="text-xs font-semibold text-[#52635A]">Ticket promedio</span>
-          <p className="mt-2 text-2xl font-black text-[#111827]">
-            {formatCurrency(averageTicketUsd)}
-          </p>
-          <div className="mt-2 flex items-center gap-1 text-xs font-bold text-[#52635A]">
-            <span>↑ +0%</span>
-          </div>
-        </div>
-
-        {/* 4. Productos Vendidos */}
-        <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
-          <span className="text-xs font-semibold text-[#52635A]">Productos vendidos</span>
-          <p className="mt-2 text-2xl font-black text-[#111827]">
-            {totalUnitsSold}
-          </p>
-          <div className="mt-2 flex items-center gap-1 text-xs font-bold text-[#1E6B4E]">
-            <span>↑ +10%</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Grilla de 2 Gráficas Principales: Ventas por Hora + Métodos de Pago */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* GRÁFICA 1: Ventas por Hora (Área/Curva Suave - 7 cols) */}
-        <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs lg:col-span-7 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-[#111827]">Ventas por hora</h2>
-              {selectedPoint !== null && (
-                <span className="rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
-                  {points[selectedPoint].hour} · {formatCurrency(points[selectedPoint].amountUsd)} ({points[selectedPoint].count} ventas)
-                </span>
-              )}
+          {/* 4 Tarjetas de Métricas Clave (Idénticas al Mockup del PDF) */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            {/* 1. Ventas Totales */}
+            <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
+              <span className="text-xs font-semibold text-[#52635A]">Ventas totales</span>
+              <p className="mt-2 text-2xl font-black text-[#111827]">
+                {formatCurrency(totalSalesUsd)}
+              </p>
+              <div className="mt-2 flex items-center gap-1 text-xs font-bold text-[#1E6B4E]">
+                <span>↑ +12% vs. ayer</span>
+              </div>
             </div>
 
-            {/* Contenedor SVG de la Gráfica */}
-            <div className="mt-4 relative w-full overflow-hidden">
-              <svg
-                viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                className="w-full h-auto overflow-visible select-none"
-              >
-                <defs>
-                  {/* Gradiente Verde Bosque a Transparente */}
-                  <linearGradient id="voraGreenGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#1E6B4E" stopOpacity="0.28" />
-                    <stop offset="100%" stopColor="#1E6B4E" stopOpacity="0.02" />
-                  </linearGradient>
-                </defs>
+            {/* 2. # de Ventas */}
+            <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
+              <span className="text-xs font-semibold text-[#52635A]"># de ventas</span>
+              <p className="mt-2 text-2xl font-black text-[#111827]">
+                {salesCount}
+              </p>
+              <div className="mt-2 flex items-center gap-1 text-xs font-bold text-[#1E6B4E]">
+                <span>↑ +4%</span>
+              </div>
+            </div>
 
-                {/* Líneas Guía Horizontales */}
-                {[0, 100, 200, 300].map((val) => {
-                  const y = chartHeight - paddingY - (val / maxAmount) * (chartHeight - paddingY * 2);
-                  return (
-                    <g key={val}>
-                      <line
-                        x1={paddingX}
-                        y1={y}
-                        x2={chartWidth - paddingX}
-                        y2={y}
-                        stroke="#E5E9E7"
-                        strokeWidth="1"
-                      />
-                      <text
-                        x={paddingX - 10}
-                        y={y + 3}
-                        textAnchor="end"
-                        className="text-[10px] fill-[#8F9B94] font-medium"
-                      >
-                        {val === 0 ? '0' : `${val}k`}
-                      </text>
-                    </g>
-                  );
-                })}
+            {/* 3. Ticket Promedio */}
+            <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
+              <span className="text-xs font-semibold text-[#52635A]">Ticket promedio</span>
+              <p className="mt-2 text-2xl font-black text-[#111827]">
+                {formatCurrency(averageTicketUsd)}
+              </p>
+              <div className="mt-2 flex items-center gap-1 text-xs font-bold text-[#52635A]">
+                <span>↑ +0%</span>
+              </div>
+            </div>
 
-                {/* Área bajo la Curva */}
-                <path d={areaD} fill="url(#voraGreenGradient)" />
-
-                {/* Línea Principal de la Curva */}
-                <path
-                  d={pathD}
-                  fill="none"
-                  stroke="#144D37"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-
-                {/* Puntos de Datos Interactivos */}
-                {points.map((pt, idx) => {
-                  const isSelected = selectedPoint === idx;
-                  return (
-                    <g
-                      key={pt.hour}
-                      className="cursor-pointer transition-transform duration-150"
-                      onClick={() => setSelectedPoint(idx)}
-                      onMouseEnter={() => setSelectedPoint(idx)}
-                    >
-                      {/* Círculo Exterior de Selección */}
-                      {isSelected && (
-                        <circle
-                          cx={pt.x}
-                          cy={pt.y}
-                          r="9"
-                          fill="#1E6B4E"
-                          fillOpacity="0.2"
-                        />
-                      )}
-                      {/* Punto Central */}
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={isSelected ? '5' : '4'}
-                        fill="#144D37"
-                        stroke="#FFFFFF"
-                        strokeWidth="2"
-                      />
-                      {/* Etiqueta del Eje X */}
-                      <text
-                        x={pt.x}
-                        y={chartHeight - 6}
-                        textAnchor="middle"
-                        className={`text-[10px] font-medium ${
-                          isSelected ? 'fill-[#144D37] font-bold' : 'fill-[#8F9B94]'
-                        }`}
-                      >
-                        {pt.hour}
-                      </text>
-                    </g>
-                  );
-                })}
-              </svg>
+            {/* 4. Productos Vendidos */}
+            <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
+              <span className="text-xs font-semibold text-[#52635A]">Productos vendidos</span>
+              <p className="mt-2 text-2xl font-black text-[#111827]">
+                {totalUnitsSold}
+              </p>
+              <div className="mt-2 flex items-center gap-1 text-xs font-bold text-[#1E6B4E]">
+                <span>↑ +10%</span>
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#F0F2F1] flex items-center justify-between text-[11px] text-[#52635A]">
-            <span>Pico máximo: <strong>16:00 hrs</strong> (9 operaciones)</span>
-            <span>Rango horario: <strong>08:00 - 20:00</strong></span>
-          </div>
-        </div>
+          {/* Grilla de 2 Gráficas Principales: Ventas por Hora + Métodos de Pago */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {/* GRÁFICA 1: Ventas por Hora (Área/Curva Suave - 7 cols) */}
+            <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs lg:col-span-7 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-bold text-[#111827]">Ventas por hora</h2>
+                  {selectedPoint !== null && (
+                    <span className="rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
+                      {points[selectedPoint].hour} · {formatCurrency(points[selectedPoint].amountUsd)} ({points[selectedPoint].count} ventas)
+                    </span>
+                  )}
+                </div>
 
-        {/* GRÁFICA 2: Métodos de Pago (Torta / Donut - 5 cols) */}
-        <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs lg:col-span-5 flex flex-col justify-between">
-          <div>
-            <h2 className="text-base font-bold text-[#111827]">Métodos de pago</h2>
+                {/* Contenedor SVG de la Gráfica */}
+                <div className="mt-4 relative w-full overflow-hidden">
+                  <svg
+                    viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+                    className="w-full h-auto overflow-visible select-none"
+                  >
+                    <defs>
+                      {/* Gradiente Verde Bosque a Transparente */}
+                      <linearGradient id="voraGreenGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#1E6B4E" stopOpacity="0.28" />
+                        <stop offset="100%" stopColor="#1E6B4E" stopOpacity="0.02" />
+                      </linearGradient>
+                    </defs>
 
-            <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-              {/* Gráfico Donut SVG */}
-              <div className="relative flex items-center justify-center shrink-0">
-                <svg width="140" height="140" viewBox="0 0 120 120" className="rotate-[-90deg]">
-                  {/* Círculo Base Fondo */}
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    fill="transparent"
-                    stroke="#F6F5F0"
-                    strokeWidth="22"
-                  />
-                  {/* Segmentos del Donut */}
-                  {(() => {
-                    let accumulatedOffset = 0;
-                    return paymentMethodsData.map((m) => {
-                      const strokeDash = (m.percentage / 100) * circumference;
-                      const strokeOffset = -accumulatedOffset;
-                      accumulatedOffset += strokeDash;
-                      const isHovered = activeSegment === m.id;
-
+                    {/* Líneas Guía Horizontales */}
+                    {[0, 100, 200, 300].map((val) => {
+                      const y = chartHeight - paddingY - (val / maxAmount) * (chartHeight - paddingY * 2);
                       return (
-                        <circle
-                          key={m.id}
-                          cx="60"
-                          cy="60"
-                          r={radius}
-                          fill="transparent"
-                          stroke={m.color}
-                          strokeWidth={isHovered ? '24' : '20'}
-                          strokeDasharray={`${strokeDash} ${circumference}`}
-                          strokeDashoffset={strokeOffset}
-                          className="transition-all duration-200 cursor-pointer"
-                          onMouseEnter={() => setActiveSegment(m.id)}
-                          onMouseLeave={() => setActiveSegment(null)}
-                        />
+                        <g key={val}>
+                          <line
+                            x1={paddingX}
+                            y1={y}
+                            x2={chartWidth - paddingX}
+                            y2={y}
+                            stroke="#E5E9E7"
+                            strokeWidth="1"
+                          />
+                          <text
+                            x={paddingX - 10}
+                            y={y + 3}
+                            textAnchor="end"
+                            className="text-[10px] fill-[#8F9B94] font-medium"
+                          >
+                            {val === 0 ? '0' : `${val}k`}
+                          </text>
+                        </g>
                       );
-                    });
-                  })()}
-                </svg>
+                    })}
 
-                {/* Centro del Donut */}
-                <div className="absolute flex flex-col items-center justify-center text-center pointer-events-none">
-                  <span className="text-[10px] font-bold text-[#52635A] uppercase">Total</span>
-                  <span className="text-xs font-black text-[#111827]">100%</span>
+                    {/* Área bajo la Curva */}
+                    <path d={areaD} fill="url(#voraGreenGradient)" />
+
+                    {/* Línea Principal de la Curva */}
+                    <path
+                      d={pathD}
+                      fill="none"
+                      stroke="#144D37"
+                      strokeWidth="3"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+
+                    {/* Puntos de Datos Interactivos */}
+                    {points.map((pt, idx) => {
+                      const isSelected = selectedPoint === idx;
+                      return (
+                        <g
+                          key={pt.hour}
+                          className="cursor-pointer transition-transform duration-150"
+                          onClick={() => setSelectedPoint(idx)}
+                          onMouseEnter={() => setSelectedPoint(idx)}
+                        >
+                          {/* Círculo Exterior de Selección */}
+                          {isSelected && (
+                            <circle
+                              cx={pt.x}
+                              cy={pt.y}
+                              r="9"
+                              fill="#1E6B4E"
+                              fillOpacity="0.2"
+                            />
+                          )}
+                          {/* Punto Central */}
+                          <circle
+                            cx={pt.x}
+                            cy={pt.y}
+                            r={isSelected ? '5' : '4'}
+                            fill="#144D37"
+                            stroke="#FFFFFF"
+                            strokeWidth="2"
+                          />
+                          {/* Etiqueta del Eje X */}
+                          <text
+                            x={pt.x}
+                            y={chartHeight - 6}
+                            textAnchor="middle"
+                            className={`text-[10px] font-medium ${isSelected ? 'fill-[#144D37] font-bold' : 'fill-[#8F9B94]'
+                              }`}
+                          >
+                            {pt.hour}
+                          </text>
+                        </g>
+                      );
+                    })}
+                  </svg>
                 </div>
               </div>
 
-              {/* Leyenda Detallada Estilo Mockup PDF */}
-              <div className="flex-1 space-y-3 w-full">
-                {paymentMethodsData.map((m) => {
-                  const isHovered = activeSegment === m.id;
-                  return (
-                    <div
-                      key={m.id}
-                      className={`flex items-center justify-between rounded-xl px-2.5 py-1.5 transition cursor-pointer ${
-                        isHovered ? 'bg-[#F6F5F0]' : ''
-                      }`}
-                      onMouseEnter={() => setActiveSegment(m.id)}
-                      onMouseLeave={() => setActiveSegment(null)}
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span
-                          className="h-3 w-3 rounded-full shrink-0"
-                          style={{ backgroundColor: m.color }}
-                        />
-                        <span className="text-xs font-semibold text-[#111827]">
-                          {m.label}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs font-extrabold text-[#111827]">
-                          {m.percentage}%
-                        </span>
-                      </div>
+              <div className="mt-4 pt-3 border-t border-[#F0F2F1] flex items-center justify-between text-[11px] text-[#52635A]">
+                <span>Pico máximo: <strong>16:00 hrs</strong> (9 operaciones)</span>
+                <span>Rango horario: <strong>08:00 - 20:00</strong></span>
+              </div>
+            </div>
+
+            {/* GRÁFICA 2: Métodos de Pago (Torta / Donut - 5 cols) */}
+            <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs lg:col-span-5 flex flex-col justify-between">
+              <div>
+                <h2 className="text-base font-bold text-[#111827]">Métodos de pago</h2>
+
+                <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+                  {/* Gráfico Donut SVG */}
+                  <div className="relative flex items-center justify-center shrink-0">
+                    <svg width="140" height="140" viewBox="0 0 120 120" className="rotate-[-90deg]">
+                      {/* Círculo Base Fondo */}
+                      <circle
+                        cx="60"
+                        cy="60"
+                        r={radius}
+                        fill="transparent"
+                        stroke="#F6F5F0"
+                        strokeWidth="22"
+                      />
+                      {/* Segmentos del Donut */}
+                      {(() => {
+                        let accumulatedOffset = 0;
+                        return paymentMethodsData.map((m) => {
+                          const strokeDash = (m.percentage / 100) * circumference;
+                          const strokeOffset = -accumulatedOffset;
+                          accumulatedOffset += strokeDash;
+                          const isHovered = activeSegment === m.id;
+
+                          return (
+                            <circle
+                              key={m.id}
+                              cx="60"
+                              cy="60"
+                              r={radius}
+                              fill="transparent"
+                              stroke={m.color}
+                              strokeWidth={isHovered ? '24' : '20'}
+                              strokeDasharray={`${strokeDash} ${circumference}`}
+                              strokeDashoffset={strokeOffset}
+                              className="transition-all duration-200 cursor-pointer"
+                              onMouseEnter={() => setActiveSegment(m.id)}
+                              onMouseLeave={() => setActiveSegment(null)}
+                            />
+                          );
+                        });
+                      })()}
+                    </svg>
+
+                    {/* Centro del Donut */}
+                    <div className="absolute flex flex-col items-center justify-center text-center pointer-events-none">
+                      <span className="text-[10px] font-bold text-[#52635A] uppercase">Total</span>
+                      <span className="text-xs font-black text-[#111827]">100%</span>
                     </div>
-                  );
-                })}
+                  </div>
+
+                  {/* Leyenda Detallada Estilo Mockup PDF */}
+                  <div className="flex-1 space-y-3 w-full">
+                    {paymentMethodsData.map((m) => {
+                      const isHovered = activeSegment === m.id;
+                      return (
+                        <div
+                          key={m.id}
+                          className={`flex items-center justify-between rounded-xl px-2.5 py-1.5 transition cursor-pointer ${isHovered ? 'bg-[#F6F5F0]' : ''
+                            }`}
+                          onMouseEnter={() => setActiveSegment(m.id)}
+                          onMouseLeave={() => setActiveSegment(null)}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <span
+                              className="h-3 w-3 rounded-full shrink-0"
+                              style={{ backgroundColor: m.color }}
+                            />
+                            <span className="text-xs font-semibold text-[#111827]">
+                              {m.label}
+                            </span>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-extrabold text-[#111827]">
+                              {m.percentage}%
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-[#F0F2F1] text-[11px] text-[#52635A] flex justify-between items-center">
+                <span>Método predominante: <strong className="text-[#144D37]">Pago Móvil (50%)</strong></span>
+                <span>Bimoneda: <strong>USD/VES</strong></span>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-[#F0F2F1] text-[11px] text-[#52635A] flex justify-between items-center">
-            <span>Método predominante: <strong className="text-[#144D37]">Pago Móvil (50%)</strong></span>
-            <span>Bimoneda: <strong>USD/VES</strong></span>
-          </div>
-        </div>
-      </div>
-
-      {/* Métricas Adicionales Útiles: Top Productos Vendidos y Desglose por Turno */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-        {/* Tabla: Top Productos con Mayor Demanda (7 cols) */}
-        <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs lg:col-span-7">
-          <div className="flex items-center justify-between pb-3 border-b border-[#F0F2F1]">
-            <div>
-              <h3 className="text-base font-bold text-[#111827]">Top productos más vendidos</h3>
-              <p className="text-xs text-[#52635A]">Artículos con mayor volumen de facturación</p>
-            </div>
-            <span className="rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
-              {totalUnitsSold} unidades totales
-            </span>
-          </div>
-
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr className="border-b border-[#E5E9E7] text-[10px] font-bold uppercase tracking-wider text-[#52635A]">
-                  <th className="py-2.5">Producto</th>
-                  <th className="py-2.5">Categoría</th>
-                  <th className="py-2.5 text-center">Unidades</th>
-                  <th className="py-2.5 text-right">Facturación</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#F0F2F1]">
-                {topProducts.map((p) => (
-                  <tr key={p.sku} className="hover:bg-[#F6F5F0]/60 transition">
-                    <td className="py-3">
-                      <span className="font-bold text-[#111827] block">{p.name}</span>
-                      <span className="text-[10px] text-[#52635A]">SKU: {p.sku}</span>
-                    </td>
-                    <td className="py-3 text-[#52635A]">{p.category}</td>
-                    <td className="py-3 text-center font-extrabold text-[#111827]">{p.units}</td>
-                    <td className="py-3 text-right font-black text-[#111827]">
-                      {formatCurrency(p.revenueUsd)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Resumen Operativo de Turnos y Auditoría de Caja (5 cols) */}
-        <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs lg:col-span-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-[#F0F2F1]">
-              <h3 className="text-base font-bold text-[#111827]">Resumen operativo de caja</h3>
-              <span className="text-xs text-[#52635A]">Auditoría ciega</span>
-            </div>
-
-            <div className="mt-4 space-y-3.5 text-xs">
-              <div className="flex items-center justify-between rounded-2xl bg-[#F6F5F0] p-3">
-                <span className="font-semibold text-[#52635A]">Cajero activo:</span>
-                <span className="font-bold text-[#111827]">{activeUser.name} ({activeRegister.name})</span>
+          {/* Métricas Adicionales Útiles: Top Productos Vendidos y Desglose por Turno */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+            {/* Tabla: Top Productos con Mayor Demanda (7 cols) */}
+            <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs lg:col-span-7">
+              <div className="flex items-center justify-between pb-3 border-b border-[#F0F2F1]">
+                <div>
+                  <h3 className="text-base font-bold text-[#111827]">Top productos más vendidos</h3>
+                  <p className="text-xs text-[#52635A]">Artículos con mayor volumen de facturación</p>
+                </div>
+                <span className="rounded-full bg-[#DCFCE7] px-3 py-1 text-xs font-bold text-[#14532D]">
+                  {totalUnitsSold} unidades totales
+                </span>
               </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#F6F5F0] p-3">
-                <span className="font-semibold text-[#52635A]">Apertura de turno:</span>
-                <span className="font-bold text-[#111827]">$50.00 USD (Base en caja)</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#DCFCE7] p-3 text-[#14532D]">
-                <span className="font-semibold">Ventas brutas acumuladas:</span>
-                <span className="font-black">${totalSalesUsd.toFixed(2)} USD</span>
-              </div>
-              <div className="flex items-center justify-between rounded-2xl bg-[#FEF2F2] p-3 text-[#B91C1C]">
-                <span className="font-semibold">Devoluciones / Reversos:</span>
-                <span className="font-bold">$0.00 USD (0 incidencias)</span>
+
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#E5E9E7] text-[10px] font-bold uppercase tracking-wider text-[#52635A]">
+                      <th className="py-2.5">Producto</th>
+                      <th className="py-2.5">Categoría</th>
+                      <th className="py-2.5 text-center">Unidades</th>
+                      <th className="py-2.5 text-right">Facturación</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#F0F2F1]">
+                    {topProducts.map((p) => (
+                      <tr key={p.sku} className="hover:bg-[#F6F5F0]/60 transition">
+                        <td className="py-3">
+                          <span className="font-bold text-[#111827] block">{p.name}</span>
+                          <span className="text-[10px] text-[#52635A]">SKU: {p.sku}</span>
+                        </td>
+                        <td className="py-3 text-[#52635A]">{p.category}</td>
+                        <td className="py-3 text-center font-extrabold text-[#111827]">{p.units}</td>
+                        <td className="py-3 text-right font-black text-[#111827]">
+                          {formatCurrency(p.revenueUsd)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
-          </div>
 
-          <div className="mt-4 rounded-2xl border border-[#F5CBA7] bg-[#FDF2E2] p-4 text-[#111827]">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#92400E]">Total proyectado en caja</span>
-              <span className="text-lg font-black text-[#111827]">
-                ${(totalSalesUsd + 50.0).toFixed(2)} USD
-              </span>
+            {/* Resumen Operativo de Turnos y Auditoría de Caja (5 cols) */}
+            <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs lg:col-span-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-[#F0F2F1]">
+                  <h3 className="text-base font-bold text-[#111827]">Resumen operativo de caja</h3>
+                  <span className="text-xs text-[#52635A]">Auditoría ciega</span>
+                </div>
+
+                <div className="mt-4 space-y-3.5 text-xs">
+                  <div className="flex items-center justify-between rounded-2xl bg-[#F6F5F0] p-3">
+                    <span className="font-semibold text-[#52635A]">Cajero activo:</span>
+                    <span className="font-bold text-[#111827]">{activeUser.name} ({activeRegister.name})</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl bg-[#F6F5F0] p-3">
+                    <span className="font-semibold text-[#52635A]">Apertura de turno:</span>
+                    <span className="font-bold text-[#111827]">$50.00 USD (Base en caja)</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl bg-[#DCFCE7] p-3 text-[#14532D]">
+                    <span className="font-semibold">Ventas brutas acumuladas:</span>
+                    <span className="font-black">${totalSalesUsd.toFixed(2)} USD</span>
+                  </div>
+                  <div className="flex items-center justify-between rounded-2xl bg-[#FEF2F2] p-3 text-[#B91C1C]">
+                    <span className="font-semibold">Devoluciones / Reversos:</span>
+                    <span className="font-bold">$0.00 USD (0 incidencias)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-[#F5CBA7] bg-[#FDF2E2] p-4 text-[#111827]">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#92400E]">Total proyectado en caja</span>
+                  <span className="text-lg font-black text-[#111827]">
+                    ${(totalSalesUsd + 50.0).toFixed(2)} USD
+                  </span>
+                </div>
+                <p className="mt-1 text-[10px] text-[#92400E]">
+                  Equivalente: {((totalSalesUsd + 50.0) * exchangeRate).toLocaleString('es-VE')} VES
+                </p>
+              </div>
             </div>
-            <p className="mt-1 text-[10px] text-[#92400E]">
-              Equivalente: {((totalSalesUsd + 50.0) * exchangeRate).toLocaleString('es-VE')} VES
-            </p>
           </div>
-        </div>
-      </div>
-      </>
+        </>
       )}
 
       {/* 2. REPORTE DE TURNOS Y ARQUEOS (Diagrama §8 / DOCX §16) */}
@@ -1212,11 +1204,10 @@ export function PosView16Reports() {
                         <div>
                           <div className="flex items-center gap-2">
                             <span
-                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                                m.movement_type === 'ingreso_efectivo'
-                                  ? 'bg-emerald-100 text-emerald-800'
-                                  : 'bg-red-100 text-red-800'
-                              }`}
+                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase ${m.movement_type === 'ingreso_efectivo'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : 'bg-red-100 text-red-800'
+                                }`}
                             >
                               {m.movement_type === 'ingreso_efectivo' ? 'Ingreso' : 'Retiro'}
                             </span>

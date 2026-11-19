@@ -24,6 +24,7 @@ import {
 import { usePos } from './pos-context';
 import type { PosProduct } from '@/lib/types';
 import { MOCK_USERS } from '@/lib/pos-demo-data';
+import { connectScaleWebSerial } from '@/lib/pos-hardware';
 
 export function PosView0304SaleCart() {
   const {
@@ -84,6 +85,24 @@ export function PosView0304SaleCart() {
   const [weighingProduct, setWeighingProduct] = useState<PosProduct | null>(null);
   const [scaleWeightKg, setScaleWeightKg] = useState<string>('0.750');
   const [scaleTareKg, setScaleTareKg] = useState<string>('0.000');
+  const [isScaleConnected, setIsScaleConnected] = useState(false);
+  const [scaleDisconnect, setScaleDisconnect] = useState<(() => void) | null>(null);
+
+  const handleConnectScale = async () => {
+    const conn = await connectScaleWebSerial(
+      (weight) => {
+        setScaleWeightKg(weight.toFixed(3));
+      },
+      (err) => {
+        showNotification('Balanza Serie', err, 'alert');
+      },
+    );
+    if (conn) {
+      setIsScaleConnected(true);
+      setScaleDisconnect(() => conn.disconnect);
+      showNotification('Báscula conectada', 'Lectura de peso en vivo activa por puerto serie USB.', 'success');
+    }
+  };
 
   // Modal Alta Rápida de Producto (Inventario / Warehouse)
   const [showNewProductModal, setShowNewProductModal] = useState(false);

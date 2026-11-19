@@ -21,6 +21,8 @@ import { MOCK_USERS } from '@/lib/pos-demo-data';
 
 export function PosView15ShiftClosure() {
   const {
+    tenantName,
+    tenantBranding,
     activeShift,
     activeBranch,
     activeUser,
@@ -617,10 +619,12 @@ export function PosView15ShiftClosure() {
             {/* Simulación de Ticket Térmico 80mm */}
             <div className="rounded-2xl border border-[#DCE3DF] bg-[#FAF9F5] p-4 font-mono text-[11px] text-[#111827] space-y-2 shadow-inner">
               <div className="text-center space-y-0.5 border-b border-dashed border-[#B5C2BA] pb-2">
-                <p className="font-extrabold text-xs">VORA RETAIL PILOTO C.A.</p>
-                <p className="text-[10px]">RIF: J-502258027</p>
+                <p className="font-extrabold text-xs uppercase" style={{ color: tenantBranding.primaryColor }}>
+                  {tenantName || 'EMPRESA PILOTO'}
+                </p>
+                <p className="text-[10px]">RIF: {activeBranch.code ? `J-${activeBranch.code}` : 'J-502258027'}</p>
                 <p className="text-[9px] text-[#52635A]">{activeBranch.name}</p>
-                <p className="font-bold text-[11px] pt-1 text-[#1E6B4E]">
+                <p className="font-bold text-[11px] pt-1" style={{ color: tenantBranding.primaryColor }}>
                   *** REPORTE CORTE {reportType} ***
                 </p>
                 <p className="text-[9px]">
