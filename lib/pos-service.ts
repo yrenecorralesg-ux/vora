@@ -51,7 +51,6 @@ import type {
   PosDispatchOrder,
   PosDispatchStatus,
 } from './types';
-import { TheFactoryHkaProvider } from './pos-hka-provider';
 import { casheaProvider, CasheaPosProvider } from './pos-cashea-provider';
 
 // Estado global en memoria para reactividad completa en modo demo / preview
@@ -979,8 +978,11 @@ class PosInMemoryStore {
   }
 }
 
-// Instancia única (Singleton) en memoria
+/**
+ * Motor local del navegador. Solo se usa para el comprobante PROVISIONAL de una
+ * venta hecha sin conexión (pos-view-06): la venta real la registra el servidor
+ * (Supabase) al sincronizar la cola. Ningún dato de negocio vive aquí.
+ */
 export const posStore = new PosInMemoryStore();
-export const hkaProvider = new TheFactoryHkaProvider(posStore.fiscalIntegration);
 export { casheaProvider, CasheaPosProvider };
 

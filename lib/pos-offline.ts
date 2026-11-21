@@ -14,6 +14,13 @@ export interface QueuedOfflineSale {
   payload: any;
   retryCount: number;
   lastError?: string;
+  /** El servidor la rechazó de forma definitiva (no se reintenta; queda para revisión). */
+  rejected?: boolean;
+}
+
+/** Errores HTTP que pueden resolverse reintentando (sesión, tiempo de espera, límite, servidor). */
+function isRetryable(status: number): boolean {
+  return status === 401 || status === 408 || status === 429 || status >= 500;
 }
 
 const STORAGE_KEY_PREFIX = 'vora_pos_offline_queue_';
@@ -66,46 +73,49 @@ export async function syncOfflineSales(slug: string): Promise<{
   syncedCount: number;
   errorsCount: number;
   remainingCount: number;
+  rejectedCount: number;
+  newlyRejected: number;
 }> {
   const queue = getOfflineQueue(slug);
-  if (queue.length === 0) {
-    return { syncedCount: 0, errorsCount: 0, remainingCount: 0 };
-  }
-
   let syncedCount = 0;
   let errorsCount = 0;
-  const remaining: QueuedOfflineSale[] = [];
+  let newlyRejected = 0;
+  const kept: QueuedOfflineSale[] = [];
 
   for (const item of queue) {
+    if (item.rejected) {
+      kept.push(item);
+      continue;
+    }
     try {
       const res = await fetch(`/api/t/${slug}/pos/sales`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(item.payload),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok) {
-          syncedCount++;
-          continue; // Venta sincronizada con éxito
-        }
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.ok) {
+        syncedCount++;
+        continue; // Venta registrada (o ya existía por la misma clave de idempotencia)
       }
-
       item.retryCount++;
-      item.lastError = `HTTP ${res.status}`;
+      item.lastError = data?.error || `HTTP ${res.status}`;
+      if (!isRetryable(res.status)) {
+        item.rejected = true;
+        newlyRejected++;
+      }
       errorsCount++;
-      remaining.push(item);
+      kept.push(item);
     } catch (err: any) {
       item.retryCount++;
       item.lastError = err.message || 'Error de red';
       errorsCount++;
-      remaining.push(item);
+      kept.push(item);
     }
   }
 
   try {
-    localStorage.setItem(getStorageKey(slug), JSON.stringify(remaining));
+    localStorage.setItem(getStorageKey(slug), JSON.stringify(kept));
   } catch (err) {
     console.error('[pos-offline] Error al persistir cola restante:', err);
   }
@@ -113,6 +123,8 @@ export async function syncOfflineSales(slug: string): Promise<{
   return {
     syncedCount,
     errorsCount,
-    remainingCount: remaining.length,
+    remainingCount: kept.filter((q) => !q.rejected).length,
+    rejectedCount: kept.filter((q) => q.rejected).length,
+    newlyRejected,
   };
 }

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { authorizeTenantApi } from '@/lib/tenant-api-auth';
-import { posStore } from '@/lib/pos-service';
+import { mapCustomer } from '@/lib/pos/server';
 import type { PosCustomer } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +26,7 @@ export async function GET(
       .maybeSingle();
 
     if (!tenant) {
-      return NextResponse.json({ ok: true, customers: posStore.customers });
+      return NextResponse.json({ ok: false, error: 'Empresa no encontrada.' }, { status: 404 });
     }
 
     let query = supabase
@@ -37,15 +37,17 @@ export async function GET(
       .order('total_purchases_count', { ascending: false });
 
     if (q) {
-      const cleanQ = q.replace(/[\s\.-]/g, '');
-      query = query.or(`legal_name.ilike.%${q}%,document_number.ilike.%${cleanQ}%,phone.ilike.%${q}%,email.ilike.%${q}%`);
+      // Sin comas, paréntesis ni comodines: no deben alterar el filtro de PostgREST.
+      const safeQ = q.replace(/[,()*%\\]/g, ' ').trim().slice(0, 80);
+      const cleanQ = safeQ.replace(/[\s\.-]/g, '');
+      query = query.or(`legal_name.ilike.%${safeQ}%,document_number.ilike.%${cleanQ}%,phone.ilike.%${safeQ}%,email.ilike.%${safeQ}%`);
     }
 
     const { data: rows, error } = await query.limit(50);
 
     if (error) {
       console.warn('[pos/customers] Error consultando pos_customers:', error.message);
-      return NextResponse.json({ ok: true, customers: posStore.customers });
+      return NextResponse.json({ ok: false, error: 'No se pudieron cargar los clientes.' }, { status: 500 });
     }
 
     // Auto-aprovisionar "Consumidor Final" si no existe ninguno
@@ -68,16 +70,12 @@ export async function GET(
 
         if (!autoErr && autoCust) {
           const list: PosCustomer[] = [autoCust as PosCustomer];
-          posStore.customers = list;
           return NextResponse.json({ ok: true, customers: list, auto_provisioned: true });
         }
       }
     }
 
-    const custList: PosCustomer[] = (rows as PosCustomer[]) || posStore.customers;
-    if (!q) {
-      posStore.customers = custList;
-    }
+    const custList: PosCustomer[] = (rows ?? []).map(mapCustomer);
     return NextResponse.json({ ok: true, customers: custList });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || 'Error en servidor' }, { status: 500 });
@@ -135,8 +133,6 @@ export async function POST(
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     }
-
-    posStore.customers.unshift(created as PosCustomer);
 
     return NextResponse.json({ ok: true, customer: created });
   } catch (err: any) {

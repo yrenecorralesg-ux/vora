@@ -22,7 +22,6 @@ import {
   X,
 } from 'lucide-react';
 import { usePos } from './pos-context';
-import { posStore } from '@/lib/pos-service';
 import type { PosShift } from '@/lib/types';
 
 export function PosView16Reports() {

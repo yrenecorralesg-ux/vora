@@ -30,13 +30,16 @@ import {
 
 const PREDEFINED_ROLES = [
   { value: 'tenant_admin', label: 'Administrador de Empresa (Acceso Total)', badge: 'Admin' },
-  { value: 'owner', label: 'Dueño / Propietario', badge: 'Owner' },
   { value: 'pos_store_admin', label: 'Administrador de Tienda (POS)', badge: 'POS Admin' },
   { value: 'pos_supervisor', label: 'Supervisor de Caja (POS)', badge: 'POS Super' },
   { value: 'pos_cashier', label: 'Cajero(a) (POS)', badge: 'POS Cajero' },
   { value: 'pos_sales_rep', label: 'Asesor de Ventas / Comercial (POS)', badge: 'Ventas' },
-  { value: 'warehouse_manager', label: 'Encargado de Almacén (Warehouse)', badge: 'Almacén Jefe' },
-  { value: 'warehouse_operator', label: 'Operador de Almacén (Warehouse)', badge: 'Almacén Operador' },
+  { value: 'pos_auditor', label: 'Auditor / Contador (POS)', badge: 'POS Auditor' },
+  { value: 'wh_manager', label: 'Administrador de Almacén (Warehouse)', badge: 'Almacén Admin' },
+  { value: 'wh_supervisor', label: 'Supervisor de Almacén (Warehouse)', badge: 'Almacén Super' },
+  { value: 'wh_clerk', label: 'Almacenista (Warehouse)', badge: 'Almacenista' },
+  { value: 'wh_scanner', label: 'Operador de Escaneo (Warehouse)', badge: 'Escaneo' },
+  { value: 'wh_auditor', label: 'Auditor de Almacén (Warehouse)', badge: 'Almacén Auditor' },
   { value: 'member', label: 'Miembro estándar CRM', badge: 'CRM' },
 ];
 
@@ -69,15 +72,18 @@ export function TenantUsersPanel({
   };
 
   const roleLabels: Record<string, string> = {
-    owner: 'Dueño / Propietario',
     tenant_admin: 'Administrador de Empresa',
     admin: 'Administrador',
     pos_store_admin: 'Admin Tienda POS',
     pos_supervisor: 'Supervisor de Caja POS',
     pos_cashier: 'Cajero(a) POS',
     pos_sales_rep: 'Asesor Comercial POS',
-    warehouse_manager: 'Jefe de Almacén',
-    warehouse_operator: 'Operador de Almacén',
+    pos_auditor: 'Auditor POS',
+    wh_manager: 'Administrador de Almacén',
+    wh_supervisor: 'Supervisor de Almacén',
+    wh_clerk: 'Almacenista',
+    wh_scanner: 'Operador de Escaneo',
+    wh_auditor: 'Auditor de Almacén',
     member: 'Miembro CRM',
   };
 

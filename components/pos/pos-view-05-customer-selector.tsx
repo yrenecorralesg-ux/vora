@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { Search, UserPlus, CheckCircle2, ArrowLeft, X, Edit2, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
 import { usePos } from './pos-context';
 import type { PosCustomer } from '@/lib/types';
-import { posStore } from '@/lib/pos-service';
 
 export function PosView05CustomerSelector() {
   const { customers, selectedCustomer, setSelectedCustomer, navigateTo, showNotification, addCustomer, activeTenantSlug } = usePos();
@@ -133,12 +132,13 @@ export function PosView05CustomerSelector() {
       customer_tier: 'nuevo',
     });
 
+    if (!created) return;
     setSelectedCustomer(created);
     setActiveCust(created);
     setShowNewForm(false);
     showNotification(
       'Cliente Creado',
-      `${created.legal_name} (${rifCheck.formatted}) registrado y validado ante SENIAT.`,
+      `${created.legal_name} (${rifCheck.formatted}) registrado. El formato del RIF/cédula es válido (no se consulta al SENIAT).`,
       'success',
     );
     navigateTo('POS-03-04');

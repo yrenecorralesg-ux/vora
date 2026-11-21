@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Settings,
   ShieldCheck,
@@ -16,7 +16,6 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { usePos } from './pos-context';
-import { posStore } from '@/lib/pos-service';
 import type { PosPaymentMethod } from '@/lib/types';
 
 export function PosView17Settings() {
@@ -35,11 +34,31 @@ export function PosView17Settings() {
     isFetchingExchangeRate,
     isFuncActive,
     staffUsers,
-    updateSupervisorConfig,
-    addStaffUser,
-    toggleStaffUser,
-    updateStaffPin,
+    me,
+    can,
+    saveSettings,
+    reloadSettings,
+    reloadStaff,
+    activeTenantSlug,
   } = usePos();
+
+  const ROLE_LABELS: Record<string, string> = {
+    tenant_admin: 'Administrador',
+    pos_store_admin: 'Admin. tienda',
+    pos_supervisor: 'Supervisor',
+    pos_cashier: 'Cajero',
+    pos_sales_rep: 'Asesor',
+    pos_auditor: 'Auditor',
+    wh_manager: 'Administrador de almacén',
+    wh_supervisor: 'Supervisor de almacén',
+    wh_clerk: 'Almacenista',
+    wh_scanner: 'Operador de escaneo',
+    wh_auditor: 'Auditor de almacén',
+  };
+  const [currentPin, setCurrentPin] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [savingPin, setSavingPin] = useState(false);
 
   const [maxDiscount, setMaxDiscount] = useState<number>(settings.max_cashier_discount_percent);
   const [allowPartial, setAllowPartial] = useState<boolean>(settings.allow_partial_payments);
@@ -53,20 +72,18 @@ export function PosView17Settings() {
   const [docPrefix, setDocPrefix] = useState<string>(settings.internal_doc_prefix);
   const [activeMethods, setActiveMethods] = useState<PosPaymentMethod[]>([...settings.active_methods]);
 
-  // Políticas y Configuración del Supervisor (pos_supervisor_panel)
-  const [supervisorPin, setSupervisorPin] = useState<string>(settings.supervisor_pin || '9999');
-  const [requirePinReturns, setRequirePinReturns] = useState<boolean>(settings.require_pin_for_returns !== false);
   const [requirePinWithdrawals, setRequirePinWithdrawals] = useState<boolean>(settings.require_pin_for_withdrawals !== false);
-  const [requirePinCancel, setRequirePinCancel] = useState<boolean>(settings.require_pin_for_cancel !== false);
-  const [enforceBlindCount, setEnforceBlindCount] = useState<boolean>(settings.enforce_blind_count !== false);
 
-  // Nuevo Miembro del Personal (Cajero / Asesor / Supervisor)
-  const [showNewStaffModal, setShowNewStaffModal] = useState<boolean>(false);
-  const [newStaffName, setNewStaffName] = useState('');
-  const [newStaffEmail, setNewStaffEmail] = useState('');
-  const [newStaffRole, setNewStaffRole] = useState<'pos_cashier' | 'pos_supervisor' | 'pos_sales_rep'>('pos_cashier');
-  const [newStaffPin, setNewStaffPin] = useState('1111');
-  const [newStaffCommission, setNewStaffCommission] = useState('3.0');
+  useEffect(() => {
+    setMaxDiscount(settings.max_cashier_discount_percent);
+    setAllowPartial(settings.allow_partial_payments);
+    setExchangeRateInput(settings.active_exchange_rate ? settings.active_exchange_rate.toString() : '');
+    setExchangeRateApiUrl(settings.exchange_rate_api_url || 'https://ve.dolarapi.com/v1/dolares/oficial');
+    setAutoFetchRate(settings.auto_fetch_exchange_rate ?? true);
+    setDocPrefix(settings.internal_doc_prefix);
+    setActiveMethods([...settings.active_methods]);
+    setRequirePinWithdrawals(settings.require_pin_for_withdrawals !== false);
+  }, [settings]);
 
   // Nueva Sede / Sucursal
   const [showNewBranchForm, setShowNewBranchForm] = useState(false);
@@ -98,33 +115,40 @@ export function PosView17Settings() {
     }
   };
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     const rateVal = parseFloat(exchangeRateInput);
     if (isNaN(rateVal) || rateVal <= 0) {
       showNotification('Tasa inválida', 'La tasa debe ser mayor a cero.', 'critical');
       return;
     }
-
-    settings.max_cashier_discount_percent = maxDiscount;
-    settings.allow_partial_payments = allowPartial;
-    settings.active_exchange_rate = rateVal;
-    settings.exchange_rate_api_url = exchangeRateApiUrl.trim();
-    settings.auto_fetch_exchange_rate = autoFetchRate;
-    settings.internal_doc_prefix = docPrefix.trim() || 'COMP-INT-';
-    settings.active_methods = activeMethods;
-    settings.updated_at = new Date().toISOString();
-
-    posStore.addAudit({
-      branch_id: activeBranch.id,
-      shift_id: null,
-      actor_id: activeUser.id,
-      event_type: 'actualizacion_parametros_pos',
-      entity_type: 'pos_settings',
-      entity_id: settings.id,
-      description: `Parámetros operativos de ${activeBranch.name} actualizados`,
-      metadata: { maxDiscount, allowPartial, rateVal, exchangeRateApiUrl, autoFetchRate, activeMethods },
+    const result = await saveSettings({
+      max_cashier_discount_percent: maxDiscount,
+      allow_partial_payments: allowPartial,
+      active_methods: activeMethods,
+      internal_doc_prefix: docPrefix.trim() || 'COMP-INT-',
+      ...(rateVal !== settings.active_exchange_rate ? { active_exchange_rate: rateVal } : {}),
     });
+    if (!result.ok) {
+      showNotification('No se guardó la configuración', result.error ?? 'Error al guardar.', 'critical');
+      return;
+    }
+    if (
+      exchangeRateApiUrl.trim() !== (settings.exchange_rate_api_url ?? '') ||
+      autoFetchRate !== (settings.auto_fetch_exchange_rate ?? true)
+    ) {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/exchange-rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set', url: exchangeRateApiUrl.trim(), auto_fetch: autoFetchRate }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        showNotification('API de tasa no guardada', data?.error ?? 'Error al guardar la API de tasa.', 'critical');
+        return;
+      }
+      await reloadSettings();
+    }
 
     showNotification(
       'Configuración guardada',
@@ -133,21 +157,22 @@ export function PosView17Settings() {
     );
   };
 
-  const handleCreateBranch = (e: React.FormEvent) => {
+  const handleCreateBranch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newBranchCode.trim() || !newBranchName.trim()) return;
 
-    const created = addBranch({
+    const created = await addBranch({
       tenant_id: activeBranch.tenant_id,
       code: newBranchCode.trim().toUpperCase(),
       name: newBranchName.trim(),
-      fiscal_address: newBranchAddress.trim() || 'Dirección fiscal no especificada',
-      phone: newBranchPhone.trim() || '+58 212 000 0000',
+      fiscal_address: newBranchAddress.trim() || null,
+      phone: newBranchPhone.trim() || null,
       timezone: 'America/Caracas',
       is_primary: false,
       status: 'active',
     });
 
+    if (!created) return;
     setNewBranchCode('');
     setNewBranchName('');
     setNewBranchAddress('');
@@ -156,11 +181,11 @@ export function PosView17Settings() {
     showNotification('Sede registrada', `Nueva sede ${created.name} (${created.code}) agregada exitosamente.`, 'success');
   };
 
-  const handleCreateRegister = (e: React.FormEvent) => {
+  const handleCreateRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newRegCode.trim() || !newRegName.trim()) return;
 
-    const created = addRegister({
+    const created = await addRegister({
       tenant_id: activeBranch.tenant_id,
       branch_id: targetBranchId || activeBranch.id,
       code: newRegCode.trim().toUpperCase(),
@@ -168,46 +193,48 @@ export function PosView17Settings() {
       status: 'active',
     });
 
+    if (!created) return;
     setNewRegCode('');
     setNewRegName('');
     setShowNewRegForm(false);
     showNotification('Caja registrada', `Nueva caja física ${created.code} agregada exitosamente.`, 'success');
   };
 
-  const handleSaveSupervisorPolicies = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!supervisorPin.trim() || supervisorPin.trim().length < 4) {
-      showNotification('PIN inválido', 'El PIN de supervisor debe contener al menos 4 dígitos.', 'critical');
-      return;
-    }
-
-    updateSupervisorConfig({
-      supervisorPin: supervisorPin.trim(),
-      maxCashierDiscountPercent: maxDiscount,
-      requirePinForReturns: requirePinReturns,
-      requirePinForWithdrawals: requirePinWithdrawals,
-      requirePinForCancel: requirePinCancel,
-      enforceBlindCount: enforceBlindCount,
-    });
+  const handleSavePolicies = async () => {
+    const result = await saveSettings({ require_pin_for_withdrawals: requirePinWithdrawals });
+    showNotification(
+      result.ok ? 'Políticas guardadas' : 'No se guardaron las políticas',
+      result.ok ? 'Políticas de supervisión actualizadas.' : result.error ?? 'Error al guardar.',
+      result.ok ? 'success' : 'critical',
+    );
   };
 
-  const handleCreateStaff = (e: React.FormEvent) => {
+  const handleSavePin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newStaffName.trim() || !newStaffPin.trim()) return;
-
-    addStaffUser({
-      name: newStaffName.trim(),
-      email: newStaffEmail.trim() || undefined,
-      role: newStaffRole,
-      pin: newStaffPin.trim(),
-      assignedBranchId: activeBranch.id,
-      commission_rate_percent: newStaffRole === 'pos_sales_rep' ? parseFloat(newStaffCommission) || 3.0 : undefined,
-    });
-
-    setNewStaffName('');
-    setNewStaffEmail('');
-    setNewStaffPin('1111');
-    setShowNewStaffModal(false);
+    if (newPin !== confirmPin) {
+      showNotification('PIN no coincide', 'Repite el mismo PIN en ambos campos.', 'critical');
+      return;
+    }
+    setSavingPin(true);
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/pin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: newPin.trim(), current_pin: currentPin.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        showNotification('PIN no guardado', data?.error ?? 'No se pudo guardar el PIN.', 'critical');
+        return;
+      }
+      setCurrentPin('');
+      setNewPin('');
+      setConfirmPin('');
+      await reloadStaff();
+      showNotification('PIN guardado', 'Tu PIN de supervisor quedó configurado.', 'success');
+    } finally {
+      setSavingPin(false);
+    }
   };
 
   return (
@@ -560,7 +587,7 @@ export function PosView17Settings() {
         </div>
       </div>
 
-      {/* Panel de Supervisión y Control de Roles (pos_supervisor_panel) */}
+      {/* Supervisión: PIN personal y personal real de la empresa */}
       {isFuncActive('pos_supervisor_panel') && (
         <div className="rounded-3xl border border-[#DCE3DF] bg-white p-6 shadow-sm space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E5E9E7] pb-4">
@@ -569,205 +596,121 @@ export function PosView17Settings() {
                 <ShieldCheck className="h-5 w-5" />
               </div>
               <div>
-                <h2 className="text-base font-bold text-[#111827]">
-                  Panel de Control y Supervisión de Caja (Supervisor de Sede)
-                </h2>
+                <h2 className="text-base font-bold text-[#111827]">Supervisión de caja</h2>
                 <p className="text-xs text-[#52635A]">
-                  Configuración de PIN de autorización, políticas de arqueo/retiros y gestión de cajeros y asesores.
+                  Cada supervisor autoriza con su PIN personal, validado en el servidor. Los usuarios y roles se
+                  administran desde el gestor de VORA.
                 </p>
               </div>
             </div>
-
-            <div className="flex items-center gap-2">
-              {isFuncActive('pos_supervisor_users_crud') && (
-                <button
-                  type="button"
-                  onClick={() => navigateTo('POS-19')}
-                  className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-3.5 py-1.5 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition"
-                >
-                  Abrir Módulo de Personal (CRUD)
-                </button>
-              )}
-              <span className="rounded-full bg-[#1E6B4E] px-3 py-1 text-xs font-bold text-white shadow-2xs">
-                Módulo Supervisor Activo
-              </span>
-            </div>
+            {isFuncActive('pos_supervisor_users_crud') && (
+              <button
+                type="button"
+                onClick={() => navigateTo('POS-19')}
+                className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-3.5 py-1.5 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition"
+              >
+                Ver personal
+              </button>
+            )}
           </div>
 
-          <form onSubmit={handleSaveSupervisorPolicies} className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Columna 1: Clave PIN y Políticas */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Columna 1: Mi PIN y políticas */}
             <div className="space-y-4 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-5">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
-                Políticas de Autorización y PIN Supervisor
-              </h3>
-
-              <div>
-                <label className="block text-xs font-bold text-[#111827]">
-                  Clave PIN Maestra de Supervisor
-                </label>
-                <div className="relative mt-1">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">Mi PIN de supervisor</h3>
+              {me?.can_approve ? (
+                <form onSubmit={handleSavePin} className="space-y-3">
+                  <p className="text-[11px] text-[#52635A]">
+                    {me.has_pin
+                      ? 'Ya tienes un PIN configurado. Para cambiarlo, ingresa el actual.'
+                      : 'Aún no tienes PIN: configúralo para poder autorizar descuentos, devoluciones y retiros en la caja de un cajero.'}
+                  </p>
+                  {me.has_pin && (
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={8}
+                      required
+                      placeholder="PIN actual"
+                      value={currentPin}
+                      onChange={(e) => setCurrentPin(e.target.value)}
+                      className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 text-xs font-mono font-bold tracking-widest"
+                    />
+                  )}
+                  <div className="relative">
+                    <input
+                      type="password"
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={8}
+                      required
+                      placeholder="Nuevo PIN (4 a 8 dígitos)"
+                      value={newPin}
+                      onChange={(e) => setNewPin(e.target.value)}
+                      className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 pr-10 text-xs font-mono font-bold tracking-widest"
+                    />
+                    <KeyRound className="absolute right-3 top-3 h-4 w-4 text-[#52635A]" />
+                  </div>
                   <input
                     type="password"
+                    inputMode="numeric"
+                    autoComplete="off"
                     maxLength={8}
                     required
-                    value={supervisorPin}
-                    onChange={(e) => setSupervisorPin(e.target.value)}
-                    className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 pr-10 text-xs font-mono font-bold tracking-widest text-[#111827] focus:border-[#1E6B4E] focus:outline-none"
-                    placeholder="Mínimo 4 dígitos"
+                    placeholder="Repite el nuevo PIN"
+                    value={confirmPin}
+                    onChange={(e) => setConfirmPin(e.target.value)}
+                    className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 text-xs font-mono font-bold tracking-widest"
                   />
-                  <KeyRound className="absolute right-3 top-3 h-4 w-4 text-[#52635A]" />
-                </div>
-                <p className="mt-1 text-[11px] text-[#52635A]">
-                  Utilizada para autorizar excepciones en caja, retiros y anulaciones.
+                  <button
+                    type="submit"
+                    disabled={savingPin}
+                    className="w-full rounded-xl bg-[#1E6B4E] py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-[#16523B] disabled:opacity-60"
+                  >
+                    {me.has_pin ? 'Cambiar mi PIN' : 'Guardar mi PIN'}
+                  </button>
+                </form>
+              ) : (
+                <p className="text-[11px] text-[#52635A]">
+                  Tu rol no autoriza operaciones de supervisor, por lo que no necesita PIN.
                 </p>
-              </div>
+              )}
 
-              <div className="space-y-2.5 pt-2 border-t border-[#DCE3DF]">
+              <div className="space-y-2.5 pt-3 border-t border-[#DCE3DF]">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">Políticas</h3>
+                <p className="text-[11px] text-[#52635A]">
+                  Las devoluciones y los descuentos por encima del máximo del cajero siempre requieren supervisor.
+                </p>
                 <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#111827]">
                   <input
                     type="checkbox"
-                    checked={requirePinReturns}
-                    onChange={(e) => setRequirePinReturns(e.target.checked)}
-                    className="h-4 w-4 rounded accent-[#1E6B4E]"
-                  />
-                  <span>Exigir PIN de supervisor para procesar devoluciones y notas de crédito</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#111827]">
-                  <input
-                    type="checkbox"
+                    disabled={!can('pos.settings.manage')}
                     checked={requirePinWithdrawals}
                     onChange={(e) => setRequirePinWithdrawals(e.target.checked)}
                     className="h-4 w-4 rounded accent-[#1E6B4E]"
                   />
-                  <span>Exigir PIN de supervisor para retiros o egresos de caja</span>
+                  <span>Exigir PIN de supervisor para retiros de efectivo</span>
                 </label>
-
-                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#111827]">
-                  <input
-                    type="checkbox"
-                    checked={requirePinCancel}
-                    onChange={(e) => setRequirePinCancel(e.target.checked)}
-                    className="h-4 w-4 rounded accent-[#1E6B4E]"
-                  />
-                  <span>Exigir PIN de supervisor para cancelar ventas en curso</span>
-                </label>
-
-                <label className="flex items-center gap-2.5 cursor-pointer text-xs font-semibold text-[#111827]">
-                  <input
-                    type="checkbox"
-                    checked={enforceBlindCount}
-                    onChange={(e) => setEnforceBlindCount(e.target.checked)}
-                    className="h-4 w-4 rounded accent-[#1E6B4E]"
-                  />
-                  <span>Obligatoriedad de arqueo a ciegas en el cierre de turno</span>
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-xl bg-[#1E6B4E] py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-[#16523B]"
-              >
-                Actualizar políticas de supervisión
-              </button>
-            </div>
-
-            {/* Columna 2: Gestión de Personal (Cajeros, Supervisores, Asesores) */}
-            <div className="space-y-4 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">
-                    Personal de Caja y Venta de la Sede
-                  </h3>
-                  <p className="text-[11px] text-[#52635A]">
-                    {staffUsers.length} usuarios registrados en la sede
-                  </p>
-                </div>
                 <button
                   type="button"
-                  onClick={() => setShowNewStaffModal(!showNewStaffModal)}
-                  className="rounded-xl border border-[#DCE3DF] bg-white px-3 py-1.5 text-xs font-bold text-[#111827] shadow-2xs hover:bg-[#DCE3DF]"
+                  onClick={handleSavePolicies}
+                  disabled={!can('pos.settings.manage')}
+                  className="w-full rounded-xl border border-[#1E6B4E] bg-white py-2 text-xs font-bold text-[#1E6B4E] hover:bg-[#DCFCE7] disabled:opacity-50"
                 >
-                  {showNewStaffModal ? 'Cerrar formulario' : '+ Nuevo personal'}
+                  Guardar políticas
                 </button>
               </div>
+            </div>
 
-              {showNewStaffModal && (
-                <div className="rounded-2xl border border-[#86EFAC] bg-white p-4 text-xs space-y-3 shadow-xs">
-                  <span className="font-bold text-[#14532D]">Alta de Cajero, Supervisor o Asesor</span>
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-                    <div>
-                      <label className="text-[10px] font-bold text-[#52635A]">Nombre completo</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="Ej: Pedro Ramos"
-                        value={newStaffName}
-                        onChange={(e) => setNewStaffName(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-semibold"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-[#52635A]">Correo / Usuario</label>
-                      <input
-                        type="email"
-                        placeholder="pedro.cajero@ejemplo.com"
-                        value={newStaffEmail}
-                        onChange={(e) => setNewStaffEmail(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-semibold"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-[#52635A]">Rol asignado</label>
-                      <select
-                        value={newStaffRole}
-                        onChange={(e) => setNewStaffRole(e.target.value as any)}
-                        className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-semibold"
-                      >
-                        <option value="pos_cashier">Cajero(a)</option>
-                        <option value="pos_sales_rep">Asesor(a) de Venta</option>
-                        <option value="pos_supervisor">Supervisor(a)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-bold text-[#52635A]">Clave PIN (4 dígitos)</label>
-                      <input
-                        type="password"
-                        maxLength={4}
-                        required
-                        value={newStaffPin}
-                        onChange={(e) => setNewStaffPin(e.target.value)}
-                        className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-mono font-bold"
-                      />
-                    </div>
-                    {newStaffRole === 'pos_sales_rep' && (
-                      <div>
-                        <label className="text-[10px] font-bold text-[#52635A]">Comisión (%)</label>
-                        <input
-                          type="number"
-                          step="0.1"
-                          value={newStaffCommission}
-                          onChange={(e) => setNewStaffCommission(e.target.value)}
-                          className="mt-1 w-full rounded-xl border border-[#DCE3DF] p-2 text-xs font-bold"
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleCreateStaff}
-                    className="w-full rounded-xl bg-[#1E6B4E] py-2 text-xs font-bold text-white shadow-2xs hover:bg-[#16523B]"
-                  >
-                    Registrar en el equipo
-                  </button>
-                </div>
-              )}
-
-              {/* Lista de personal con estado y PIN */}
+            {/* Columna 2: Personal real de la empresa */}
+            <div className="space-y-4 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-5">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">Personal de la empresa</h3>
+                <p className="text-[11px] text-[#52635A]">
+                  {staffUsers.length} usuarios. Altas, roles y bajas: gestor de VORA → empresa → Usuarios.
+                </p>
+              </div>
               <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
                 {staffUsers.map((user) => (
                   <div
@@ -775,65 +718,28 @@ export function PosView17Settings() {
                     className="flex items-center justify-between rounded-xl border border-[#E5E9E7] bg-white p-3 text-xs shadow-2xs"
                   >
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-[#111827]">{user.name}</span>
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${
-                            user.role === 'pos_supervisor'
-                              ? 'bg-[#FEF3C7] text-[#92400E]'
-                              : user.role === 'pos_sales_rep'
-                              ? 'bg-[#EDE9FE] text-[#6D28D9]'
-                              : user.role === 'pos_store_admin'
-                              ? 'bg-[#E0E7FF] text-[#3730A3]'
-                              : 'bg-[#DCFCE7] text-[#14532D]'
-                          }`}
-                        >
-                          {user.role === 'pos_supervisor'
-                            ? 'Supervisor'
-                            : user.role === 'pos_sales_rep'
-                            ? `Asesor (${user.commission_rate_percent ?? 3}%)`
-                            : user.role === 'pos_store_admin'
-                            ? 'Admin Tienda'
-                            : 'Cajero'}
-                        </span>
-                      </div>
+                      <span className="font-bold text-[#111827]">{user.name}</span>
                       <p className="mt-0.5 text-[10px] text-[#52635A]">
-                        {user.email || 'Sin correo asociado'} · PIN: <span className="font-mono font-bold">****</span>
+                        {user.email || 'Sin correo'} · {ROLE_LABELS[user.role] ?? user.role}
                       </p>
                     </div>
-
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newPin = prompt(`Ingrese nuevo PIN (4 dígitos) para ${user.name}:`, user.pin);
-                          if (newPin && newPin.trim().length >= 4) {
-                            updateStaffPin(user.id, newPin.trim());
-                          }
-                        }}
-                        className="rounded-lg border border-[#DCE3DF] bg-[#F6F5F0] px-2 py-1 text-[10px] font-bold text-[#52635A] hover:bg-[#DCE3DF]"
-                      >
-                        Cambiar PIN
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => toggleStaffUser(user.id)}
-                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold transition ${
-                          user.is_active !== false
-                            ? 'bg-[#DCFCE7] text-[#14532D] hover:bg-[#FEE2E2] hover:text-[#991B1B]'
-                            : 'bg-[#FEE2E2] text-[#991B1B] hover:bg-[#DCFCE7] hover:text-[#14532D]'
+                      {user.has_pin && (
+                        <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[9px] font-bold text-[#92400E]">PIN</span>
+                      )}
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                          user.is_active ? 'bg-[#DCFCE7] text-[#14532D]' : 'bg-[#FEE2E2] text-[#991B1B]'
                         }`}
-                        title="Clic para activar o desactivar usuario"
                       >
-                        {user.is_active !== false ? 'Activo' : 'Inactivo'}
-                      </button>
+                        {user.is_active ? 'Activo' : 'Inactivo'}
+                      </span>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
-          </form>
+          </div>
         </div>
       )}
     </div>

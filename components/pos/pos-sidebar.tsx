@@ -28,7 +28,6 @@ export function PosSidebar() {
     currentView,
     navigateTo,
     isFuncActive,
-    isWarehouseEnabled,
   } = usePos();
 
   const handleLogout = async () => {
@@ -71,14 +70,6 @@ export function PosSidebar() {
       icon: Package,
       isActive: false,
       onClick: () => navigateTo('POS-03-04'),
-    },
-    {
-      id: 'inventory',
-      label: isWarehouseEnabled ? 'Inventario (Warehouse)' : 'Inventario',
-      icon: Boxes,
-      isActive: false,
-      // Con Warehouse activo, el inventario real vive allí; sin él se mantiene la vista del POS.
-      onClick: () => (isWarehouseEnabled ? router.push(`/t/${activeTenantSlug}/warehouse/stock`) : navigateTo('POS-03-04')),
     },
     {
       id: 'customers',

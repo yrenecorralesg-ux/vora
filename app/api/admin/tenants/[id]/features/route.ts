@@ -10,7 +10,11 @@ const schema = z.object({
         enabled: z.boolean(),
         contracted: z.boolean().optional(),
         config: z
-          .object({ functions: z.record(z.boolean()).optional() })
+          .object({
+            functions: z.record(z.boolean()).optional(),
+            catalog_source: z.enum(['warehouse', 'pos']).optional(),
+            pos_stock_policy: z.enum(['strict_block', 'warn_and_allow', 'allow_unrestricted']).optional(),
+          })
           .catchall(z.unknown())
           .default({}),
       }),

@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi } from '@/lib/tenant-api-auth';
-import { posStore } from '@/lib/pos-service';
+import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 import type { PosBranch } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +24,7 @@ export async function GET(
       .maybeSingle();
 
     if (!tenant) {
-      return NextResponse.json({ ok: true, branches: posStore.branches });
+      return NextResponse.json({ ok: false, error: 'Empresa no encontrada.' }, { status: 404 });
     }
 
     // 2. Consultar sedes reales
@@ -38,7 +37,7 @@ export async function GET(
 
     if (error) {
       console.warn('[pos/branches] Error consultando tenant_branches:', error.message);
-      return NextResponse.json({ ok: true, branches: posStore.branches });
+      return NextResponse.json({ ok: false, error: 'No se pudieron cargar las sedes.' }, { status: 500 });
     }
 
     // 3. Auto-aprovisionar Sede Principal y Caja 01 si está vacía
@@ -49,8 +48,8 @@ export async function GET(
           tenant_id: tenant.id,
           code: 'CCS-01',
           name: 'Sede Principal',
-          fiscal_address: 'Av. Francisco de Miranda, Caracas',
-          phone: '+58 212 000 0000',
+          fiscal_address: null,
+          phone: null,
           timezone: 'America/Caracas',
           is_primary: true,
           status: 'active',
@@ -69,13 +68,11 @@ export async function GET(
         });
 
         const branchList: PosBranch[] = [autoBranch as PosBranch];
-        posStore.branches = branchList;
         return NextResponse.json({ ok: true, branches: branchList, auto_provisioned: true });
       }
     }
 
-    const branchList: PosBranch[] = (rows as PosBranch[]) || posStore.branches;
-    posStore.branches = branchList;
+    const branchList: PosBranch[] = (rows as PosBranch[]) ?? [];
     return NextResponse.json({ ok: true, branches: branchList });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || 'Error en servidor' }, { status: 500 });
@@ -88,6 +85,9 @@ export async function POST(
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
+
+  if (!(await hasTenantPermission(auth.access, 'pos.settings.manage')))
+    return permissionDenied('Tu rol no permite crear sedes.');
 
   try {
     const body = await request.json();
@@ -128,8 +128,6 @@ export async function POST(
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     }
-
-    posStore.addBranch(created as PosBranch);
 
     return NextResponse.json({ ok: true, branch: created });
   } catch (err: any) {

@@ -61,6 +61,11 @@ export function PosView06Checkout() {
     selectedSalesRep,
     setSelectedSalesRep,
     reloadProducts,
+    reloadSales,
+    refreshActiveShift,
+    reloadCustomers,
+    products,
+    customers,
   } = usePos();
 
   // Billetera Digital & Saldo a Favor (pos_digital_wallet)
@@ -436,20 +441,35 @@ export function PosView06Checkout() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(salePayload),
         });
-        if (response.ok) {
-          const resData = await response.json();
-          if (resData.ok && resData.sale) {
-            confirmedSale = resData.sale;
-          }
+        const resData = await response.json().catch(() => null);
+        if (response.ok && resData?.ok && resData.sale) {
+          confirmedSale = resData.sale;
+        } else if (response.status >= 400 && response.status < 500) {
+          // Rechazo definitivo del servidor (permisos, stock, datos): no se
+          // registra localmente ni se encola, para no saltarse la validación.
+          showNotification(
+            'Venta rechazada',
+            resData?.error ?? 'El servidor rechazó la venta.',
+            'critical',
+          );
+          return;
         }
       } catch {
-        // Fallback inmediato a posStore local
+        // Sin conexión: respaldo local y cola de sincronización
       }
     }
 
+    let isProvisional = false;
     if (!confirmedSale) {
-      // Encolar de forma segura en local storage para reintento automático
+      // Sin conexión: se encola con la misma clave de idempotencia y se emite un
+      // comprobante provisional local. El servidor la registra (o la rechaza) al reconectar.
       enqueueOfflineSale(activeTenantSlug, salePayload);
+      isProvisional = true;
+      posStore.shifts = [{ ...activeShift, expected_totals: { ...activeShift.expected_totals } }];
+      posStore.products = products.map((p) => ({ ...p }));
+      posStore.customers = customers.map((c) => ({ ...c }));
+      posStore.sales = [];
+      posStore.settings.active_exchange_rate = exchangeRate;
 
       const saleResult = posStore.confirmSale({
         branchId: activeBranch.id,
@@ -473,7 +493,13 @@ export function PosView06Checkout() {
         showNotification('Error en confirmación', saleResult.error ?? 'Fallo al confirmar la venta.', 'critical');
         return;
       }
-      confirmedSale = saleResult.sale;
+      confirmedSale = {
+        ...saleResult.sale,
+        sale_number: `PEND-${idempotencyKey.slice(-6).toUpperCase()}`,
+        notes: [saleResult.sale.notes, 'Venta registrada sin conexión: pendiente de sincronizar con el servidor.']
+          .filter(Boolean)
+          .join(' | '),
+      };
     }
 
     // Apertura automática de gaveta RJ11 si hubo cobro en efectivo
@@ -483,9 +509,18 @@ export function PosView06Checkout() {
 
     setLastConfirmedSale(confirmedSale);
     clearCart();
-    reloadProducts().catch(() => {});
+    if (!isProvisional) {
+      reloadProducts().catch(() => {});
+      reloadSales().catch(() => {});
+      refreshActiveShift().catch(() => {});
+      reloadCustomers().catch(() => {});
+    }
     showNotification(
-      confirmedSale.balance_due_usd > 0 ? 'Venta a Crédito Confirmada' : 'Venta confirmada',
+      isProvisional
+        ? 'Venta guardada sin conexión'
+        : confirmedSale.balance_due_usd > 0
+          ? 'Venta a Crédito Confirmada'
+          : 'Venta confirmada',
       confirmedSale.balance_due_usd > 0
         ? `Operación ${confirmedSale.sale_number} registrada con saldo pendiente de $${confirmedSale.balance_due_usd.toFixed(2)} USD en CxC.`
         : `Operación ${confirmedSale.sale_number} procesada con éxito.`,

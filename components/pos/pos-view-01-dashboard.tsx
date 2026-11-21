@@ -9,8 +9,7 @@ import {
   Banknote,
   Smartphone,
   CreditCard,
-  Building2,
-  TrendingUp,
+  Wallet,
 } from 'lucide-react';
 import { usePos } from './pos-context';
 
@@ -21,8 +20,10 @@ export function PosView01Dashboard() {
     activeShift,
     navigateTo,
     sales,
+    returns,
     showNotification,
     tenantBranding,
+    me,
   } = usePos();
 
   const primaryColor = tenantBranding?.primaryColor || 'var(--crm-primary, #1E6B4E)';
@@ -30,20 +31,42 @@ export function PosView01Dashboard() {
 
   const isShiftOpen = activeShift && activeShift.status === 'abierto';
 
-  // Métricas calculadas en vivo
-  const confirmedSales = sales.filter(
-    (s) => s.commercial_status === 'confirmada' || s.commercial_status === 'parcialmente_devuelta',
-  );
+  // Métricas reales: "hoy" en hora de Caracas; la caja solo cuenta el turno abierto.
+  const dayKey = (iso: string | null | undefined) =>
+    iso ? new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Caracas' }) : '';
+  const today = dayKey(new Date().toISOString());
+  const isConfirmed = (s: (typeof sales)[number]) =>
+    s.commercial_status === 'confirmada' || s.commercial_status === 'parcialmente_devuelta';
 
-  const totalSalesUsd = confirmedSales.reduce((sum, s) => sum + s.total_usd, 0);
-  const totalSalesCount = confirmedSales.length;
-
-  const totalUnitsSold = confirmedSales
+  const todaySales = sales.filter((s) => isConfirmed(s) && dayKey(s.confirmed_at ?? s.created_at) === today);
+  const totalSalesUsd = todaySales.reduce((sum, s) => sum + s.total_usd, 0);
+  const totalSalesCount = todaySales.length;
+  const totalUnitsSold = todaySales
     .flatMap((s) => s.lines ?? [])
     .filter((l) => !l.is_service)
     .reduce((sum, l) => sum + (l.quantity - l.returned_quantity), 0);
-
   const averageTicketUsd = totalSalesCount > 0 ? totalSalesUsd / totalSalesCount : 0;
+
+  const shiftSales = isShiftOpen ? sales.filter((s) => s.shift_id === activeShift!.id && isConfirmed(s)) : [];
+  const shiftSalesUsd = shiftSales.reduce((sum, s) => sum + s.total_usd, 0);
+  const shiftReturnsUsd = isShiftOpen
+    ? returns.filter((r) => r.shift_id === activeShift!.id).reduce((sum, r) => sum + r.total_refunded_usd, 0)
+    : 0;
+  const openingUsd = isShiftOpen ? activeShift!.opening_amount_usd : 0;
+
+  const byMethod: Record<string, number> = { efectivo: 0, pago_movil: 0, tarjeta: 0, cashea: 0 };
+  for (const p of shiftSales.flatMap((s) => s.payments ?? [])) {
+    const usd = p.currency === 'USD' ? p.amount_applied : p.exchange_rate_snapshot > 0 ? p.amount_applied / p.exchange_rate_snapshot : 0;
+    byMethod[p.method] = (byMethod[p.method] ?? 0) + usd;
+  }
+  const methodRows = [
+    { key: 'efectivo', label: 'Efectivo', icon: Banknote },
+    { key: 'pago_movil', label: 'Pago Móvil', icon: Smartphone },
+    { key: 'tarjeta', label: 'Tarjeta', icon: CreditCard },
+    { key: 'cashea', label: 'Cashea', icon: Wallet },
+  ];
+  const usd = (n: number) => `$${n.toFixed(2)} USD`;
+  const firstName = me ? activeUser.name.split(' ')[0] : '';
 
   const handleStartSale = () => {
     if (!isShiftOpen) {
@@ -63,10 +86,10 @@ export function PosView01Dashboard() {
       {/* Saludo y Estado Principal */}
       <div>
         <h1 className="text-3xl font-extrabold text-[#111827]">
-          ¡Hola, {activeUser.name.split(' ')[0]}!
+          {firstName ? `¡Hola, ${firstName}!` : '¡Hola!'}
         </h1>
         <p className="mt-1 text-sm font-medium text-[#52635A]">
-          Todo listo para vender
+          {isShiftOpen ? 'Todo listo para vender' : 'Abre la caja para empezar a vender'}
         </p>
       </div>
 
@@ -155,7 +178,7 @@ export function PosView01Dashboard() {
           <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
             <span className="text-xs font-semibold text-[#52635A]">Productos vendidos</span>
             <div className="mt-2 text-2xl font-black text-[#111827]">
-              {totalUnitsSold > 0 ? totalUnitsSold : 34}
+              {totalUnitsSold}
             </div>
             <div className="mt-1 text-xs text-[#52635A]">Unidades</div>
           </div>
@@ -164,12 +187,9 @@ export function PosView01Dashboard() {
           <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
             <span className="text-xs font-semibold text-[#52635A]">Ticket promedio</span>
             <div className="mt-2 text-2xl font-black text-[#111827]">
-              ${averageTicketUsd > 0 ? averageTicketUsd.toFixed(2) : '104.16'}
+              ${averageTicketUsd.toFixed(2)}
             </div>
-            <div className="mt-1 flex items-center gap-1 text-xs font-bold text-[#1E6B4E]">
-              <TrendingUp className="h-3.5 w-3.5" />
-              <span>Vs. ayer +12%</span>
-            </div>
+            <div className="mt-1 text-xs text-[#52635A]">Por venta</div>
           </div>
         </div>
       </div>
@@ -211,23 +231,21 @@ export function PosView01Dashboard() {
                 <div className="flex justify-between text-[#52635A]">
                   <span>Saldo inicial</span>
                   <span className="font-bold text-[#111827]">
-                    ${activeShift ? activeShift.opening_amount_usd.toFixed(2) : '50.00'} USD
+                    {usd(openingUsd)}
                   </span>
                 </div>
                 <div className="flex justify-between text-[#52635A]">
                   <span>Ventas</span>
                   <div className="text-right">
-                    <span className="font-bold text-[#111827]">
-                      ${totalSalesUsd.toFixed(2)} USD
+                    <span className="font-bold text-[#111827]">{usd(shiftSalesUsd)}</span>
+                    <span className="ml-1 text-[10px]">
+                      ({shiftSales.length} {shiftSales.length === 1 ? 'venta' : 'ventas'})
                     </span>
-                    <span className="ml-1 text-[10px]">({totalSalesCount} ventas)</span>
                   </div>
                 </div>
                 <div className="flex justify-between text-[#52635A]">
                   <span>Devoluciones</span>
-                  <span className="font-bold text-[#B91C1C]">
-                    $0.00 USD
-                  </span>
+                  <span className="font-bold text-[#B91C1C]">{usd(shiftReturnsUsd)}</span>
                 </div>
               </div>
             </div>
@@ -236,7 +254,7 @@ export function PosView01Dashboard() {
             <div className="mt-6 flex items-center justify-between rounded-2xl border border-[#F5CBA7] bg-[#FDF2E2] p-4 text-[#111827]">
               <span className="text-sm font-bold">Total en caja</span>
               <span className="text-xl font-extrabold">
-                ${((activeShift?.opening_amount_usd ?? 50) + totalSalesUsd).toFixed(2)} USD
+                {usd(openingUsd + shiftSalesUsd - shiftReturnsUsd)}
               </span>
             </div>
           </div>
@@ -245,34 +263,16 @@ export function PosView01Dashboard() {
           <div className="rounded-3xl border border-[#E5E9E7] bg-white p-6 shadow-xs">
             <h3 className="text-sm font-bold text-[#111827]">Resumen por método de pago</h3>
             <div className="mt-4 space-y-3.5 text-xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 text-[#52635A]">
-                  <Banknote className="h-4 w-4 text-[#1E6B4E]" />
-                  <span>Efectivo</span>
+              {methodRows.map(({ key, label, icon: Icon }) => (
+                <div key={key} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2.5 text-[#52635A]">
+                    <Icon className="h-4 w-4 text-[#52635A]" />
+                    <span>{label}</span>
+                  </div>
+                  <span className="font-bold text-[#111827]">{usd(byMethod[key] ?? 0)}</span>
                 </div>
-                <span className="font-bold text-[#111827]">$350.00 USD</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 text-[#52635A]">
-                  <Smartphone className="h-4 w-4 text-[#C97857]" />
-                  <span>Pago Móvil</span>
-                </div>
-                <span className="font-bold text-[#111827]">$620.00 USD</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 text-[#52635A]">
-                  <CreditCard className="h-4 w-4 text-[#1E6B4E]" />
-                  <span>Tarjeta</span>
-                </div>
-                <span className="font-bold text-[#111827]">$280.00 USD</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 text-[#52635A]">
-                  <Building2 className="h-4 w-4 text-[#52635A]" />
-                  <span>Transferencia</span>
-                </div>
-                <span className="font-bold text-[#111827]">$100.00 USD</span>
-              </div>
+              ))}
+              {!isShiftOpen && <p className="pt-1 text-[11px] text-[#8A968F]">Sin turno abierto: los montos se muestran al abrir la caja.</p>}
             </div>
           </div>
         </div>

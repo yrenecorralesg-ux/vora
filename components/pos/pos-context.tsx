@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import type {
   PosBranch,
   PosRegister,
@@ -8,24 +8,71 @@ import type {
   PosProduct,
   PosCustomer,
   PosSale,
+  PosSaleReturn,
   PosCashMovement,
   PosSettings,
-  PosFiscalIntegration,
   PosPromotion,
   PosSalesRep,
   PosDispatchOrder,
   PosDispatchStatus,
 } from '@/lib/types';
-import {
-  MOCK_TENANT_ID,
-  MOCK_TENANT_SLUG,
-  MOCK_USERS,
-  MOCK_EXCHANGE_RATE,
-  type PosMockUser,
-} from '@/lib/pos-demo-data';
-import { posStore } from '@/lib/pos-service';
-import { getSupabaseClient } from '@/lib/supabase-client';
 import { getOfflineQueue, syncOfflineSales } from '@/lib/pos-offline';
+import {
+  apiError,
+  buildSalesBookCsv,
+  deriveDispatchOrders,
+  type PosMe,
+  type PosStaffUser,
+  type PosSupervisor,
+} from '@/lib/pos/client-utils';
+
+/** Marcadores mientras cargan sedes y cajas reales (no son datos de negocio). */
+const EMPTY_BRANCH: PosBranch = {
+  id: '',
+  tenant_id: '',
+  code: '',
+  name: 'Sin sede',
+  fiscal_address: null,
+  phone: null,
+  timezone: 'America/Caracas',
+  is_primary: false,
+  status: 'active',
+  created_at: '',
+  updated_at: '',
+};
+const EMPTY_REGISTER: PosRegister = {
+  id: '',
+  tenant_id: '',
+  branch_id: '',
+  code: '',
+  name: 'Sin caja',
+  status: 'active',
+  created_at: '',
+  updated_at: '',
+};
+const EMPTY_SETTINGS: PosSettings = {
+  id: '',
+  tenant_id: '',
+  branch_id: '',
+  active_methods: ['efectivo', 'pago_movil', 'tarjeta', 'cashea'],
+  max_cashier_discount_percent: 0,
+  allow_partial_payments: true,
+  cross_currency_change_enabled: true,
+  internal_doc_prefix: 'COMP-INT-',
+  next_internal_seq: 1,
+  next_sale_seq: 1,
+  active_exchange_rate: 0,
+  updated_by: null,
+  updated_at: '',
+};
+
+/** Aviso flotante del POS (ver pos-toaster.tsx). */
+export interface PosToast {
+  id: number;
+  title: string;
+  detail: string;
+  type: 'success' | 'alert' | 'critical';
+}
 
 export interface ParkedSale {
   id: string;
@@ -89,8 +136,10 @@ interface PosContextType {
   activeBranchId: string;
   setActiveBranchId: (id: string) => void;
   activeBranch: PosBranch;
-  activeUser: PosMockUser;
-  setActiveUserId: (id: string) => void;
+  /** Usuario de la sesión (Supabase Auth + membresía). */
+  activeUser: PosMe;
+  me: PosMe | null;
+  can: (permission: string) => boolean;
   activeRegisterId: string;
   setActiveRegisterId: (id: string) => void;
   activeRegister: PosRegister;
@@ -99,18 +148,25 @@ interface PosContextType {
   currentView: PosViewKey;
   navigateTo: (view: PosViewKey) => void;
 
-  // Operational State
+  // Operational State (Supabase es la fuente de verdad)
   activeShift: PosShift | null;
-  refreshActiveShift: () => void;
+  refreshActiveShift: () => Promise<void>;
   exchangeRate: number;
   settings: PosSettings;
+  reloadSettings: () => Promise<void>;
+  saveSettings: (patch: Record<string, unknown>) => Promise<{ ok: boolean; error?: string }>;
+  catalogSource: 'warehouse' | 'pos';
   branches: PosBranch[];
   registers: PosRegister[];
   products: PosProduct[];
   customers: PosCustomer[];
   sales: PosSale[];
+  returns: PosSaleReturn[];
   shifts: PosShift[];
   cashMovements: PosCashMovement[];
+  reloadSales: () => Promise<void>;
+  reloadReturns: () => Promise<void>;
+  reloadShifts: () => Promise<void>;
 
   // Cart & Active Sale
   cart: CartLine[];
@@ -123,6 +179,7 @@ interface PosContextType {
   setCartNotes: (notes: string) => void;
   selectedCustomer: PosCustomer | null;
   setSelectedCustomer: (cust: PosCustomer | null) => void;
+  /** Id de pos_authorizations (descuento autorizado por un supervisor). */
   discountAuthorizedBy: string | null;
   setDiscountAuthorizedBy: (id: string | null) => void;
 
@@ -139,6 +196,7 @@ interface PosContextType {
   // Connectivity & Offline
   isOnline: boolean;
   offlineQueueCount: number;
+  offlineRejectedCount: number;
   triggerSyncOfflineSales: () => Promise<void>;
 
   // Barcode quick scan
@@ -160,7 +218,7 @@ interface PosContextType {
   reloadCustomers: () => Promise<void>;
   stockPolicy: 'warn_and_allow' | 'strict_block' | 'allow_unrestricted';
 
-  // Nuevas capacidades diferenciadoras
+  // Asesores, promociones y pantalla de cliente
   salesReps: PosSalesRep[];
   promotions: PosPromotion[];
   selectedSalesRep: PosSalesRep | null;
@@ -168,41 +226,38 @@ interface PosContextType {
   isCustomerDisplayOpen: boolean;
   setIsCustomerDisplayOpen: (open: boolean) => void;
 
-  // Personal, Roles y Supervisión
-  staffUsers: PosMockUser[];
-  validateSupervisorPin: (pin: string) => boolean;
-  updateSupervisorConfig: (params: {
-    supervisorPin?: string;
-    maxCashierDiscountPercent?: number;
-    requirePinForReturns?: boolean;
-    requirePinForWithdrawals?: boolean;
-    requirePinForCancel?: boolean;
-    enforceBlindCount?: boolean;
-  }) => PosSettings;
-  addStaffUser: (user: Omit<PosMockUser, 'id'>) => PosMockUser;
-  createUser: (user: Omit<PosMockUser, 'id'>) => PosMockUser;
-  updateUser: (id: string, updates: Partial<PosMockUser>) => PosMockUser | null;
-  deleteUser: (id: string) => { ok: boolean; error?: string };
-  toggleStaffUser: (id: string) => boolean;
-  updateStaffPin: (id: string, newPin: string) => boolean;
+  // Personal y supervisión (usuarios reales; PIN validado en el servidor)
+  staffUsers: PosStaffUser[];
+  supervisors: PosSupervisor[];
+  reloadStaff: () => Promise<void>;
+  requestSupervisorAuthorization: (params: {
+    supervisorId: string;
+    pin: string;
+    operationType: 'discount_override' | 'sale_void' | 'sale_return' | 'cash_movement';
+    reason: string;
+    limitSnapshot?: Record<string, unknown>;
+  }) => Promise<{ ok: boolean; authorizationId?: string; approverName?: string | null; error?: string }>;
 
   // Comandas y Despacho KDS (pos_order_dispatch_kds)
   dispatchOrders: PosDispatchOrder[];
-  updateDispatchStatus: (orderId: string, status: PosDispatchStatus, preparedBy?: string) => boolean;
-  toggleDispatchItem: (orderId: string, itemSku: string) => boolean;
+  updateDispatchStatus: (orderId: string, status: PosDispatchStatus, preparedBy?: string) => Promise<boolean>;
+  toggleDispatchItem: (orderId: string, itemSku: string) => Promise<boolean>;
 
   // Exportación Contable SENIAT (pos_accounting_export)
   generateAccountingSalesBookCsv: (params?: { startDate?: string; endDate?: string }) => string;
 
   // Notification Toast Message (Pure Typography)
-  notification: { title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null;
+  /** Último aviso (compatibilidad); los avisos visibles están en toasts. */
+  notification: PosToast | null;
+  toasts: PosToast[];
+  dismissToast: (id: number) => void;
   showNotification: (title: string, detail: string, type?: 'success' | 'alert' | 'critical') => void;
   clearNotification: () => void;
 
   // Sedes, Cajas y Clientes
-  addBranch: (branch: Omit<PosBranch, 'id' | 'created_at' | 'updated_at'>) => PosBranch;
-  addRegister: (register: Omit<PosRegister, 'id' | 'created_at' | 'updated_at'>) => PosRegister;
-  addCustomer: (customer: Omit<PosCustomer, 'id' | 'tenant_id' | 'total_purchases_count' | 'total_purchases_usd' | 'last_purchase_at' | 'created_at' | 'updated_at'>) => Promise<PosCustomer>;
+  addBranch: (branch: Omit<PosBranch, 'id' | 'created_at' | 'updated_at'>) => Promise<PosBranch | null>;
+  addRegister: (register: Omit<PosRegister, 'id' | 'created_at' | 'updated_at'>) => Promise<PosRegister | null>;
+  addCustomer: (customer: Omit<PosCustomer, 'id' | 'tenant_id' | 'total_purchases_count' | 'total_purchases_usd' | 'last_purchase_at' | 'created_at' | 'updated_at'>) => Promise<PosCustomer | null>;
 }
 
 const PosContext = createContext<PosContextType | null>(null);
@@ -232,9 +287,9 @@ export function PosProvider({
   } | null;
 }) {
   const isSolee = (initialSlug || '').toLowerCase() === 'solee';
-  const [activeTenantSlug, setActiveTenantSlug] = useState<string>(initialSlug || MOCK_TENANT_SLUG);
+  const [activeTenantSlug, setActiveTenantSlug] = useState<string>(initialSlug);
   const [tenantName, setTenantName] = useState<string>(
-    initialTenant?.commercial_name || (isSolee ? 'SOLEÉ' : initialSlug || MOCK_TENANT_SLUG)
+    initialTenant?.commercial_name || (isSolee ? 'SOLEÉ' : initialSlug)
   );
   const [tenantCurrency, setTenantCurrency] = useState<string>(
     initialTenant?.currency || 'USD'
@@ -251,22 +306,31 @@ export function PosProvider({
     logoUrl: initialBranding?.logo_url || null,
     bannerUrl: initialBranding?.banner_url || null,
   });
-  const [activeBranchId, setActiveBranchId] = useState<string>('b0000000-0000-0000-0000-000000000001');
-  const [activeUserId, setActiveUserId] = useState<string>('u0000000-0000-0000-0000-000000000001');
-  const [activeRegisterId, setActiveRegisterId] = useState<string>('r0000000-0000-0000-0000-000000000001');
+  const [activeBranchId, setActiveBranchId] = useState<string>('');
+  const [activeRegisterId, setActiveRegisterId] = useState<string>('');
   const [currentView, setCurrentView] = useState<PosViewKey>('POS-01');
 
-  // Operational State synced from store
-  const [branches, setBranches] = useState<PosBranch[]>(posStore.branches);
-  const [registers, setRegisters] = useState<PosRegister[]>(posStore.registers);
-  const [customers, setCustomers] = useState<PosCustomer[]>(posStore.customers);
+  // Estado operativo: se carga desde la API (Supabase)
+  const [branches, setBranches] = useState<PosBranch[]>([]);
+  const [registers, setRegisters] = useState<PosRegister[]>([]);
+  const [customers, setCustomers] = useState<PosCustomer[]>([]);
   const [activeShift, setActiveShift] = useState<PosShift | null>(null);
+  const [sales, setSales] = useState<PosSale[]>([]);
+  const [returns, setReturns] = useState<PosSaleReturn[]>([]);
+  const [shifts, setShifts] = useState<PosShift[]>([]);
+  const [cashMovements, setCashMovements] = useState<PosCashMovement[]>([]);
+  const [settings, setSettings] = useState<PosSettings>(EMPTY_SETTINGS);
+  const [catalogSource, setCatalogSource] = useState<'warehouse' | 'pos'>('pos');
+  const [me, setMe] = useState<PosMe | null>(null);
+  const [staffUsers, setStaffUsers] = useState<PosStaffUser[]>([]);
+  const [supervisors, setSupervisors] = useState<PosSupervisor[]>([]);
   const [cart, setCart] = useState<CartLine[]>([]);
   const [cartNotes, setCartNotes] = useState<string>('');
-  const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(posStore.customers[0] ?? null);
+  const [selectedCustomer, setSelectedCustomer] = useState<PosCustomer | null>(null);
   const [discountAuthorizedBy, setDiscountAuthorizedBy] = useState<string | null>(null);
   const [lastConfirmedSale, setLastConfirmedSale] = useState<PosSale | null>(null);
-  const [notification, setNotification] = useState<{ title: string; detail: string; type: 'success' | 'alert' | 'critical' } | null>(null);
+  const [toasts, setToasts] = useState<PosToast[]>([]);
+  const notification = toasts[toasts.length - 1] ?? null;
 
   // Multiticket / Ventas en Espera
   const [parkedSales, setParkedSales] = useState<ParkedSale[]>([]);
@@ -274,16 +338,17 @@ export function PosProvider({
   // Conectividad & Offline
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [offlineQueueCount, setOfflineQueueCount] = useState<number>(0);
+  const [offlineRejectedCount, setOfflineRejectedCount] = useState<number>(0);
 
-  // Tasa de cambio BCV / API
-  const [exchangeRate, setExchangeRate] = useState<number>(posStore.settings.active_exchange_rate);
+  // Tasa de cambio BCV / API (guardada por empresa en el servidor)
+  const [exchangeRate, setExchangeRate] = useState<number>(0);
   const [isFetchingExchangeRate, setIsFetchingExchangeRate] = useState<boolean>(false);
 
   // Modularidad & Feature Flags configurables desde el Gestor VORA
   const [isModuleEnabled, setIsModuleEnabled] = useState<boolean>(true);
   const [isWarehouseEnabled, setIsWarehouseEnabled] = useState<boolean>(false);
-  const [stockPolicy, setStockPolicy] = useState<'warn_and_allow' | 'strict_block' | 'allow_unrestricted'>('warn_and_allow');
-  const [products, setProducts] = useState<PosProduct[]>(posStore.products);
+  const [stockPolicy, setStockPolicy] = useState<'warn_and_allow' | 'strict_block' | 'allow_unrestricted'>('strict_block');
+  const [products, setProducts] = useState<PosProduct[]>([]);
   const [posFeatures, setPosFeatures] = useState<Record<string, boolean>>({
     pos_sales: true,
     pos_shifts: true,
@@ -318,10 +383,8 @@ export function PosProvider({
   });
 
   // Estado nuevas capacidades
-  const [selectedSalesRep, setSelectedSalesRep] = useState<PosSalesRep | null>(posStore.salesReps[0] ?? null);
+  const [selectedSalesRep, setSelectedSalesRep] = useState<PosSalesRep | null>(null);
   const [isCustomerDisplayOpen, setIsCustomerDisplayOpen] = useState<boolean>(false);
-  const [staffUsers, setStaffUsers] = useState<PosMockUser[]>(posStore.users);
-  const [dispatchOrders, setDispatchOrders] = useState<PosDispatchOrder[]>(posStore.dispatchOrders);
 
   const isFuncActive = (funcKey: string): boolean => {
     if (!isModuleEnabled) return false;
@@ -329,16 +392,20 @@ export function PosProvider({
     return Boolean(posFeatures[funcKey]);
   };
 
+  const api = `/api/t/${activeTenantSlug}/pos`;
+  const getJson = async (path: string) => {
+    const res = await fetch(`${api}${path}`, { cache: 'no-store' });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) throw new Error(data?.error || `Error HTTP ${res.status}`);
+    return data;
+  };
+
   const reloadProducts = async () => {
     try {
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/products`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.products)) {
-          setProducts(data.products);
-          posStore.products = data.products;
-        }
-      }
+      const data = await getJson('/products');
+      setProducts(Array.isArray(data.products) ? data.products : []);
+      if (data.source === 'warehouse' || data.source === 'pos') setCatalogSource(data.source);
+      if (data.stock_policy) setStockPolicy(data.stock_policy);
     } catch (err) {
       console.warn('[pos-context] reloadProducts error:', err);
     }
@@ -346,17 +413,10 @@ export function PosProvider({
 
   const reloadBranches = async () => {
     try {
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/branches`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.branches) && data.branches.length > 0) {
-          setBranches(data.branches);
-          posStore.branches = data.branches;
-          if (!data.branches.some((b: PosBranch) => b.id === activeBranchId)) {
-            setActiveBranchId(data.branches[0].id);
-          }
-        }
-      }
+      const data = await getJson('/branches');
+      const list: PosBranch[] = Array.isArray(data.branches) ? data.branches : [];
+      setBranches(list);
+      if (list.length && !list.some((b) => b.id === activeBranchId)) setActiveBranchId(list[0].id);
     } catch (err) {
       console.warn('[pos-context] reloadBranches error:', err);
     }
@@ -364,17 +424,10 @@ export function PosProvider({
 
   const reloadRegisters = async () => {
     try {
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/registers`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.registers) && data.registers.length > 0) {
-          setRegisters(data.registers);
-          posStore.registers = data.registers;
-          if (!data.registers.some((r: PosRegister) => r.id === activeRegisterId)) {
-            setActiveRegisterId(data.registers[0].id);
-          }
-        }
-      }
+      const data = await getJson('/registers');
+      const list: PosRegister[] = Array.isArray(data.registers) ? data.registers : [];
+      setRegisters(list);
+      if (list.length && !list.some((r) => r.id === activeRegisterId)) setActiveRegisterId(list[0].id);
     } catch (err) {
       console.warn('[pos-context] reloadRegisters error:', err);
     }
@@ -382,17 +435,78 @@ export function PosProvider({
 
   const reloadCustomers = async () => {
     try {
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/customers`, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.ok && Array.isArray(data.customers) && data.customers.length > 0) {
-          setCustomers(data.customers);
-          posStore.customers = data.customers;
-          setSelectedCustomer((prev) => prev ?? data.customers[0]);
-        }
-      }
+      const data = await getJson('/customers');
+      const list: PosCustomer[] = Array.isArray(data.customers) ? data.customers : [];
+      setCustomers(list);
+      setSelectedCustomer((prev) => (prev ? list.find((c) => c.id === prev.id) ?? prev : list[0] ?? null));
     } catch (err) {
       console.warn('[pos-context] reloadCustomers error:', err);
+    }
+  };
+
+  const reloadSettings = async () => {
+    try {
+      const data = await getJson('/settings');
+      setSettings(data.settings);
+      setExchangeRate(Number(data.settings?.active_exchange_rate) || 0);
+      if (data.catalog_source) setCatalogSource(data.catalog_source);
+      if (data.stock_policy) setStockPolicy(data.stock_policy);
+    } catch (err) {
+      console.warn('[pos-context] reloadSettings error:', err);
+    }
+  };
+
+  const saveSettings = async (patch: Record<string, unknown>) => {
+    const res = await fetch(`${api}/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_settings', ...patch }),
+    });
+    if (!res.ok) return { ok: false, error: await apiError(res, 'No se pudo guardar la configuración.') };
+    const data = await res.json();
+    setSettings(data.settings);
+    setExchangeRate(Number(data.settings?.active_exchange_rate) || 0);
+    return { ok: true };
+  };
+
+  const reloadSales = async () => {
+    try {
+      const data = await getJson('/sales?limit=500');
+      setSales(Array.isArray(data.sales) ? data.sales : []);
+    } catch (err) {
+      console.warn('[pos-context] reloadSales error:', err);
+    }
+  };
+
+  const reloadReturns = async () => {
+    try {
+      const data = await getJson('/returns');
+      setReturns(Array.isArray(data.returns) ? data.returns : []);
+    } catch (err) {
+      console.warn('[pos-context] reloadReturns error:', err);
+    }
+  };
+
+  const reloadShifts = async () => {
+    try {
+      const q = activeRegisterId ? `?register_id=${encodeURIComponent(activeRegisterId)}` : '';
+      const data = await getJson(`/shifts${q}`);
+      setShifts(Array.isArray(data.shifts) ? data.shifts : []);
+      setActiveShift(data.active_shift ?? null);
+      setCashMovements(Array.isArray(data.movements) ? data.movements : []);
+    } catch (err) {
+      console.warn('[pos-context] reloadShifts error:', err);
+    }
+  };
+
+  const reloadStaff = async () => {
+    try {
+      const [users, sup] = await Promise.all([getJson('/users'), getJson('/authorizations')]);
+      setMe(users.me ?? null);
+      setStaffUsers(Array.isArray(users.users) ? users.users : []);
+      setSupervisors(Array.isArray(sup.supervisors) ? sup.supervisors : []);
+    } catch (err) {
+      console.warn('[pos-context] reloadStaff error:', err);
     }
   };
 
@@ -429,45 +543,20 @@ export function PosProvider({
 
   useEffect(() => {
     reloadTenantFeatures();
+    reloadSettings();
     reloadProducts();
     reloadBranches();
     reloadRegisters();
     reloadCustomers();
+    reloadStaff();
+    reloadSales();
+    reloadReturns();
   }, [activeTenantSlug]);
 
+  // Turno abierto de la caja seleccionada (siempre desde el servidor).
   useEffect(() => {
-    async function initSessionUser() {
-      try {
-        const supabase = getSupabaseClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const email = user.email || '';
-          const name = user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0] || 'Operador';
-          setStaffUsers((prev) => {
-            const existing = prev.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-            if (existing) {
-              setActiveUserId(existing.id);
-              return prev;
-            }
-            const authUserEntry: PosMockUser = {
-              id: user.id,
-              name,
-              email,
-              role: 'pos_store_admin',
-              assignedBranchId: activeBranchId,
-              pin: '0000',
-              is_active: true,
-            };
-            setActiveUserId(authUserEntry.id);
-            return [authUserEntry, ...prev];
-          });
-        }
-      } catch (err) {
-        console.warn('[pos-context] error loading session user', err);
-      }
-    }
-    initSessionUser();
-  }, []);
+    reloadShifts();
+  }, [activeTenantSlug, activeRegisterId]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -476,20 +565,9 @@ export function PosProvider({
       const online = navigator.onLine;
       setIsOnline(online);
       const queue = getOfflineQueue(activeTenantSlug);
-      setOfflineQueueCount(queue.length);
-
-      if (online && queue.length > 0) {
-        syncOfflineSales(activeTenantSlug).then((res) => {
-          setOfflineQueueCount(res.remainingCount);
-          if (res.syncedCount > 0) {
-            setNotification({
-              title: 'Sincronización Offline',
-              detail: `Se sincronizaron ${res.syncedCount} ventas guardadas localmente.`,
-              type: 'success',
-            });
-          }
-        });
-      }
+      setOfflineQueueCount(queue.filter((q) => !q.rejected).length);
+      setOfflineRejectedCount(queue.filter((q) => q.rejected).length);
+      if (online && queue.some((q) => !q.rejected)) triggerSyncOfflineSales();
     };
 
     updateOnlineStatus();
@@ -505,171 +583,123 @@ export function PosProvider({
   const triggerSyncOfflineSales = async () => {
     const res = await syncOfflineSales(activeTenantSlug);
     setOfflineQueueCount(res.remainingCount);
+    setOfflineRejectedCount(res.rejectedCount);
     if (res.syncedCount > 0) {
-      setNotification({
-        title: 'Ventas sincronizadas',
-        detail: `Se enviaron ${res.syncedCount} ventas pendientes al servidor.`,
-        type: 'success',
-      });
+      await Promise.all([reloadSales(), reloadShifts(), reloadProducts()]);
+      showNotification(
+        'Ventas sincronizadas',
+        `Se enviaron ${res.syncedCount} ventas pendientes al servidor.`,
+        'success',
+      );
+    }
+    if (res.newlyRejected > 0) {
+      showNotification(
+        'Ventas rechazadas al sincronizar',
+        `${res.newlyRejected} venta(s) guardadas sin conexión fueron rechazadas por el servidor. Revísalas en el historial de la cola.`,
+        'critical',
+      );
     }
   };
 
-  const addBranch = (data: Omit<PosBranch, 'id' | 'created_at' | 'updated_at'>): PosBranch => {
-    const tempId = `b-${Date.now()}`;
-    const newBranch: PosBranch = {
-      ...data,
-      id: tempId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    posStore.addBranch(newBranch);
-    setBranches([...posStore.branches]);
-
-    fetch(`/api/t/${activeTenantSlug}/pos/branches`, {
+  const postJson = async (path: string, body: unknown) => {
+    const res = await fetch(`${api}${path}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-      .then((res) => res.json())
-      .then((resData) => {
-        if (resData.ok && resData.branch) {
-          setBranches((prev) =>
-            prev.map((b) => (b.id === tempId ? (resData.branch as PosBranch) : b)),
-          );
-        }
-      })
-      .catch((err) => console.warn('[pos-context] addBranch async error:', err));
-
-    return newBranch;
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) throw new Error(data?.error || `Error HTTP ${res.status}`);
+    return data;
   };
 
-  const addRegister = (data: Omit<PosRegister, 'id' | 'created_at' | 'updated_at'>): PosRegister => {
-    const tempId = `r-${Date.now()}`;
-    const newReg: PosRegister = {
-      ...data,
-      id: tempId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    posStore.addRegister(newReg);
-    setRegisters([...posStore.registers]);
-
-    fetch(`/api/t/${activeTenantSlug}/pos/registers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-      .then((res) => res.json())
-      .then((resData) => {
-        if (resData.ok && resData.register) {
-          setRegisters((prev) =>
-            prev.map((r) => (r.id === tempId ? (resData.register as PosRegister) : r)),
-          );
-        }
-      })
-      .catch((err) => console.warn('[pos-context] addRegister async error:', err));
-
-    return newReg;
-  };
-
-  const addCustomer = async (data: Omit<PosCustomer, 'id' | 'tenant_id' | 'total_purchases_count' | 'total_purchases_usd' | 'last_purchase_at' | 'created_at' | 'updated_at'>): Promise<PosCustomer> => {
-    const tempId = `c-${Date.now()}`;
-    const newCust: PosCustomer = {
-      ...data,
-      id: tempId,
-      tenant_id: activeBranch.tenant_id,
-      total_purchases_count: 0,
-      total_purchases_usd: 0,
-      last_purchase_at: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    posStore.customers.unshift(newCust);
-    setCustomers([...posStore.customers]);
-
+  const addBranch = async (data: Omit<PosBranch, 'id' | 'created_at' | 'updated_at'>): Promise<PosBranch | null> => {
     try {
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/customers`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        const resData = await res.json();
-        if (resData.ok && resData.customer) {
-          setCustomers((prev) =>
-            prev.map((c) => (c.id === tempId ? (resData.customer as PosCustomer) : c)),
-          );
-          return resData.customer;
-        }
-      }
+      const res = await postJson('/branches', data);
+      await reloadBranches();
+      return res.branch as PosBranch;
     } catch (err) {
-      console.warn('[pos-context] addCustomer async error:', err);
+      showNotification('No se pudo crear la sede', (err as Error).message, 'critical');
+      return null;
     }
-    return newCust;
   };
 
-  const activeBranch = branches.find((b) => b.id === activeBranchId) ?? branches[0] ?? posStore.branches[0];
-  const activeUser = staffUsers.find((u) => u.id === activeUserId) ?? staffUsers[0] ?? MOCK_USERS[0];
-  const activeRegister = registers.find((r) => r.id === activeRegisterId) ?? registers[0] ?? posStore.registers[0];
-
-  const refreshActiveShift = () => {
-    const shift = posStore.getOpenShift(activeRegisterId);
-    setActiveShift(shift ?? null);
+  const addRegister = async (data: Omit<PosRegister, 'id' | 'created_at' | 'updated_at'>): Promise<PosRegister | null> => {
+    try {
+      const res = await postJson('/registers', data);
+      await reloadRegisters();
+      return res.register as PosRegister;
+    } catch (err) {
+      showNotification('No se pudo crear la caja', (err as Error).message, 'critical');
+      return null;
+    }
   };
 
-  useEffect(() => {
-    refreshActiveShift();
-  }, [activeRegisterId]);
+  const addCustomer = async (
+    data: Omit<PosCustomer, 'id' | 'tenant_id' | 'total_purchases_count' | 'total_purchases_usd' | 'last_purchase_at' | 'created_at' | 'updated_at'>,
+  ): Promise<PosCustomer | null> => {
+    try {
+      const res = await postJson('/customers', data);
+      const created = res.customer as PosCustomer;
+      setCustomers((prev) => [created, ...prev.filter((c) => c.id !== created.id)]);
+      return created;
+    } catch (err) {
+      showNotification('No se pudo registrar el cliente', (err as Error).message, 'critical');
+      return null;
+    }
+  };
 
+  const activeBranch = branches.find((b) => b.id === activeBranchId) ?? branches[0] ?? EMPTY_BRANCH;
+  const activeRegister = registers.find((r) => r.id === activeRegisterId) ?? registers[0] ?? EMPTY_REGISTER;
+  const activeUser: PosMe = me ?? {
+    id: '',
+    name: 'Cargando…',
+    email: null,
+    role: '',
+    has_pin: false,
+    can_approve: false,
+    permissions: {},
+  };
+  const can = (permission: string) =>
+    Boolean(me && (me.role === 'tenant_admin' || me.role === 'super_admin' || me.permissions[permission]));
+
+  const refreshActiveShift = async () => {
+    await reloadShifts();
+  };
+
+  // Se apilan como máximo 4 avisos; un aviso idéntico al último no se repite.
   const showNotification = (title: string, detail: string, type: 'success' | 'alert' | 'critical' = 'success') => {
-    setNotification({ title, detail, type });
+    setToasts((prev) => {
+      const last = prev[prev.length - 1];
+      if (last && last.title === title && last.detail === detail && last.type === type) return prev;
+      return [...prev, { id: Date.now() + Math.random(), title, detail, type }].slice(-4);
+    });
   };
 
-  const clearNotification = () => setNotification(null);
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
+  const clearNotification = () => setToasts([]);
+
+  /**
+   * El servidor consulta la API de tasa y guarda el valor de la empresa; con
+   * customUrl (solo administradores) cambia además la API configurada.
+   */
   const refreshExchangeRate = async (customUrl?: string): Promise<{ ok: boolean; rate?: number; error?: string }> => {
     setIsFetchingExchangeRate(true);
     try {
-      const urlParam = customUrl ? `?url=${encodeURIComponent(customUrl)}` : '';
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/exchange-rate${urlParam}`, {
-        cache: 'no-store',
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || 'Error al consultar la tasa oficial');
-      }
-
+      const data = await postJson('/exchange-rate', { action: 'refresh', ...(customUrl ? { url: customUrl } : {}) });
       const newRate = Number(data.rate);
-      posStore.settings.active_exchange_rate = newRate;
-      posStore.settings.last_exchange_rate_fetch = data.timestamp || new Date().toISOString();
-      if (data.source) {
-        posStore.settings.exchange_rate_source = data.source;
-      }
-      if (customUrl) {
-        posStore.settings.exchange_rate_api_url = customUrl;
-      }
       setExchangeRate(newRate);
-
-      // Sincronizar en segundo plano
-      fetch(`/api/t/${activeTenantSlug}/pos/exchange-rate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rate: newRate,
-          source: data.source,
-          url: customUrl || posStore.settings.exchange_rate_api_url,
-          auto_fetch: posStore.settings.auto_fetch_exchange_rate,
-        }),
-      }).catch(() => {});
-
+      if (data.settings) setSettings(data.settings);
       showNotification(
         'Tasa BCV sincronizada',
-        `Tasa oficial actualizada: ${newRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} VES/USD (${data.source || 'dolarapi'}).`,
+        `Tasa oficial actualizada: ${newRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} VES/USD (${data.source || 'API'}).`,
         'success',
       );
       return { ok: true, rate: newRate };
-    } catch (err: any) {
-      const msg = err.message || 'No se pudo conectar con la API de tasa';
+    } catch (err) {
+      const msg = (err as Error).message || 'No se pudo conectar con la API de tasa';
       showNotification('Error al sincronizar tasa', msg, 'critical');
       return { ok: false, error: msg };
     } finally {
@@ -677,103 +707,81 @@ export function PosProvider({
     }
   };
 
-  // Auto-sincronización de tasa BCV al inicializar
+  // Auto-sincronización de tasa al abrir el POS (si la empresa la tiene activa).
   useEffect(() => {
-    if (posStore.settings.auto_fetch_exchange_rate !== false) {
+    if (settings.tenant_id && settings.auto_fetch_exchange_rate !== false) {
       refreshExchangeRate();
     }
-  }, []);
+    // Solo una vez por carga de configuración de la empresa.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settings.tenant_id]);
 
-  // Supervisor & Staff Management
-  const updateSupervisorConfig = (params: {
-    supervisorPin?: string;
-    maxCashierDiscountPercent?: number;
-    requirePinForReturns?: boolean;
-    requirePinForWithdrawals?: boolean;
-    requirePinForCancel?: boolean;
-    enforceBlindCount?: boolean;
-  }) => {
-    const updated = posStore.updateSupervisorConfig(params);
-    showNotification('Supervisión actualizada', 'Políticas y parámetros de control guardados con éxito.', 'success');
-    return updated;
-  };
-
-  const validateSupervisorPin = (pin: string): boolean => {
-    return posStore.validateSupervisorPin(pin);
-  };
-
-  const addStaffUser = (user: Omit<PosMockUser, 'id'>) => {
-    const created = posStore.addStaffUser(user);
-    setStaffUsers([...posStore.users]);
-    showNotification('Usuario creado', `Se ha registrado al usuario ${created.name} con éxito.`, 'success');
-    return created;
-  };
-
-  const toggleStaffUser = (id: string) => {
-    const ok = posStore.toggleStaffUser(id);
-    if (ok) {
-      setStaffUsers([...posStore.users]);
-      showNotification('Estado actualizado', 'Estatus de activación del usuario modificado.', 'success');
+  const requestSupervisorAuthorization: PosContextType['requestSupervisorAuthorization'] = async (params) => {
+    try {
+      const data = await postJson('/authorizations', {
+        supervisorId: params.supervisorId,
+        pin: params.pin,
+        operationType: params.operationType,
+        reason: params.reason,
+        limitSnapshot: params.limitSnapshot ?? {},
+        shiftId: activeShift?.id ?? null,
+        branchId: activeBranch.id || null,
+      });
+      return {
+        ok: true,
+        authorizationId: data.authorization.id as string,
+        approverName: data.authorization.approver_name_snapshot as string | null,
+      };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
     }
+  };
+
+  const dispatchOrders = useMemo(() => deriveDispatchOrders(sales), [sales]);
+
+  const updateDispatch = async (orderId: string, body: Record<string, unknown>) => {
+    try {
+      const data = await postJson(`/sales/${orderId}`, { action: 'dispatch', ...body });
+      setSales((prev) =>
+        prev.map((s) =>
+          s.id === orderId
+            ? ({ ...s, metadata: { ...((s as any).metadata ?? {}), dispatch: data.dispatch } } as PosSale)
+            : s,
+        ),
+      );
+      return true;
+    } catch (err) {
+      showNotification('No se pudo actualizar la comanda', (err as Error).message, 'critical');
+      return false;
+    }
+  };
+
+  const updateDispatchStatus = async (orderId: string, status: PosDispatchStatus, preparedBy?: string) => {
+    const ok = await updateDispatch(orderId, { status, prepared_by: preparedBy });
+    if (ok) showNotification('Comanda actualizada', `Pedido marcado como "${status}".`, 'success');
     return ok;
   };
 
-  const updateStaffPin = (id: string, newPin: string) => {
-    const ok = posStore.updateStaffPin(id, newPin);
-    if (ok) {
-      setStaffUsers([...posStore.users]);
-      showNotification('PIN actualizado', 'La clave PIN del usuario ha sido modificada.', 'success');
-    }
-    return ok;
-  };
+  const toggleDispatchItem = (orderId: string, itemSku: string) => updateDispatch(orderId, { toggle_sku: itemSku });
 
-  const createUser = (user: Omit<PosMockUser, 'id'>) => {
-    const created = posStore.createUser(user);
-    setStaffUsers([...posStore.users]);
-    showNotification('Usuario Creado', `Usuario ${created.name} registrado con éxito en el sistema.`, 'success');
-    return created;
-  };
+  const generateAccountingSalesBookCsv = (params?: { startDate?: string; endDate?: string }): string =>
+    buildSalesBookCsv(sales, params);
 
-  const updateUser = (id: string, updates: Partial<PosMockUser>) => {
-    const updated = posStore.updateUser(id, updates);
-    if (updated) {
-      setStaffUsers([...posStore.users]);
-      showNotification('Usuario Actualizado', `Datos del usuario ${updated.name} guardados.`, 'success');
-    }
-    return updated;
-  };
-
-  const deleteUser = (id: string) => {
-    const res = posStore.deleteUser(id);
-    if (res.ok) {
-      setStaffUsers([...posStore.users]);
-      showNotification('Usuario Eliminado', 'El usuario fue eliminado del personal de esta sede.', 'alert');
-    } else {
-      showNotification('Error al eliminar', res.error || 'No se pudo eliminar el usuario.', 'critical');
-    }
-    return res;
-  };
-
-  const updateDispatchStatus = (orderId: string, status: PosDispatchStatus, preparedBy?: string) => {
-    const ok = posStore.updateDispatchStatus(orderId, status, preparedBy);
-    if (ok) {
-      setDispatchOrders([...posStore.dispatchOrders]);
-      showNotification('Comanda actualizada', `Pedido ${orderId} marcado como "${status}".`, 'success');
-    }
-    return ok;
-  };
-
-  const toggleDispatchItem = (orderId: string, itemSku: string) => {
-    const ok = posStore.toggleDispatchItem(orderId, itemSku);
-    if (ok) {
-      setDispatchOrders([...posStore.dispatchOrders]);
-    }
-    return ok;
-  };
-
-  const generateAccountingSalesBookCsv = (params?: { startDate?: string; endDate?: string }): string => {
-    return posStore.generateAccountingSalesBookCsv(params);
-  };
+  // Asesores de venta = usuarios reales con rol de asesor.
+  const salesReps: PosSalesRep[] = useMemo(
+    () =>
+      staffUsers
+        .filter((u) => u.role === 'pos_sales_rep' && u.is_active)
+        .map((u) => ({
+          id: u.id,
+          name: u.name,
+          code: (u.email ?? u.name).split('@')[0].toUpperCase().slice(0, 12),
+          commission_rate_percent: 0,
+          is_active: true,
+        })),
+    [staffUsers],
+  );
+  const promotions: PosPromotion[] = [];
 
   // Cart operations
   const addToCart = (product: PosProduct, quantity = 1) => {
@@ -959,7 +967,7 @@ export function PosProvider({
 
     setParkedSales((prev) => [newParked, ...prev]);
     clearCart();
-    setSelectedCustomer(posStore.customers[0] ?? null);
+    setSelectedCustomer(customers[0] ?? null);
     showNotification(
       'Venta en espera',
       `Carrito pausado (#${newParked.id.slice(-4)}). Puede atender al siguiente cliente.`,
@@ -1102,7 +1110,8 @@ export function PosProvider({
         setActiveBranchId,
         activeBranch,
         activeUser,
-        setActiveUserId,
+        me,
+        can,
         activeRegisterId,
         setActiveRegisterId,
         activeRegister,
@@ -1113,7 +1122,10 @@ export function PosProvider({
         exchangeRate,
         refreshExchangeRate,
         isFetchingExchangeRate,
-        settings: posStore.settings,
+        settings,
+        reloadSettings,
+        saveSettings,
+        catalogSource,
         branches,
         registers,
         addBranch,
@@ -1126,9 +1138,13 @@ export function PosProvider({
         reloadCustomers,
         stockPolicy,
         customers,
-        sales: posStore.sales,
-        shifts: posStore.shifts,
-        cashMovements: posStore.cashMovements,
+        sales,
+        returns,
+        shifts,
+        cashMovements,
+        reloadSales,
+        reloadReturns,
+        reloadShifts,
         cart,
         addToCart,
         updateCartQuantity,
@@ -1144,6 +1160,8 @@ export function PosProvider({
         lastConfirmedSale,
         setLastConfirmedSale,
         notification,
+        toasts,
+        dismissToast,
         showNotification,
         clearNotification,
         parkedSales,
@@ -1152,6 +1170,7 @@ export function PosProvider({
         deleteParkedSale,
         isOnline,
         offlineQueueCount,
+        offlineRejectedCount,
         triggerSyncOfflineSales,
         scanBarcode,
         isModuleEnabled,
@@ -1159,21 +1178,16 @@ export function PosProvider({
         posFeatures,
         isFuncActive,
         reloadTenantFeatures,
-        salesReps: posStore.salesReps,
-        promotions: posStore.promotions,
+        salesReps,
+        promotions,
         selectedSalesRep,
         setSelectedSalesRep,
         isCustomerDisplayOpen,
         setIsCustomerDisplayOpen,
         staffUsers,
-        validateSupervisorPin,
-        updateSupervisorConfig,
-        addStaffUser,
-        createUser,
-        updateUser,
-        deleteUser,
-        toggleStaffUser,
-        updateStaffPin,
+        supervisors,
+        reloadStaff,
+        requestSupervisorAuthorization,
         dispatchOrders,
         updateDispatchStatus,
         toggleDispatchItem,

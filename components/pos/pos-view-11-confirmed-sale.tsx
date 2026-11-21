@@ -3,10 +3,9 @@
 import React, { useState } from 'react';
 import { CheckCircle2, FileText, ArrowRight, RefreshCw, Send, Tag, Wallet, UserCheck } from 'lucide-react';
 import { usePos } from './pos-context';
-import { posStore } from '@/lib/pos-service';
 
 export function PosView11ConfirmedSale() {
-  const { lastConfirmedSale, navigateTo, showNotification, isFuncActive, activeUser } = usePos();
+  const { lastConfirmedSale, navigateTo, showNotification, isFuncActive, activeUser, activeTenantSlug } = usePos();
   const [replayNotice, setReplayNotice] = useState<string | null>(null);
 
   if (!lastConfirmedSale) {
@@ -18,21 +17,35 @@ export function PosView11ConfirmedSale() {
   }
 
   // Prueba Técnica de Idempotencia: Simular doble clic concurrente
-  const handleSimulateIdempotentReplay = () => {
-    const res = posStore.confirmSale({
-      branchId: lastConfirmedSale.branch_id,
-      shiftId: lastConfirmedSale.shift_id,
-      registerId: lastConfirmedSale.register_id,
-      cashierUserId: lastConfirmedSale.cashier_user_id,
-      customerId: lastConfirmedSale.customer_id ?? undefined,
-      correlationId: `recheck-${Date.now()}`,
-      idempotencyKey: lastConfirmedSale.idempotency_key,
-      lines: [],
-      payments: [],
-      notes: lastConfirmedSale.notes ?? undefined,
-    });
+  // Reenvía la misma clave de idempotencia al servidor: debe devolver la misma venta.
+  const handleSimulateIdempotentReplay = async () => {
+    let res: { ok?: boolean; idempotent_replay?: boolean; error?: string } | null = null;
+    try {
+      const response = await fetch(`/api/t/${activeTenantSlug}/pos/sales`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          idempotency_key: lastConfirmedSale.idempotency_key,
+          shift_id: lastConfirmedSale.shift_id,
+          customer_id: lastConfirmedSale.customer_id,
+          lines: (lastConfirmedSale.lines ?? []).map((l) => ({
+            productId: l.product_id,
+            quantity: l.quantity,
+            discountPercent: l.discount_percent,
+          })),
+          payments: [],
+        }),
+      });
+      res = await response.json().catch(() => null);
+    } catch {
+      res = { ok: false, error: 'Sin conexión con el servidor.' };
+    }
 
-    if (res.ok && res.idempotentReplay) {
+    if (!res?.ok || !res.idempotent_replay) {
+      showNotification('Idempotencia', res?.error ?? 'El servidor no reconoció la venta como repetida.', 'critical');
+      return;
+    }
+    {
       setReplayNotice(
         `Idempotencia exitosa comprobada: El backend reconoció la llave "${lastConfirmedSale.idempotency_key}" y devolvió la venta ${lastConfirmedSale.sale_number} sin duplicar cobros ni existencias.`,
       );

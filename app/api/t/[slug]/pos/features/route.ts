@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { CRM_MODULES_CATALOG } from '@/lib/modules-config';
 import { authorizeTenantApi } from '@/lib/tenant-api-auth';
+import { loadPosConfig } from '@/lib/pos/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -24,36 +25,7 @@ export async function GET(
       .maybeSingle();
 
     if (!tenant) {
-      // Fallback demo/mock si no existe tenant en BD
-      return NextResponse.json({
-        ok: true,
-        tenant_id: null,
-        tenant_name: 'VORA POS',
-        country: 'VE',
-        currency: 'USD',
-        branding: null,
-        is_module_enabled: true,
-        functions: {
-          pos_sales: true,
-          pos_shifts: true,
-          pos_payments: true,
-          pos_cashea: true,
-          pos_fiscal: true,
-          pos_fiscal_reports: true,
-          pos_c2p_debit: true,
-          pos_multiticket: true,
-          pos_scanner: true,
-          pos_thermal_print: true,
-          pos_blind_reconciliation: true,
-          pos_exchange_rate_api: true,
-          pos_returns: true,
-          pos_authorizations: true,
-          pos_documents: true,
-          pos_kardex: true,
-          pos_settings: true,
-          pos_reports: true,
-        },
-      });
+      return NextResponse.json({ ok: false, error: 'Empresa no encontrada.' }, { status: 404 });
     }
 
     // 2. Consultar tenant_features
@@ -75,8 +47,9 @@ export async function GET(
     // Warehouse activo: el menú "Inventario" del POS abre el módulo en lugar de la vista demo.
     const whFeature = (tfRows || []).find((f) => f.feature_key === 'warehouse.inventory');
     const isWarehouseEnabled = Boolean(whFeature?.enabled);
-    const whConfig = (whFeature?.config as Record<string, any>) || {};
-    const stockPolicy = whConfig.pos_stock_policy || 'warn_and_allow';
+    // Política efectiva y origen del catálogo (misma regla que aplica el servidor al vender).
+    const posConfig = await loadPosConfig(supabase, tenant.id);
+    const stockPolicy = posConfig.stockPolicy;
 
     const tenantFuncs = posFeature?.config?.functions || {};
     const finalFunctions = { ...defaultFuncs, ...tenantFuncs };
@@ -95,6 +68,7 @@ export async function GET(
       is_module_enabled: isModuleEnabled,
       is_warehouse_enabled: isWarehouseEnabled,
       stock_policy: stockPolicy,
+      catalog_source: posConfig.catalogSource,
       functions: finalFunctions,
     });
   } catch (err: any) {

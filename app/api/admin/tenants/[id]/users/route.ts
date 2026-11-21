@@ -10,17 +10,37 @@ const createUserSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres').max(100),
   name: z.string().trim().min(1, 'El nombre es obligatorio').max(150),
   role: z.enum([
-    'owner',
     'tenant_admin',
     'pos_store_admin',
     'pos_supervisor',
     'pos_cashier',
     'pos_sales_rep',
-    'warehouse_manager',
-    'warehouse_operator',
+    'pos_auditor',
+    'wh_manager',
+    'wh_supervisor',
+    'wh_clerk',
+    'wh_scanner',
+    'wh_auditor',
     'member',
   ]),
 });
+
+/** Busca una cuenta de Supabase Auth por correo recorriendo todas las páginas. */
+async function findAuthUserByEmail(
+  service: ReturnType<typeof getSupabaseServiceClient>,
+  emailLower: string,
+) {
+  const perPage = 1000;
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(`No se pudo consultar usuarios: ${error.message}`);
+    const users = data?.users ?? [];
+    const match = users.find((u) => u.email?.toLowerCase() === emailLower);
+    if (match) return match;
+    if (users.length < perPage) return null;
+  }
+  return null;
+}
 
 export async function POST(
   req: Request,
@@ -61,21 +81,20 @@ export async function POST(
 
   // 2. Crear o resolver usuario en Supabase Auth
   let authUserId: string;
+  let reusedExistingAccount = false;
 
-  const { data: existingUsers } = await service.auth.admin.listUsers();
-  const existing = existingUsers?.users?.find(
-    (u) => u.email?.toLowerCase() === emailLower,
-  );
+  let existing: Awaited<ReturnType<typeof findAuthUserByEmail>>;
+  try {
+    existing = await findAuthUserByEmail(service, emailLower);
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 500 });
+  }
 
   if (existing) {
+    // La cuenta ya existe (puede pertenecer a otra empresa o a Venesoft): solo
+    // se vincula. Nunca se cambia su contraseña ni sus datos desde aquí.
     authUserId = existing.id;
-    // Actualizar contraseña si se proporcionó una nueva
-    if (password) {
-      await service.auth.admin.updateUserById(authUserId, {
-        password,
-        user_metadata: { full_name: name, commercial_name: tenant.commercial_name },
-      });
-    }
+    reusedExistingAccount = true;
   } else {
     const { data: createdAuth, error: createAuthErr } = await service.auth.admin.createUser({
       email: emailLower,
@@ -128,6 +147,7 @@ export async function POST(
       role,
       auth_user_id: authUserId,
       tenant_slug: tenant.slug,
+      reused_existing_account: reusedExistingAccount,
     },
   });
 
@@ -142,6 +162,9 @@ export async function POST(
       status: 'active',
       created_at: membership.created_at,
     },
-    message: `Usuario ${name} (${emailLower}) asignado con rol ${role} exitosamente.`,
+    reused_existing_account: reusedExistingAccount,
+    message: reusedExistingAccount
+      ? `La cuenta ${emailLower} ya existía: se asignó con rol ${role} y conserva su contraseña actual.`
+      : `Usuario ${name} (${emailLower}) asignado con rol ${role} exitosamente.`,
   });
 }

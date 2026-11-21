@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { Search, FileText, RotateCcw, ArrowLeft, Filter, DollarSign, CheckCircle2, AlertCircle, X, Download } from 'lucide-react';
 import { usePos } from './pos-context';
-import { posStore } from '@/lib/pos-service';
 import type { PosSale } from '@/lib/types';
 
 export function PosView13History() {
@@ -19,6 +18,9 @@ export function PosView13History() {
     showNotification,
     isFuncActive,
     generateAccountingSalesBookCsv,
+    activeTenantSlug,
+    reloadSales,
+    refreshActiveShift,
   } = usePos();
 
   const [selectedRegister, setSelectedRegister] = useState<string>('all');
@@ -392,34 +394,47 @@ export function PosView13History() {
             </div>
 
             <form
-              onSubmit={(e) => {
+              onSubmit={async (e) => {
                 e.preventDefault();
                 const amount = Number(paymentAmountUsd);
                 if (isNaN(amount) || amount <= 0) {
                   showNotification('Monto inválido', 'Ingrese un monto mayor a cero.', 'alert');
                   return;
                 }
-                const currentShiftId = activeShift?.id ?? debtSale.shift_id;
-                const res = posStore.recordDebtPayment({
-                  saleId: debtSale.id,
-                  shiftId: currentShiftId,
-                  amountUsd: amount,
-                  amountVes: Number((amount * debtSale.exchange_rate_snapshot).toFixed(2)),
-                  paymentMethod: debtPayMethod,
-                  reference: debtRef || undefined,
-                  notes: debtNotes,
-                  performedBy: activeUser.id,
-                });
-                if (res.ok) {
+                if (!activeShift) {
+                  showNotification('Turno cerrado', 'Abra un turno de caja para registrar abonos.', 'alert');
+                  return;
+                }
+                let res: { ok?: boolean; error?: string; sale?: { balance_due_usd: number } } | null = null;
+                try {
+                  const response = await fetch(`/api/t/${activeTenantSlug}/pos/sales/${debtSale.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      action: 'debt_payment',
+                      shift_id: activeShift.id,
+                      method: debtPayMethod,
+                      currency: 'USD',
+                      amount,
+                      reference_number: debtRef || undefined,
+                      idempotency_key: `abono-${debtSale.id}-${Date.now()}`,
+                    }),
+                  });
+                  res = await response.json().catch(() => null);
+                } catch {
+                  res = { ok: false, error: 'Sin conexión con el servidor.' };
+                }
+                if (res?.ok) {
                   showNotification(
                     'Abono Registrado',
-                    `Abono de $${amount.toFixed(2)} USD procesado con éxito. Saldo restante: $${res.sale?.balance_due_usd.toFixed(2)} USD.`,
+                    `Abono de ${amount.toFixed(2)} USD registrado. Saldo restante: ${Number(res.sale?.balance_due_usd ?? 0).toFixed(2)} USD.`,
                     'success',
                   );
                   setDebtSale(null);
                   setPaymentAmountUsd('');
+                  await Promise.all([reloadSales(), refreshActiveShift()]);
                 } else {
-                  showNotification('Error', res.error || 'Error al procesar abono.', 'critical');
+                  showNotification('Error', res?.error || 'Error al procesar abono.', 'critical');
                 }
               }}
               className="mt-4 space-y-3 text-xs"

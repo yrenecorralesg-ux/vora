@@ -23,7 +23,6 @@ import {
 } from 'lucide-react';
 import { usePos } from './pos-context';
 import type { PosProduct } from '@/lib/types';
-import { MOCK_USERS } from '@/lib/pos-demo-data';
 import { connectScaleWebSerial } from '@/lib/pos-hardware';
 
 export function PosView0304SaleCart() {
@@ -53,8 +52,9 @@ export function PosView0304SaleCart() {
     scanBarcode,
     isFuncActive,
     promotions,
-    staffUsers,
-    validateSupervisorPin,
+    supervisors,
+    requestSupervisorAuthorization,
+    can,
     activeTenantSlug,
     reloadProducts,
     tenantBranding,
@@ -76,9 +76,11 @@ export function PosView0304SaleCart() {
   const [showSupervisorModal, setShowSupervisorModal] = useState(false);
   const [supervisorIndex, setSupervisorIndex] = useState<number | null>(null);
   const [requestedDiscountPercent, setRequestedDiscountPercent] = useState<number>(0);
-  const [supervisorId, setSupervisorId] = useState(MOCK_USERS[2].id);
+  const discountApprovers = supervisors.filter((s) => s.permissions.includes('pos.sales.discount.override'));
+  const [supervisorId, setSupervisorId] = useState('');
+  const [approving, setApproving] = useState(false);
   const [supervisorPin, setSupervisorPin] = useState('');
-  const [supervisorReason, setSupervisorReason] = useState('Campaña de fidelización autorizada en mostrador');
+  const [supervisorReason, setSupervisorReason] = useState('');
   const [supervisorError, setSupervisorError] = useState<string | null>(null);
 
   // Modal de Pesaje en Balanza (pos_scale_weighing)
@@ -110,7 +112,8 @@ export function PosView0304SaleCart() {
   const [newProdName, setNewProdName] = useState('');
   const [newProdBarcode, setNewProdBarcode] = useState('');
   const [newProdPrice, setNewProdPrice] = useState('');
-  const [newProdStock, setNewProdStock] = useState('10');
+  const [newProdStock, setNewProdStock] = useState('0');
+  const [newProdCost, setNewProdCost] = useState('');
   const [newProdCategory, setNewProdCategory] = useState('General');
   const [newProdIsService, setNewProdIsService] = useState(false);
   const [creatingProduct, setCreatingProduct] = useState(false);
@@ -131,6 +134,7 @@ export function PosView0304SaleCart() {
           barcode: newProdBarcode.trim() || undefined,
           price_usd: Number(newProdPrice) || 0,
           initial_stock: Number(newProdStock) || 0,
+          unit_cost: newProdCost.trim() === '' ? undefined : Number(newProdCost),
           category: newProdCategory.trim() || 'General',
           is_service: newProdIsService,
         }),
@@ -142,13 +146,19 @@ export function PosView0304SaleCart() {
       }
 
       await reloadProducts();
-      showNotification('Producto Creado', `Se registró ${data.product.name} en catálogo y almacén.`, 'success');
+      const warnings: string[] = Array.isArray(data.warnings) ? data.warnings : [];
+      showNotification(
+        warnings.length ? 'Producto creado con advertencias' : 'Producto creado',
+        warnings.length ? warnings.join(' ') : data.message || 'Producto registrado en el catálogo.',
+        warnings.length ? 'alert' : 'success',
+      );
 
       setNewProdSku('');
       setNewProdName('');
       setNewProdBarcode('');
       setNewProdPrice('');
-      setNewProdStock('10');
+      setNewProdStock('0');
+      setNewProdCost('');
       setShowNewProductModal(false);
 
       if (data.product) {
@@ -216,32 +226,47 @@ export function PosView0304SaleCart() {
   const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleDiscountChange = (index: number, newPercent: number) => {
-    if (newPercent > settings.max_cashier_discount_percent) {
+    // Un supervisor con sesión iniciada aplica el descuento sin pedir PIN.
+    if (newPercent > settings.max_cashier_discount_percent && !can('pos.sales.discount.override')) {
       setSupervisorIndex(index);
       setRequestedDiscountPercent(newPercent);
       setSupervisorError(null);
       setSupervisorPin('');
+      setSupervisorId((prev) => prev || discountApprovers[0]?.id || '');
       setShowSupervisorModal(true);
     } else {
       updateCartDiscount(index, newPercent);
     }
   };
 
-  const handleApproveDiscount = () => {
-    const supervisor = staffUsers.find((u) => u.id === supervisorId);
-    const isValid =
-      (supervisor && supervisorPin === supervisor.pin) ||
-      validateSupervisorPin(supervisorPin);
-
-    if (!isValid) {
-      setSupervisorError('El PIN del supervisor no es válido. Operación denegada.');
+  const handleApproveDiscount = async () => {
+    if (!supervisorId) {
+      setSupervisorError('Selecciona el supervisor que autoriza.');
+      return;
+    }
+    if (supervisorReason.trim().length < 3) {
+      setSupervisorError('Indica la justificación del descuento.');
+      return;
+    }
+    // El PIN lo valida el servidor y devuelve una autorización de un solo uso.
+    setApproving(true);
+    const result = await requestSupervisorAuthorization({
+      supervisorId,
+      pin: supervisorPin,
+      operationType: 'discount_override',
+      reason: supervisorReason.trim(),
+      limitSnapshot: { discount_percent: requestedDiscountPercent, max_cashier: settings.max_cashier_discount_percent },
+    });
+    setApproving(false);
+    if (!result.ok || !result.authorizationId) {
+      setSupervisorError(result.error ?? 'El PIN del supervisor no es válido. Operación denegada.');
       return;
     }
 
     if (supervisorIndex !== null) {
       updateCartDiscount(supervisorIndex, requestedDiscountPercent);
-      const authName = supervisor?.name || 'Supervisor de Guardia';
-      setDiscountAuthorizedBy(authName);
+      const authName = result.approverName || 'Supervisor';
+      setDiscountAuthorizedBy(result.authorizationId);
       showNotification(
         'Descuento Aprobado',
         `Descuento del ${requestedDiscountPercent}% autorizado por ${authName}.`,
@@ -756,9 +781,10 @@ export function PosView0304SaleCart() {
                   onChange={(e) => setSupervisorId(e.target.value)}
                   className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-semibold text-[#111827]"
                 >
-                  {MOCK_USERS.filter((u) => u.role === 'pos_supervisor' || u.role === 'pos_store_admin').map((u) => (
+                  {discountApprovers.length === 0 && <option value="">No hay supervisores con PIN configurado</option>}
+                  {discountApprovers.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name} ({u.role})
+                      {u.name}
                     </option>
                   ))}
                 </select>
@@ -770,10 +796,12 @@ export function PosView0304SaleCart() {
                 </label>
                 <input
                   type="password"
-                  maxLength={6}
+                  maxLength={8}
+                  inputMode="numeric"
+                  autoComplete="off"
                   value={supervisorPin}
                   onChange={(e) => setSupervisorPin(e.target.value)}
-                  placeholder="PIN numérico (ej. 9876 para Carlos R.)"
+                  placeholder="PIN personal del supervisor"
                   className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-2.5 text-xs text-[#111827]"
                 />
               </div>
@@ -802,6 +830,7 @@ export function PosView0304SaleCart() {
               <button
                 type="button"
                 onClick={handleApproveDiscount}
+                disabled={approving}
                 className="rounded-2xl bg-[#1E6B4E] px-4 py-2 text-xs font-bold text-white hover:bg-[#16523B]"
               >
                 Autorizar descuento
@@ -1161,10 +1190,26 @@ export function PosView0304SaleCart() {
                     type="number"
                     step="1"
                     min="0"
-                    placeholder="10"
+                    placeholder="0"
                     value={newProdStock}
                     disabled={newProdIsService}
                     onChange={(e) => setNewProdStock(e.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-mono font-bold text-[#111827] focus:border-[#1E6B4E] focus:outline-none disabled:opacity-40"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-[#111827]">
+                    Costo Unitario ($ USD){Number(newProdStock) > 0 && !newProdIsService ? ' *' : ''}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    required={Number(newProdStock) > 0 && !newProdIsService}
+                    placeholder="Costo de compra por unidad"
+                    value={newProdCost}
+                    disabled={newProdIsService}
+                    onChange={(e) => setNewProdCost(e.target.value)}
                     className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-mono font-bold text-[#111827] focus:border-[#1E6B4E] focus:outline-none disabled:opacity-40"
                   />
                 </div>

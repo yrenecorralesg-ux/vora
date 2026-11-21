@@ -4,6 +4,7 @@ import React from 'react';
 import { PosProvider, usePos } from '@/components/pos/pos-context';
 import { PosSidebar } from '@/components/pos/pos-sidebar';
 import { PosHeader } from '@/components/pos/pos-header';
+import { PosToaster } from '@/components/pos/pos-toaster';
 import { PosCustomerDisplayModal } from '@/components/pos/pos-customer-display-modal';
 import { PosView01Dashboard } from '@/components/pos/pos-view-01-dashboard';
 import { PosView02OpenShift } from '@/components/pos/pos-view-02-open-shift';
@@ -65,6 +66,9 @@ export function PosModuleContent() {
         fontFamily: tenantBranding.fontFamily,
       } as React.CSSProperties}
     >
+      {/* Notificaciones flotantes */}
+      <PosToaster />
+
       {/* Modal Pantalla de Cara al Cliente (pos_customer_display) */}
       <PosCustomerDisplayModal />
 

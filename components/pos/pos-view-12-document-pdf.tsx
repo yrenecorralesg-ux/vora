@@ -1,13 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Printer, RefreshCw, AlertTriangle, ArrowLeft, Send } from 'lucide-react';
 import { usePos } from './pos-context';
-import { posStore, hkaProvider } from '@/lib/pos-service';
+import type { PosFiscalIntegration } from '@/lib/types';
 
 export function PosView12DocumentPdf() {
-  const { lastConfirmedSale, activeBranch, showNotification, navigateTo, isFuncActive, activeTenantSlug, tenantName, activeUser } = usePos();
-  const [fiscalSale, setFiscalSale] = useState(lastConfirmedSale ?? posStore.sales[0]);
+  const { lastConfirmedSale, sales, activeBranch, showNotification, navigateTo, isFuncActive, activeTenantSlug, tenantName, activeUser } = usePos();
+  const [fiscalSale, setFiscalSale] = useState(lastConfirmedSale ?? sales[0]);
+  const [integration, setIntegration] = useState<PosFiscalIntegration | null>(null);
+
+  // Configuración fiscal real de la empresa (pos_fiscal_integrations).
+  useEffect(() => {
+    fetch(`/api/t/${activeTenantSlug}/pos/fiscal`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => setIntegration(d.integration ?? null))
+      .catch(() => setIntegration(null));
+  }, [activeTenantSlug]);
+
+  useEffect(() => {
+    if (!fiscalSale && sales[0]) setFiscalSale(sales[0]);
+  }, [sales, fiscalSale]);
   const [fiscalLoading, setFiscalLoading] = useState(false);
   const [providerMessage, setProviderMessage] = useState<string | null>(null);
   const [thermalFormat, setThermalFormat] = useState(false);
@@ -20,8 +33,7 @@ export function PosView12DocumentPdf() {
     );
   }
 
-  const integration = posStore.fiscalIntegration;
-  const isHkaConfigured = integration.legal_status !== 'sin_configurar' && integration.enabled;
+  const isHkaConfigured = Boolean(integration && integration.legal_status !== 'sin_configurar' && integration.enabled);
 
   // Emisión Fiscal HKA
   const handleIssueFiscal = async () => {
@@ -35,7 +47,7 @@ export function PosView12DocumentPdf() {
         body: JSON.stringify({
           action: 'issue',
           sale_id: fiscalSale.id,
-          idempotency_key: `idemp-hka-${fiscalSale.id}`,
+          idempotency_key: `hka:${fiscalSale.id}`,
         }),
       });
 
@@ -95,7 +107,7 @@ export function PosView12DocumentPdf() {
         body: JSON.stringify({
           action: 'status',
           sale_id: fiscalSale.id,
-          idempotency_key: `idemp-hka-${fiscalSale.id}`,
+          idempotency_key: `hka:${fiscalSale.id}`,
           numero_documento: fiscalSale.fiscal_request?.fiscal_invoice_number || '1',
         }),
       });
@@ -355,7 +367,7 @@ export function PosView12DocumentPdf() {
               Integración Fiscal HKA
             </h2>
             <p className="mt-1 text-xs text-[#52635A]">
-              Ambiente: <strong className="text-[#111827]">{integration.environment.toUpperCase()}</strong>
+              Ambiente: <strong className="text-[#111827]">{(integration?.environment ?? "sin configurar").toUpperCase()}</strong>
             </p>
 
             {/* Estatus Actual */}

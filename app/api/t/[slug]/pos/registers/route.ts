@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi } from '@/lib/tenant-api-auth';
-import { posStore } from '@/lib/pos-service';
+import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 import type { PosRegister } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +25,7 @@ export async function GET(
       .maybeSingle();
 
     if (!tenant) {
-      return NextResponse.json({ ok: true, registers: posStore.registers });
+      return NextResponse.json({ ok: false, error: 'Empresa no encontrada.' }, { status: 404 });
     }
 
     let query = supabase
@@ -43,11 +42,10 @@ export async function GET(
 
     if (error) {
       console.warn('[pos/registers] Error consultando pos_registers:', error.message);
-      return NextResponse.json({ ok: true, registers: posStore.registers });
+      return NextResponse.json({ ok: false, error: 'No se pudieron cargar las cajas.' }, { status: 500 });
     }
 
-    const regList: PosRegister[] = (rows as PosRegister[]) || posStore.registers;
-    posStore.registers = regList;
+    const regList: PosRegister[] = (rows as PosRegister[]) ?? [];
     return NextResponse.json({ ok: true, registers: regList });
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: err.message || 'Error en servidor' }, { status: 500 });
@@ -60,6 +58,9 @@ export async function POST(
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
+
+  if (!(await hasTenantPermission(auth.access, 'pos.settings.manage')))
+    return permissionDenied('Tu rol no permite crear cajas.');
 
   try {
     const body = await request.json();
@@ -83,6 +84,16 @@ export async function POST(
       return NextResponse.json({ ok: false, error: 'Código, nombre y sede asignada son obligatorios.' }, { status: 400 });
     }
 
+    const { data: branch } = await supabase
+      .from('tenant_branches')
+      .select('id')
+      .eq('tenant_id', tenant.id)
+      .eq('id', branchId)
+      .maybeSingle();
+    if (!branch) {
+      return NextResponse.json({ ok: false, error: 'La sede no pertenece a la empresa.' }, { status: 400 });
+    }
+
     const { data: created, error } = await supabase
       .from('pos_registers')
       .insert({
@@ -98,8 +109,6 @@ export async function POST(
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
     }
-
-    posStore.addRegister(created as PosRegister);
 
     return NextResponse.json({ ok: true, register: created });
   } catch (err: any) {

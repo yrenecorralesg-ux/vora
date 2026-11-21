@@ -16,8 +16,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { usePos } from './pos-context';
-import { posStore } from '@/lib/pos-service';
-import { MOCK_USERS } from '@/lib/pos-demo-data';
+import type { PosShift } from '@/lib/types';
 
 export function PosView15ShiftClosure() {
   const {
@@ -31,20 +30,26 @@ export function PosView15ShiftClosure() {
     navigateTo,
     isFuncActive,
     parkedSales,
-    staffUsers,
-    validateSupervisorPin,
+    supervisors: allSupervisors,
+    can,
+    settings,
+    sales,
+    activeTenantSlug,
   } = usePos();
+  const [closedShift, setClosedShift] = useState<PosShift | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Retiro con PIN de supervisor si la empresa lo exige y la sesión no es de supervisor.
+  const needsWithdrawalPin = (type: string) =>
+    type === 'retiro_efectivo' && settings.require_pin_for_withdrawals !== false && !can('pos.refunds.approve');
 
   // Movimiento Manual
   const [movType, setMovType] = useState<'ingreso_efectivo' | 'retiro_efectivo' | 'ajuste_caja' | 'cambio_saldo_inicial'>('ingreso_efectivo');
   const [movCurrency, setMovCurrency] = useState<'USD' | 'VES'>('USD');
-  const [movAmount, setMovAmount] = useState<string>('20.00');
-  const [movReason, setMovReason] = useState<string>('Dotación de cambio para caja');
+  const [movAmount, setMovAmount] = useState<string>('');
+  const [movReason, setMovReason] = useState<string>('');
 
   // Autorización de Supervisor para movimientos (Diagrama §5)
-  const supervisors = staffUsers.filter(
-    (u) => (u.role === 'pos_supervisor' || u.role === 'pos_store_admin') && u.is_active !== false,
-  );
+  const supervisors = allSupervisors.filter((u) => u.permissions.includes('pos.refunds.approve'));
   const [authSupervisorId, setAuthSupervisorId] = useState<string>(supervisors[0]?.id || '');
   const [authSupervisorPin, setAuthSupervisorPin] = useState<string>('');
   const [movementError, setMovementError] = useState<string | null>(null);
@@ -52,11 +57,11 @@ export function PosView15ShiftClosure() {
   // Cierre y Arqueo Ciego
   const [isBlindMode, setIsBlindMode] = useState<boolean>(isFuncActive('pos_blind_reconciliation'));
   const [revealed, setRevealed] = useState<boolean>(false);
-  const [declaredUsd, setDeclaredUsd] = useState<string>('110.00');
-  const [declaredVes, setDeclaredVes] = useState<string>('1230.00');
-  const [declaredPm, setDeclaredPm] = useState<string>('1825.00');
-  const [declaredCard, setDeclaredCard] = useState<string>('2007.50');
-  const [declaredCashea, setDeclaredCashea] = useState<string>('35.00');
+  const [declaredUsd, setDeclaredUsd] = useState<string>('');
+  const [declaredVes, setDeclaredVes] = useState<string>('');
+  const [declaredPm, setDeclaredPm] = useState<string>('');
+  const [declaredCard, setDeclaredCard] = useState<string>('');
+  const [declaredCashea, setDeclaredCashea] = useState<string>('');
   const [justification, setJustification] = useState<string>('');
   const [closureError, setClosureError] = useState<string | null>(null);
 
@@ -64,7 +69,8 @@ export function PosView15ShiftClosure() {
   const [showReportModal, setShowReportModal] = useState<boolean>(false);
   const [reportType, setReportType] = useState<'X' | 'Z'>('X');
 
-  if (!activeShift) {
+  const shift = activeShift ?? closedShift;
+  if (!shift) {
     return (
       <div className="rounded-3xl border border-[#DCE3DF] bg-white p-8 text-center text-xs text-[#52635A]">
         No hay ningún turno abierto actualmente en la caja seleccionada.
@@ -72,8 +78,8 @@ export function PosView15ShiftClosure() {
     );
   }
 
-  const isClosed = activeShift.status === 'cerrado';
-  const expected = activeShift.expected_totals ?? {};
+  const isClosed = shift.status === 'cerrado';
+  const expected = shift.expected_totals ?? {};
 
   // Cálculo en vivo de diferencias
   const diffUsd = parseFloat(declaredUsd || '0') - (expected['efectivo_usd'] ?? 0);
@@ -90,59 +96,57 @@ export function PosView15ShiftClosure() {
     Math.abs(diffCashea) > 0.01;
 
   // Registrar Movimiento Manual con control de permisos (Diagrama §5)
-  const handleAddMovement = (e: React.FormEvent) => {
+  const handleAddMovement = async (e: React.FormEvent) => {
     e.preventDefault();
     setMovementError(null);
     const amt = parseFloat(movAmount);
-    if (isNaN(amt) || amt <= 0 || !movReason.trim()) return;
-
-    // Retiros, ajustes y cambio de saldo inicial requieren autorización de Supervisor/Admin (Diagrama §5)
-    const requiresSupervisorAuth =
-      movType === 'retiro_efectivo' ||
-      movType === 'ajuste_caja' ||
-      movType === 'cambio_saldo_inicial' ||
-      activeUser.role === 'pos_cashier';
-
-    let authorizedById: string | null = null;
-    if (requiresSupervisorAuth && activeUser.role === 'pos_cashier') {
-      const supervisor = supervisors.find((u) => u.id === authSupervisorId);
-      const isPinValid =
-        (supervisor && supervisor.pin === authSupervisorPin.trim()) ||
-        validateSupervisorPin(authSupervisorPin);
-
-      if (!isPinValid) {
-        setMovementError('Autorización denegada: PIN de supervisor incorrecto (Diagrama §5 - Modelo de permisos).');
-        return;
-      }
-      authorizedById = supervisor?.id || authSupervisorId;
+    if (isNaN(amt) || amt <= 0 || !movReason.trim()) {
+      setMovementError('Indique un monto mayor a 0 y el motivo del movimiento.');
+      return;
     }
-
-    const res = posStore.addCashMovement({
-      branchId: activeBranch.id,
-      shiftId: activeShift.id,
-      movementType: movType,
-      currency: movCurrency,
-      amount: amt,
-      reason: movReason.trim(),
-      performedBy: activeUser.id,
-    });
-
-    if (!res.ok) {
-      showNotification('Error de movimiento', res.error ?? 'Fallo', 'critical');
+    const withPin = needsWithdrawalPin(movType);
+    if (withPin && (!authSupervisorId || !authSupervisorPin.trim())) {
+      setMovementError('Los retiros requieren el supervisor y su PIN.');
       return;
     }
 
-    setAuthSupervisorPin('');
-    refreshActiveShift();
-    showNotification(
-      'Movimiento registrado',
-      `${movType}: ${amt} ${movCurrency}${authorizedById ? ' (Autorizado por supervisor)' : ''}.`,
-      'success',
-    );
+    setBusy(true);
+    let data: { ok?: boolean; error?: string } | null = null;
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/shifts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'movement',
+          shift_id: shift.id,
+          movement_type: movType,
+          currency: movCurrency,
+          amount: amt,
+          reason: movReason.trim(),
+          supervisor_id: withPin ? authSupervisorId : undefined,
+          supervisor_pin: withPin ? authSupervisorPin.trim() : undefined,
+        }),
+      });
+      data = await res.json().catch(() => null);
+    } catch {
+      data = { ok: false, error: 'Sin conexión con el servidor.' };
+    } finally {
+      setBusy(false);
+      setAuthSupervisorPin('');
+    }
+
+    if (!data?.ok) {
+      setMovementError(data?.error ?? 'No se pudo registrar el movimiento.');
+      return;
+    }
+    await refreshActiveShift();
+    setMovAmount('');
+    setMovReason('');
+    showNotification('Movimiento registrado', `${movType}: ${amt} ${movCurrency}${withPin ? ' (autorizado por supervisor)' : ''}.`, 'success');
   };
 
   // Cierre Definitivo de Turno (Regla #5: Bloqueo si hay ventas en espera)
-  const handleCloseShift = (e: React.FormEvent) => {
+  const handleCloseShift = async (e: React.FormEvent) => {
     e.preventDefault();
     setClosureError(null);
 
@@ -159,25 +163,39 @@ export function PosView15ShiftClosure() {
       return;
     }
 
-    const res = posStore.closeShift({
-      shiftId: activeShift.id,
-      closedBy: activeUser.id,
-      justification: justification.trim() || undefined,
-      declared: {
-        efectivo_usd: parseFloat(declaredUsd) || 0,
-        efectivo_ves: parseFloat(declaredVes) || 0,
-        pago_movil_ves: parseFloat(declaredPm) || 0,
-        tarjeta_ves: parseFloat(declaredCard) || 0,
-        cashea_usd: parseFloat(declaredCashea) || 0,
-      },
-    });
+    setBusy(true);
+    let data: { ok?: boolean; error?: string; shift?: PosShift } | null = null;
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/shifts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'close',
+          shift_id: shift.id,
+          justification: justification.trim() || undefined,
+          declared: {
+            efectivo_usd: parseFloat(declaredUsd) || 0,
+            efectivo_ves: parseFloat(declaredVes) || 0,
+            pago_movil_ves: parseFloat(declaredPm) || 0,
+            tarjeta_ves: parseFloat(declaredCard) || 0,
+            cashea_usd: parseFloat(declaredCashea) || 0,
+          },
+        }),
+      });
+      data = await res.json().catch(() => null);
+    } catch {
+      data = { ok: false, error: 'Sin conexión con el servidor. El turno sigue abierto.' };
+    } finally {
+      setBusy(false);
+    }
 
-    if (!res.ok) {
-      setClosureError(res.error ?? 'Error en cierre de turno.');
+    if (!data?.ok) {
+      setClosureError(data?.error ?? 'Error en cierre de turno.');
       return;
     }
 
-    refreshActiveShift();
+    setClosedShift(data.shift ?? null);
+    await refreshActiveShift();
     showNotification('Turno cerrado', 'Cierre inmutable de turno ejecutado con éxito.', 'success');
   };
 
@@ -204,8 +222,8 @@ export function PosView15ShiftClosure() {
               Arqueo y Cierre Definitivo de Turno
             </h1>
             <p className="mt-1 text-xs text-[#52635A]">
-              Operador: <strong className="text-[#111827]">{activeShift.cashier_name_snapshot}</strong> · Apertura:{' '}
-              {new Date(activeShift.opened_at).toLocaleTimeString('es-VE')}
+              Operador: <strong className="text-[#111827]">{shift.cashier_name_snapshot}</strong> · Apertura:{' '}
+              {new Date(shift.opened_at).toLocaleTimeString('es-VE')}
             </p>
           </div>
 
@@ -327,7 +345,7 @@ export function PosView15ShiftClosure() {
               </div>
 
               {/* Autorización con PIN Supervisor si es retiro o ajuste (Diagrama §5) */}
-              {activeUser.role === 'pos_cashier' && (movType === 'retiro_efectivo' || movType === 'ajuste_caja') && (
+              {needsWithdrawalPin(movType) && (
                 <div className="rounded-2xl border border-[#FDE68A] bg-[#FEF3C7]/60 p-3.5 space-y-2.5">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-[#92400E]">
                     <Lock className="h-3.5 w-3.5" />
@@ -635,11 +653,11 @@ export function PosView15ShiftClosure() {
               <div className="space-y-1 text-[10px] border-b border-dashed border-[#B5C2BA] pb-2">
                 <div className="flex justify-between">
                   <span>CAJA:</span>
-                  <span className="font-bold">{activeShift.register_id.slice(-4)}</span>
+                  <span className="font-bold">{shift.register_id.slice(-4)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>CAJERO:</span>
-                  <span>{activeShift.cashier_name_snapshot}</span>
+                  <span>{shift.cashier_name_snapshot}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>FECHA:</span>
@@ -651,7 +669,7 @@ export function PosView15ShiftClosure() {
                 </div>
                 <div className="flex justify-between">
                   <span>DOCS EMITIDOS:</span>
-                  <span className="font-bold">{posStore.sales.length}</span>
+                  <span className="font-bold">{sales.filter((x) => x.shift_id === shift.id).length}</span>
                 </div>
               </div>
 

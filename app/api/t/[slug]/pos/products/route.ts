@@ -1,333 +1,231 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi } from '@/lib/tenant-api-auth';
-import { posStore } from '@/lib/pos-service';
-import type { PosProduct } from '@/lib/types';
-import { NON_STOCK_TYPES } from '@/lib/warehouse/catalog';
+import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
+import { authorizeWarehouse } from '@/lib/warehouse/access';
+import { PosError, listCatalog, loadPosConfig } from '@/lib/pos/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+/** Catálogo del POS: warehouse_items o pos_products según config.catalog_source. */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
-
+  const service = getSupabaseServiceClient();
   try {
-    const supabase = getSupabaseServiceClient();
-
-    // 1. Resolver tenant
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('id, commercial_name')
-      .eq('slug', params.slug)
-      .maybeSingle();
-
-    if (!tenant) {
-      return NextResponse.json({ ok: true, source: 'fallback', products: posStore.products });
-    }
-
-    // 2. Verificar si warehouse.inventory y wh_pos_integration están activos
-    const { data: tfRows } = await supabase
-      .from('tenant_features')
-      .select('feature_key, enabled, config')
-      .eq('tenant_id', tenant.id);
-
-    const whFeature = (tfRows || []).find((f) => f.feature_key === 'warehouse.inventory');
-    const isWarehouseEnabled = Boolean(whFeature?.enabled);
-    const whFunctions = (whFeature?.config as Record<string, any>)?.functions || {};
-    const isPosIntegrationActive = whFunctions.wh_pos_integration !== false;
-
-    // Si Warehouse no está activo o la integración está apagada, usar POS standalone
-    if (!isWarehouseEnabled || !isPosIntegrationActive) {
-      return NextResponse.json({
-        ok: true,
-        source: 'pos_standalone',
-        is_warehouse_enabled: false,
-        products: posStore.products,
-      });
-    }
-
-    // 3. Resolver almacén predeterminado del tenant
-    const { data: warehouses } = await supabase
-      .from('warehouse_warehouses')
-      .select('id, name, is_default, active')
-      .eq('tenant_id', tenant.id)
-      .eq('active', true)
-      .order('is_default', { ascending: false });
-
-    const activeWarehouse = warehouses?.[0] || null;
-
-    // 4. Consultar catálogo de warehouse_items con sus existencias y códigos de barra
-    const { data: items, error: itemsErr } = await supabase
-      .from('warehouse_items')
-      .select(`
-        id,
-        sku,
-        name,
-        item_type,
-        track_stock,
-        price_usd,
-        status,
-        warehouse_units(code, symbol),
-        warehouse_item_barcodes(code),
-        warehouse_balances(on_hand, reserved, warehouse_id)
-      `)
-      .eq('tenant_id', tenant.id)
-      .eq('status', 'active')
-      .order('name');
-
-    if (itemsErr || !items || items.length === 0) {
-      // Si aún no hay ítems en la BD de warehouse, fallback a productos base para no interrumpir
-      return NextResponse.json({
-        ok: true,
-        source: 'pos_standalone_fallback',
-        is_warehouse_enabled: true,
-        warehouse: activeWarehouse,
-        products: posStore.products,
-      });
-    }
-
-    // 5. Mapear warehouse_items al formato unificado PosProduct
-    const mappedProducts: PosProduct[] = items.map((item: any) => {
-      const isService = !item.track_stock || NON_STOCK_TYPES.includes(item.item_type);
-      const whBalances = Array.isArray(item.warehouse_balances) ? item.warehouse_balances : [];
-      const balance = activeWarehouse
-        ? whBalances.find((b: any) => b.warehouse_id === activeWarehouse.id) || whBalances[0]
-        : whBalances[0];
-
-      const onHand = Number(balance?.on_hand ?? 0);
-      const reserved = Number(balance?.reserved ?? 0);
-      const availableStock = Math.max(0, onHand - reserved);
-
-      const barcodes = Array.isArray(item.warehouse_item_barcodes) ? item.warehouse_item_barcodes : [];
-      const primaryBarcode = barcodes[0]?.code || item.sku;
-
-      return {
-        id: item.id,
-        tenant_id: tenant.id,
-        branch_id: '',
-        sku: item.sku,
-        name: item.name,
-        category: 'Inventario Warehouse',
-        is_service: isService,
-        price_usd: Number(item.price_usd || 0),
-        tax_rate_percent: 16,
-        stock_quantity: isService ? 999 : availableStock,
-        barcode: primaryBarcode,
-        status: isService || availableStock > 0 ? 'disponible' : 'agotado',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    });
-
-    // Sincronizar en memoria de posStore para que el motor de venta y checkout tengan los mismos productos
-    posStore.products = mappedProducts;
-
+    const config = await loadPosConfig(service, auth.access.tenantId);
+    const products = await listCatalog(service, auth.access.tenantId, config);
     return NextResponse.json({
       ok: true,
-      source: 'warehouse_unified',
-      is_warehouse_enabled: true,
-      warehouse: activeWarehouse,
-      products: mappedProducts,
+      source: config.catalogSource,
+      is_warehouse_enabled: config.warehouseActive,
+      track_stock: config.trackStock,
+      stock_policy: config.stockPolicy,
+      products,
     });
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err.message || 'Error al obtener productos de warehouse' },
-      { status: 500 },
-    );
+  } catch (err) {
+    const e = err as PosError;
+    return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });
   }
 }
 
+/**
+ * Alta rápida de producto desde el POS. Con catálogo de Warehouse exige sus
+ * permisos (catalog.create y, si hay stock inicial, stock.receive); con el
+ * catálogo propio del POS exige pos.settings.manage.
+ */
 export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
+  const { tenantId, userId } = auth.access;
 
+  let body: Record<string, any>;
   try {
-    const body = await request.json();
-    const sku = (body.sku || '').trim().toUpperCase();
-    const name = (body.name || '').trim();
-    const priceUsd = Number(body.price_usd || 0);
-    const initialStock = Math.max(0, Number(body.initial_stock || 0));
-    const barcode = (body.barcode || sku).trim();
-    const isService = Boolean(body.is_service);
-    const category = (body.category || 'General').trim();
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: 'Solicitud inválida.' }, { status: 400 });
+  }
+  const sku = String(body.sku ?? '').trim().toUpperCase();
+  const name = String(body.name ?? '').trim();
+  const priceUsd = Number(body.price_usd ?? 0);
+  const initialStock = Math.max(0, Number(body.initial_stock ?? 0));
+  const barcode = String(body.barcode ?? '').trim();
+  const isService = Boolean(body.is_service);
+  const category = String(body.category ?? 'General').trim() || 'General';
+  const unitCost = body.unit_cost === undefined || body.unit_cost === null || body.unit_cost === '' ? null : Number(body.unit_cost);
 
-    if (!sku || !name) {
-      return NextResponse.json({ ok: false, error: 'SKU y Nombre son requeridos.' }, { status: 400 });
+  if (!sku || !name) return NextResponse.json({ ok: false, error: 'SKU y nombre son requeridos.' }, { status: 400 });
+  if (!/^[A-Z0-9][A-Z0-9\-_.]{0,63}$/.test(sku))
+    return NextResponse.json({ ok: false, error: 'El SKU solo admite letras, números, guion, punto y guion bajo.' }, { status: 400 });
+  if (!Number.isFinite(priceUsd) || priceUsd < 0)
+    return NextResponse.json({ ok: false, error: 'El precio no puede ser negativo.' }, { status: 400 });
+  if (unitCost !== null && (!Number.isFinite(unitCost) || unitCost < 0))
+    return NextResponse.json({ ok: false, error: 'El costo unitario no es válido.' }, { status: 400 });
+  if (barcode && !/^[A-Za-z0-9\-._/]{1,64}$/.test(barcode))
+    return NextResponse.json({ ok: false, error: 'El código de barras tiene caracteres no válidos.' }, { status: 400 });
+  const wantsStock = initialStock > 0 && !isService;
+
+  const service = getSupabaseServiceClient();
+  const config = await loadPosConfig(service, tenantId);
+
+  if (config.catalogSource === 'warehouse') {
+    if (config.warehouseActive) {
+      const wh = await authorizeWarehouse(params.slug, { permission: 'catalog.create' });
+      if (!wh.ok) return wh.response;
+      if (wantsStock && !wh.ctx.can('stock.receive'))
+        return permissionDenied('Tu rol no permite registrar stock inicial en el almacén.');
+      if (wantsStock && unitCost === null)
+        return NextResponse.json({ ok: false, error: 'Indica el costo unitario para registrar el stock inicial.' }, { status: 400 });
+    } else {
+      if (!(await hasTenantPermission(auth.access, 'pos.settings.manage')))
+        return permissionDenied('Tu rol no permite crear productos en el POS.');
+      if (wantsStock)
+        return NextResponse.json(
+          { ok: false, error: 'Sin Warehouse activo no se registran existencias; crea el producto sin stock inicial.' },
+          { status: 400 },
+        );
+      await service.rpc('warehouse_bootstrap', { p_tenant: tenantId });
     }
 
-    if (priceUsd < 0) {
-      return NextResponse.json({ ok: false, error: 'El precio no puede ser negativo.' }, { status: 400 });
-    }
+    const { data: unit } = await service
+      .from('warehouse_units')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('code', 'UND')
+      .maybeSingle();
+    if (!unit) return NextResponse.json({ ok: false, error: 'No hay unidad base (UND) en el catálogo.' }, { status: 500 });
 
-    const supabase = getSupabaseServiceClient();
-
-    // 1. Resolver tenant
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('id, commercial_name')
-      .eq('slug', params.slug)
+    await service
+      .from('warehouse_categories')
+      .upsert({ tenant_id: tenantId, name: category }, { onConflict: 'tenant_id,name', ignoreDuplicates: true });
+    const { data: cat } = await service
+      .from('warehouse_categories')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('name', category)
       .maybeSingle();
 
-    if (!tenant) {
-      return NextResponse.json({ ok: false, error: 'Empresa no encontrada.' }, { status: 404 });
-    }
-
-    // 2. Verificar si warehouse.inventory está habilitado
-    const { data: tfRows } = await supabase
-      .from('tenant_features')
-      .select('feature_key, enabled')
-      .eq('tenant_id', tenant.id);
-
-    const whFeature = (tfRows || []).find((f) => f.feature_key === 'warehouse.inventory');
-    const isWarehouseEnabled = Boolean(whFeature?.enabled);
-
-    let createdProduct: PosProduct;
-
-    if (isWarehouseEnabled) {
-      // 3. Buscar unidad estándar (UND)
-      const { data: units } = await supabase
-        .from('warehouse_units')
-        .select('id')
-        .eq('tenant_id', tenant.id)
-        .order('created_at');
-
-      const unitId = units?.[0]?.id;
-      if (!unitId) {
-        return NextResponse.json({ ok: false, error: 'No se encontraron unidades de medida en el almacén.' }, { status: 500 });
-      }
-
-      // 4. Crear artículo en warehouse_items
-      const { data: itemRow, error: itemErr } = await supabase
-        .from('warehouse_items')
-        .insert({
-          tenant_id: tenant.id,
-          sku,
-          name,
-          item_type: isService ? 'service' : 'physical',
-          unit_id: unitId,
-          price_usd: priceUsd,
-          tax_rate: 16.00,
-          min_stock: 3,
-          status: 'active',
-          created_by: auth.access.userId,
-        })
-        .select('id, sku, name, price_usd, status')
-        .single();
-
-      if (itemErr || !itemRow) {
-        const msg = itemErr?.code === '23505'
-          ? `El SKU ${sku} ya existe en el catálogo.`
-          : itemErr?.message || 'Error al guardar producto en almacén.';
-        return NextResponse.json({ ok: false, error: msg }, { status: 400 });
-      }
-
-      // 5. Asignar código de barras
-      if (barcode) {
-        await supabase.from('warehouse_item_barcodes').insert({
-          tenant_id: tenant.id,
-          item_id: itemRow.id,
-          code: barcode,
-          type: 'ean13',
-        });
-      }
-
-      // 6. Si se indicó stock inicial y no es servicio, asentar movimiento en Kardex
-      let realStock = 0;
-      if (initialStock > 0 && !isService) {
-        const { data: whSettings } = await supabase
-          .from('warehouse_settings')
-          .select('default_warehouse_id')
-          .eq('tenant_id', tenant.id)
-          .maybeSingle();
-
-        const { data: warehouses } = await supabase
-          .from('warehouse_warehouses')
-          .select('id')
-          .eq('tenant_id', tenant.id)
-          .order('created_at');
-
-        const warehouseId = whSettings?.default_warehouse_id || warehouses?.[0]?.id;
-
-        if (warehouseId) {
-          try {
-            await supabase.rpc('warehouse_apply_movement', {
-              p_tenant: tenant.id,
-              p_item: itemRow.id,
-              p_warehouse: warehouseId,
-              p_type: 'receipt',
-              p_qty: initialStock,
-              p_unit_cost: priceUsd * 0.6,
-              p_bucket: 'on_hand',
-              p_document: null,
-              p_ref_type: 'pos_direct_create',
-              p_ref_id: 'INIT-STOCK',
-              p_reason: 'Carga inicial de existencias desde el Punto de Venta',
-              p_key: `pos:init:${tenant.id}:${itemRow.id}`,
-              p_actor: auth.access.userId,
-            });
-            realStock = initialStock;
-          } catch (mErr: any) {
-            console.warn('[pos/products] Error aplicando stock inicial:', mErr.message);
-          }
-        }
-      }
-
-      createdProduct = {
-        id: itemRow.id,
-        tenant_id: tenant.id,
-        branch_id: '',
-        sku: itemRow.sku,
-        name: itemRow.name,
-        category,
-        is_service: isService,
-        price_usd: Number(itemRow.price_usd),
-        tax_rate_percent: 16,
-        stock_quantity: isService ? 999 : realStock,
-        barcode,
-        status: isService || realStock > 0 ? 'disponible' : 'agotado',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-    } else {
-      // Standalone POS
-      createdProduct = {
-        id: `p-${Date.now()}`,
-        tenant_id: tenant.id,
-        branch_id: '',
+    const { data: item, error: itemErr } = await service
+      .from('warehouse_items')
+      .insert({
+        tenant_id: tenantId,
         sku,
         name,
-        category,
-        is_service: isService,
+        item_type: isService ? 'service' : 'physical',
+        unit_id: unit.id,
+        category_id: cat?.id ?? null,
         price_usd: priceUsd,
-        tax_rate_percent: 16,
-        stock_quantity: isService ? 999 : initialStock,
-        barcode,
-        status: isService || initialStock > 0 ? 'disponible' : 'agotado',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
+        tax_rate: 16,
+        status: 'active',
+        created_by: userId,
+      })
+      .select('id')
+      .single();
+    if (itemErr || !item) {
+      const msg = itemErr?.code === '23505' ? `El SKU ${sku} ya existe en el catálogo.` : 'No se pudo crear el producto.';
+      return NextResponse.json({ ok: false, error: msg }, { status: 400 });
     }
 
-    // Actualizar catálogo en memoria de posStore
-    posStore.products = [createdProduct, ...posStore.products.filter((p) => p.sku !== sku)];
-
-    return NextResponse.json({
-      ok: true,
-      product: createdProduct,
-      message: `Producto ${createdProduct.name} (${createdProduct.sku}) creado con éxito.`,
-    });
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: err.message || 'Error en el servidor al crear producto.' },
-      { status: 500 },
-    );
+    const warnings: string[] = [];
+    if (barcode) {
+      const { error } = await service.from('warehouse_item_barcodes').insert({ tenant_id: tenantId, item_id: item.id, code: barcode });
+      if (error) warnings.push('El código de barras ya pertenece a otro artículo; no se asignó.');
+    }
+    if (wantsStock) {
+      const { data: settings } = await service
+        .from('warehouse_settings')
+        .select('default_warehouse_id')
+        .eq('tenant_id', tenantId)
+        .maybeSingle();
+      const { error: movErr } = await service.rpc('warehouse_apply_movement', {
+        p_tenant: tenantId,
+        p_item: item.id,
+        p_warehouse: settings?.default_warehouse_id,
+        p_type: 'receipt',
+        p_qty: initialStock,
+        p_unit_cost: unitCost,
+        p_bucket: 'on_hand',
+        p_document: null,
+        p_ref_type: 'pos_direct_create',
+        p_ref_id: 'INIT-STOCK',
+        p_reason: 'Carga inicial de existencias desde el Punto de Venta',
+        p_key: `pos:init:${tenantId}:${item.id}`,
+        p_actor: userId,
+      });
+      if (movErr) warnings.push(`No se registró el stock inicial: ${movErr.message}`);
+    }
+    const product = (await listCatalog(service, tenantId, config)).find((p) => p.id === item.id) ?? null;
+    return NextResponse.json({ ok: true, product, warnings, message: `Producto ${name} (${sku}) creado.` });
   }
-}
 
+  // Catálogo propio del POS (pos_products, por sede).
+  if (!(await hasTenantPermission(auth.access, 'pos.settings.manage')))
+    return permissionDenied('Tu rol no permite crear productos en el POS.');
+  let branchId: string | null = null;
+  if (body.branch_id) {
+    const { data } = await service
+      .from('tenant_branches')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .eq('id', String(body.branch_id))
+      .maybeSingle();
+    branchId = data?.id ?? null;
+  }
+  if (!branchId) {
+    const { data } = await service
+      .from('tenant_branches')
+      .select('id')
+      .eq('tenant_id', tenantId)
+      .order('is_primary', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    branchId = data?.id ?? null;
+  }
+  if (!branchId) return NextResponse.json({ ok: false, error: 'Crea una sede antes de registrar productos.' }, { status: 400 });
+
+  const stock = isService ? 0 : initialStock;
+  const { data: created, error } = await service
+    .from('pos_products')
+    .insert({
+      tenant_id: tenantId,
+      branch_id: branchId,
+      sku,
+      barcode: barcode || null,
+      name,
+      category,
+      is_service: isService,
+      price_usd: priceUsd,
+      tax_rate_percent: 16,
+      stock_quantity: stock,
+      status: isService || stock > 0 ? 'disponible' : 'agotado',
+    })
+    .select('*')
+    .single();
+  if (error || !created) {
+    const msg = error?.code === '23505' ? `El SKU ${sku} ya existe en la sede.` : 'No se pudo crear el producto.';
+    return NextResponse.json({ ok: false, error: msg }, { status: 400 });
+  }
+  if (stock > 0)
+    await service.from('pos_inventory_kardex').insert({
+      tenant_id: tenantId,
+      branch_id: branchId,
+      product_id: created.id,
+      movement_type: 'ajuste_inicial',
+      quantity_delta: stock,
+      stock_before: 0,
+      stock_after: stock,
+      actor_id: userId,
+    });
+  return NextResponse.json({
+    ok: true,
+    product: { ...created, price_usd: Number(created.price_usd), stock_quantity: Number(created.stock_quantity) },
+    warnings: [],
+    message: `Producto ${name} (${sku}) creado.`,
+  });
+}

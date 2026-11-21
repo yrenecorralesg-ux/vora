@@ -1339,39 +1339,63 @@ function ModulosTab({
                     })}
                   </div>
 
-                  {f.feature_key === 'warehouse.inventory' && (
-                    <div className="mt-3 rounded-lg border border-slate-200/80 bg-white p-3 shadow-xs">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">
-                            Política de Control de Stock en Punto de Venta (POS)
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            Determina el comportamiento del POS cuando un cajero intenta vender un producto sin stock disponible en Almacén.
-                          </p>
+                  {f.feature_key === 'commerce.pos' && (() => {
+                    const setPosConfig = (key: string, val: string) =>
+                      setFeaturesList((prev) =>
+                        prev.map((item) =>
+                          item.feature_key === f.feature_key ? { ...item, config: { ...item.config, [key]: val } } : item,
+                        ),
+                      );
+                    const warehouseOn = featuresList.some((x) => x.feature_key === 'warehouse.inventory' && x.enabled);
+                    const source = (f.config?.catalog_source as string) || (warehouseOn ? 'warehouse' : 'pos');
+                    return (
+                      <div className="mt-3 space-y-3 rounded-lg border border-slate-200/80 bg-white p-3 shadow-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">Origen del catálogo de productos del POS</p>
+                            <p className="text-[11px] text-slate-500">
+                              Catálogo unificado de Warehouse (una sola fuente de verdad) o catálogo propio del POS por sede.
+                            </p>
+                          </div>
+                          <select
+                            value={source}
+                            disabled={!f.enabled}
+                            onChange={(e) => setPosConfig('catalog_source', e.target.value)}
+                            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs focus:border-slate-900 focus:outline-none"
+                          >
+                            <option value="warehouse">Catálogo de Warehouse (warehouse_items)</option>
+                            <option value="pos">Catálogo propio del POS (pos_products)</option>
+                          </select>
                         </div>
-                        <select
-                          value={f.config?.pos_stock_policy || 'warn_and_allow'}
-                          disabled={!f.enabled}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setFeaturesList((prev) =>
-                              prev.map((item) =>
-                                item.feature_key === f.feature_key
-                                  ? { ...item, config: { ...item.config, pos_stock_policy: val } }
-                                  : item,
-                              ),
-                            );
-                          }}
-                          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs focus:border-slate-900 focus:outline-none"
-                        >
-                          <option value="warn_and_allow">Alertar al cajero y permitir sobreventa (Recomendado)</option>
-                          <option value="strict_block">Bloqueo estricto por falta de stock</option>
-                          <option value="allow_unrestricted">Permitir venta sin advertencias</option>
-                        </select>
+                        {source === 'warehouse' ? (
+                          <p className="text-[11px] text-slate-500">
+                            {warehouseOn
+                              ? 'Con Warehouse activo, cada venta descuenta su stock en la misma transacción y nunca permite sobreventa.'
+                              : 'Warehouse no está activo: el POS vende con ese catálogo pero sin controlar existencias.'}
+                          </p>
+                        ) : (
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <div>
+                              <p className="text-xs font-bold text-slate-800">Política de stock del catálogo propio</p>
+                              <p className="text-[11px] text-slate-500">
+                                Qué hace el POS cuando se intenta vender más de lo que hay en existencia.
+                              </p>
+                            </div>
+                            <select
+                              value={(f.config?.pos_stock_policy as string) || 'strict_block'}
+                              disabled={!f.enabled}
+                              onChange={(e) => setPosConfig('pos_stock_policy', e.target.value)}
+                              className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 shadow-xs focus:border-slate-900 focus:outline-none"
+                            >
+                              <option value="strict_block">Bloqueo estricto por falta de stock (Recomendado)</option>
+                              <option value="warn_and_allow">Alertar al cajero y permitir sobreventa</option>
+                              <option value="allow_unrestricted">Permitir venta sin advertencias</option>
+                            </select>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
+                    );
+                  })()}
                 </div>
               )}
             </div>

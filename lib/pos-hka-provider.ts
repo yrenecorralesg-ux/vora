@@ -43,12 +43,21 @@ export class TheFactoryHkaProvider implements FiscalProviderInterface {
   private cachedToken: string | null = null;
   private tokenExpiresAt: number = 0;
 
-  // Credenciales por defecto
-  private defaultUser = 'ffxzpgyllzib_tfhka';
-  private defaultSecret = 'W5sKX?&l0,xI';
-
   constructor(integration: PosFiscalIntegration) {
     this.integration = integration;
+  }
+
+  /**
+   * Credenciales solo en el servidor: secret_reference es el prefijo de las
+   * variables de entorno <REF>_USER y <REF>_PASSWORD (nunca se guardan en BD
+   * ni viajan al navegador).
+   */
+  private credentials(): { user: string; secret: string } | null {
+    const ref = (this.integration.secret_reference ?? '').trim();
+    if (!/^[A-Z][A-Z0-9_]{2,63}$/.test(ref) || typeof process === 'undefined') return null;
+    const user = process.env[`${ref}_USER`];
+    const secret = process.env[`${ref}_PASSWORD`];
+    return user && secret ? { user, secret } : null;
   }
 
   private getBaseUrl(): string {
@@ -66,12 +75,19 @@ export class TheFactoryHkaProvider implements FiscalProviderInterface {
         return { ok: true, token: this.cachedToken };
       }
 
+      const creds = this.credentials();
+      if (!creds) {
+        return {
+          ok: false,
+          error: 'Credenciales de The Factory HKA no configuradas en el servidor (variables <REFERENCIA>_USER y <REFERENCIA>_PASSWORD).',
+        };
+      }
       const res = await fetch(`${this.getBaseUrl()}/Autenticacion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          usuario: this.defaultUser,
-          clave: this.defaultSecret,
+          usuario: creds.user,
+          clave: creds.secret,
         }),
       });
 

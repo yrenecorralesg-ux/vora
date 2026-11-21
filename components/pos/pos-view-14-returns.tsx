@@ -3,8 +3,6 @@
 import React, { useState } from 'react';
 import { Search, RotateCcw, ShieldCheck, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { usePos } from './pos-context';
-import { posStore } from '@/lib/pos-service';
-import { MOCK_USERS } from '@/lib/pos-demo-data';
 
 export function PosView14Returns() {
   const {
@@ -15,11 +13,17 @@ export function PosView14Returns() {
     activeUser,
     showNotification,
     navigateTo,
-    staffUsers,
-    validateSupervisorPin,
+    supervisors: allSupervisors,
+    can,
     activeTenantSlug,
     reloadProducts,
+    reloadSales,
+    reloadReturns,
+    refreshActiveShift,
   } = usePos();
+  const isSupervisorSession = can('pos.refunds.approve');
+  const [submitting, setSubmitting] = useState(false);
+  const [damagedLines, setDamagedLines] = useState<Record<string, boolean>>({});
 
   const [saleSearch, setSaleSearch] = useState('');
   const [selectedSale, setSelectedSale] = useState(lastConfirmedSale ?? sales[0]);
@@ -27,15 +31,13 @@ export function PosView14Returns() {
   // Selección de devolución
   const [returnType, setReturnType] = useState<'devolucion_parcial' | 'anulacion_total'>('devolucion_parcial');
   const [quantitiesToReturn, setQuantitiesToReturn] = useState<Record<string, number>>({});
-  const [reason, setReason] = useState('Cambio por defecto o solicitud de cliente en mostrador');
+  const [reason, setReason] = useState('');
   const [notes, setNotes] = useState('');
   const [refundMethod, setRefundMethod] = useState<'efectivo_usd' | 'efectivo_ves' | 'reverso_electronico' | 'nota_credito_interna'>('efectivo_usd');
 
   // Supervisor PIN
-  const supervisors = staffUsers.filter(
-    (u) => (u.role === 'pos_supervisor' || u.role === 'pos_store_admin') && u.is_active !== false,
-  );
-  const [supervisorId, setSupervisorId] = useState(supervisors[0]?.id || MOCK_USERS[2].id);
+  const supervisors = allSupervisors.filter((u) => u.permissions.includes('pos.refunds.approve'));
+  const [supervisorId, setSupervisorId] = useState(supervisors[0]?.id ?? '');
   const [supervisorPin, setSupervisorPin] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -61,25 +63,16 @@ export function PosView14Returns() {
     setErrorMsg(null);
 
     if (!selectedSale) return;
-
+    if (!activeShift) {
+      setErrorMsg('Abra un turno de caja para registrar devoluciones.');
+      return;
+    }
     if (selectedSale.commercial_status === 'anulada' || selectedSale.commercial_status === 'devuelta') {
       setErrorMsg('La venta ya se encuentra totalmente anulada o devuelta.');
       return;
     }
 
-    // Validar PIN de supervisor
-    const supervisor = staffUsers.find((u) => u.id === supervisorId);
-    const isValid =
-      (supervisor && supervisor.pin === supervisorPin.trim()) ||
-      validateSupervisorPin(supervisorPin);
-
-    if (!isValid) {
-      setErrorMsg('Credencial o PIN de supervisor inválido. Operación no autorizada.');
-      return;
-    }
-
     const itemsToReturn: Array<{ lineId: string; quantity: number }> = [];
-
     if (returnType === 'anulacion_total') {
       (selectedSale.lines ?? []).forEach((l) => {
         const remaining = l.quantity - l.returned_quantity;
@@ -90,75 +83,56 @@ export function PosView14Returns() {
         if (qty > 0) itemsToReturn.push({ lineId, quantity: qty });
       });
     }
-
     if (itemsToReturn.length === 0) {
       setErrorMsg('Debe seleccionar al menos un producto y cantidad para devolver.');
       return;
     }
+    if (!isSupervisorSession && (!supervisorId || !supervisorPin.trim())) {
+      setErrorMsg('Seleccione el supervisor e ingrese su PIN.');
+      return;
+    }
 
-    const payload = {
-      original_sale_id: selectedSale.id,
-      branch_id: activeBranch.id,
-      shift_id: activeShift ? activeShift.id : selectedSale.shift_id,
-      return_type: returnType,
-      lines: itemsToReturn.map((item) => ({
-        sale_line_id: item.lineId,
-        quantity_returned: item.quantity,
-      })),
-      reason,
-      notes: notes.trim() || undefined,
-      refund_method: refundMethod,
-      requested_by: activeUser.name,
-      approved_by: supervisor?.name || 'Supervisor de Guardia',
-    };
-
-    let returnRecord: any = null;
-
+    // El servidor valida el PIN (o el permiso de la sesión) y registra quién aprobó.
+    setSubmitting(true);
+    let data: { ok?: boolean; error?: string; return_record?: { return_number: string; total_refunded_usd: number } } | null = null;
     try {
       const resp = await fetch(`/api/t/${activeTenantSlug}/pos/returns`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          idempotency_key: `ret-${selectedSale.id}-${Date.now()}`,
+          original_sale_id: selectedSale.id,
+          shift_id: activeShift.id,
+          return_type: returnType,
+          lines: itemsToReturn.map((item) => ({
+            sale_line_id: item.lineId,
+            quantity_returned: item.quantity,
+            condition: damagedLines[item.lineId] ? 'damaged' : 'sellable',
+          })),
+          reason,
+          notes: notes.trim() || undefined,
+          refund_method: refundMethod,
+          supervisor_id: isSupervisorSession ? undefined : supervisorId,
+          supervisor_pin: isSupervisorSession ? undefined : supervisorPin.trim(),
+        }),
       });
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.ok && data.return_record) {
-          returnRecord = data.return_record;
-        }
-      }
+      data = await resp.json().catch(() => null);
     } catch {
-      // Fallback a motor en memoria
+      data = { ok: false, error: 'Sin conexión con el servidor. Las devoluciones requieren conexión.' };
+    } finally {
+      setSubmitting(false);
+      setSupervisorPin('');
     }
 
-    if (!returnRecord) {
-      const res = posStore.processReturn({
-        originalSaleId: selectedSale.id,
-        branchId: activeBranch.id,
-        shiftId: activeShift ? activeShift.id : selectedSale.shift_id,
-        returnType,
-        lines: itemsToReturn.map((item) => ({
-          saleLineId: item.lineId,
-          quantityReturned: item.quantity,
-        })),
-        reason,
-        notes: notes.trim() || undefined,
-        refundMethod,
-        requestedBy: activeUser.name,
-        approvedBy: supervisor?.name || 'Supervisor de Guardia',
-      });
-
-      if (!res.ok) {
-        setErrorMsg(res.error ?? 'Error al procesar devolución.');
-        return;
-      }
-      returnRecord = res.returnRecord;
+    if (!data?.ok || !data.return_record) {
+      setErrorMsg(data?.error ?? 'El servidor rechazó la devolución.');
+      return;
     }
 
-    await reloadProducts().catch(() => { });
-
+    await Promise.all([reloadProducts(), reloadSales(), reloadReturns(), refreshActiveShift()]).catch(() => {});
     showNotification(
-      'Devolución ejecutada',
-      `Reverso ${returnRecord?.return_number} procesado por $${Number(returnRecord?.total_refunded_usd || 0).toFixed(2)} USD. Inventario restituido en almacén y kardex.`,
+      'Devolución registrada',
+      `Reverso ${data.return_record.return_number} por $${Number(data.return_record.total_refunded_usd || 0).toFixed(2)} USD.`,
       'success',
     );
     navigateTo('POS-13');
@@ -281,6 +255,16 @@ export function PosView14Returns() {
                             className="w-20 rounded-xl border border-[#DCE3DF] bg-[#F6F5F0] p-2 text-center text-xs font-bold text-[#111827]"
                           />
                         )}
+                        {!line.is_service && remaining > 0 && (
+                          <label className="mt-1 flex items-center gap-1 text-[10px] text-[#52635A]">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(damagedLines[line.id])}
+                              onChange={(e) => setDamagedLines((prev) => ({ ...prev, [line.id]: e.target.checked }))}
+                            />
+                            Llega dañado (no vuelve al stock vendible)
+                          </label>
+                        )}
                       </div>
                     </div>
                   );
@@ -306,9 +290,10 @@ export function PosView14Returns() {
                     onChange={(e) => setSupervisorId(e.target.value)}
                     className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-xs font-semibold"
                   >
-                    {MOCK_USERS.filter((u) => u.role === 'pos_supervisor' || u.role === 'pos_store_admin').map((u) => (
+                    {supervisors.length === 0 && <option value="">No hay supervisores con PIN configurado</option>}
+                    {supervisors.map((u) => (
                       <option key={u.id} value={u.id}>
-                        {u.name} ({u.role})
+                        {u.name}
                       </option>
                     ))}
                   </select>
@@ -320,11 +305,14 @@ export function PosView14Returns() {
                   </label>
                   <input
                     type="password"
-                    maxLength={6}
-                    required
+                    maxLength={8}
+                    required={!isSupervisorSession}
+                    disabled={isSupervisorSession}
+                    inputMode="numeric"
+                    autoComplete="off"
                     value={supervisorPin}
                     onChange={(e) => setSupervisorPin(e.target.value)}
-                    placeholder="PIN de 4 a 6 dígitos"
+                    placeholder={isSupervisorSession ? 'Tu sesión de supervisor aprueba la devolución' : 'PIN personal del supervisor'}
                     className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-2.5 text-xs"
                   />
                 </div>
@@ -361,9 +349,10 @@ export function PosView14Returns() {
 
               <button
                 type="submit"
-                className="mt-6 w-full rounded-2xl bg-[#B91C1C] py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-[#991B1B]"
+                disabled={submitting}
+                className="mt-6 w-full rounded-2xl bg-[#B91C1C] py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-md hover:bg-[#991B1B] disabled:opacity-60"
               >
-                Ejecutar devolución y restituir existencias
+                {submitting ? 'Procesando…' : 'Ejecutar devolución y restituir existencias'}
               </button>
             </div>
           </div>

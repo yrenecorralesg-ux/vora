@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ShieldCheck, Activity, ArrowLeft, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { usePos } from './pos-context';
-import { posStore } from '@/lib/pos-service';
 
 function CasheaIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -20,16 +19,34 @@ function CasheaIcon({ className = 'h-4 w-4' }: { className?: string }) {
 
 export function PosView18FiscalConfig() {
   const { activeBranch, activeUser, showNotification, navigateTo, activeTenantSlug } = usePos();
-  const integration = posStore.fiscalIntegration;
 
-  const [companyRif, setCompanyRif] = useState(integration.company_rif ?? 'J-502258027');
-  const [legalName, setLegalName] = useState(integration.company_legal_name ?? 'VENESOFT. CA');
-  const [fiscalAddress, setFiscalAddress] = useState(integration.fiscal_address ?? activeBranch.fiscal_address ?? '');
-  const [environment, setEnvironment] = useState<'sandbox' | 'production'>(integration.environment);
-  const [apiUser, setApiUser] = useState('ffxzpgyllzib_tfhka');
-  const [secretRef, setSecretRef] = useState(integration.secret_reference ?? 'W5sKX?&l0,xI');
-  const [isEnabled, setIsEnabled] = useState(integration.enabled);
-  const [legalStatus, setLegalStatus] = useState(integration.legal_status);
+  // Solo datos de la empresa y la REFERENCIA de credenciales: el usuario y la
+  // clave de HKA viven en variables de entorno del servidor, nunca en el navegador.
+  const [companyRif, setCompanyRif] = useState('');
+  const [legalName, setLegalName] = useState('');
+  const [fiscalAddress, setFiscalAddress] = useState(activeBranch.fiscal_address ?? '');
+  const [environment, setEnvironment] = useState<'sandbox' | 'production'>('sandbox');
+  const [secretRef, setSecretRef] = useState('');
+  const [isEnabled, setIsEnabled] = useState(false);
+  const [legalStatus, setLegalStatus] = useState<'sin_configurar' | 'sandbox_verificado' | 'productivo_activo'>('sin_configurar');
+  const [savingConfig, setSavingConfig] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/t/${activeTenantSlug}/pos/fiscal`, { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => {
+        const i = d.integration;
+        if (!i) return;
+        setCompanyRif(i.company_rif ?? '');
+        setLegalName(i.company_legal_name ?? '');
+        if (i.fiscal_address) setFiscalAddress(i.fiscal_address);
+        setEnvironment(i.environment === 'production' ? 'production' : 'sandbox');
+        setSecretRef(i.secret_reference ?? '');
+        setIsEnabled(Boolean(i.enabled));
+        setLegalStatus(i.legal_status ?? 'sin_configurar');
+      })
+      .catch(() => {});
+  }, [activeTenantSlug]);
 
   // HKA Connection Test
   const [testingHka, setTestingHka] = useState(false);
@@ -96,35 +113,37 @@ export function PosView18FiscalConfig() {
     }
   };
 
-  const handleSaveFiscalConfig = (e: React.FormEvent) => {
+  const handleSaveFiscalConfig = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    integration.company_rif = companyRif.trim();
-    integration.company_legal_name = legalName.trim();
-    integration.fiscal_address = fiscalAddress.trim();
-    integration.environment = environment;
-    integration.secret_reference = secretRef.trim();
-    integration.enabled = isEnabled;
-    integration.legal_status = isEnabled ? (environment === 'sandbox' ? 'sandbox_verificado' : 'productivo_activo') : 'sin_configurar';
-    integration.updated_at = new Date().toISOString();
-    setLegalStatus(integration.legal_status);
-
-    posStore.addAudit({
-      branch_id: activeBranch.id,
-      shift_id: null,
-      actor_id: activeUser.id,
-      event_type: 'actualizacion_conector_hka',
-      entity_type: 'pos_fiscal_integrations',
-      entity_id: integration.id,
-      description: 'Actualización de credenciales y parámetros The Factory HKA y Cashea POS',
-      metadata: { environment, isEnabled, secretRef, companyRif },
-    });
-
-    showNotification(
-      'Configuración guardada',
-      `Integración fiscal The Factory HKA guardada en modo ${environment.toUpperCase()}.`,
-      'success',
-    );
+    setSavingConfig(true);
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/fiscal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'save_config',
+          company_rif: companyRif.trim(),
+          company_legal_name: legalName.trim(),
+          fiscal_address: fiscalAddress.trim(),
+          environment,
+          secret_reference: secretRef.trim(),
+          enabled: isEnabled,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.ok) {
+        showNotification('Configuración no guardada', data?.error ?? 'No se pudo guardar la configuración fiscal.', 'critical');
+        return;
+      }
+      setLegalStatus(data.integration?.legal_status ?? 'sin_configurar');
+      showNotification(
+        'Configuración guardada',
+        `Integración The Factory HKA guardada en modo ${environment.toUpperCase()}. Usa "Probar conexión" para verificarla.`,
+        'success',
+      );
+    } finally {
+      setSavingConfig(false);
+    }
   };
 
   return (
@@ -228,31 +247,23 @@ export function PosView18FiscalConfig() {
               />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[#111827]">
-                Usuario API Web Services
-              </label>
-              <input
-                type="text"
-                required
-                value={apiUser}
-                onChange={(e) => setApiUser(e.target.value)}
-                className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-mono text-[#111827]"
-              />
-            </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-[#111827]">
-              Clave / Secreto API HKA (Bearer Token)
+              Referencia de credenciales en el servidor
             </label>
             <input
-              type="password"
-              required
+              type="text"
               value={secretRef}
-              onChange={(e) => setSecretRef(e.target.value)}
-              className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-mono text-[#52635A]"
+              onChange={(e) => setSecretRef(e.target.value.toUpperCase())}
+              placeholder="Ej: HKA_MI_EMPRESA"
+              className="mt-1 w-full rounded-2xl border border-[#DCE3DF] p-3 text-xs font-mono text-[#111827]"
             />
+            <p className="mt-1 text-[11px] text-[#52635A]">
+              El usuario y la clave de The Factory HKA se configuran como variables de entorno del servidor
+              (<code>REFERENCIA_USER</code> y <code>REFERENCIA_PASSWORD</code>). Nunca se escriben aquí.
+            </p>
           </div>
 
           {/* Resultado de Prueba HKA */}
@@ -287,7 +298,8 @@ export function PosView18FiscalConfig() {
 
             <button
               type="submit"
-              className="flex-1 rounded-2xl bg-[#1E6B4E] py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-[#16523B]"
+              disabled={savingConfig}
+              className="flex-1 rounded-2xl bg-[#1E6B4E] py-3 text-xs font-bold uppercase tracking-wider text-white shadow-sm hover:bg-[#16523B] disabled:opacity-60"
             >
               Guardar configuración fiscal
             </button>

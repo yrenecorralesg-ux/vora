@@ -1,128 +1,110 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseServerClient } from '@/lib/supabase-server';
-import { posStore } from '@/lib/pos-service';
-import { authorizeTenantApi } from '@/lib/tenant-api-auth';
+import { NextResponse, type NextRequest } from 'next/server';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
+import { authorizeTenantApi, hasTenantPermission } from '@/lib/tenant-api-auth';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
+const APPROVER_PERMISSIONS = ['pos.refunds.approve', 'pos.sales.discount.override', 'pos.sales.void'];
+
+/**
+ * Personal del POS = usuarios reales de la empresa (tenant_memberships).
+ * Devuelve también el usuario de la sesión con su rol y permisos de acción.
+ */
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
+  const service = getSupabaseServiceClient();
+  const { tenantId, userId, role } = auth.access;
 
-  try {
-    // Si hay Supabase configurado, intentar consultar tenant_memberships
-    const supabase = getSupabaseServerClient();
-    const { data: tenant } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('slug', params.slug)
-      .maybeSingle();
+  const [{ data: members }, { data: pins }] = await Promise.all([
+    service
+      .from('tenant_memberships')
+      .select('auth_user_id, role, status, created_at')
+      .eq('tenant_id', tenantId)
+      .order('created_at'),
+    service.from('pos_staff_pins').select('auth_user_id').eq('tenant_id', tenantId),
+  ]);
+  const withPin = new Set((pins ?? []).map((p) => p.auth_user_id as string));
+  const ids = Array.from(new Set([...(members ?? []).map((m) => m.auth_user_id as string), userId]));
+  const profiles = new Map<string, { name: string; email: string | null }>();
+  await Promise.all(
+    ids.map(async (id) => {
+      const { data } = await service.auth.admin.getUserById(id);
+      const u = data?.user;
+      if (u)
+        profiles.set(id, {
+          name: (u.user_metadata?.full_name as string) || u.email?.split('@')[0] || 'Usuario',
+          email: u.email ?? null,
+        });
+    }),
+  );
 
-    if (tenant) {
-      const { data: members, error } = await supabase
-        .from('tenant_memberships')
-        .select('id, auth_user_id, role, status, created_at')
-        .eq('tenant_id', tenant.id);
+  const users = (members ?? []).map((m) => ({
+    id: m.auth_user_id as string,
+    name: profiles.get(m.auth_user_id)?.name ?? 'Usuario',
+    email: profiles.get(m.auth_user_id)?.email ?? null,
+    role: m.role as string,
+    is_active: m.status === 'active',
+    has_pin: withPin.has(m.auth_user_id),
+    created_at: m.created_at as string,
+  }));
 
-      if (!error && members && members.length > 0) {
-        return NextResponse.json({ ok: true, users: members, source: 'supabase' });
-      }
-    }
+  const permissions: Record<string, boolean> = {};
+  for (const p of [
+    'pos.sales.create',
+    'pos.cash.open',
+    'pos.cash.close',
+    'pos.payments.register',
+    'pos.reports.view',
+    'pos.settings.manage',
+    'pos.fiscal.issue',
+    ...APPROVER_PERMISSIONS,
+  ])
+    permissions[p] = await hasTenantPermission(auth.access, p);
 
-    // Fallback reactivo a posStore en memoria
-    return NextResponse.json({ ok: true, users: posStore.users, source: 'posStore' });
-  } catch {
-    return NextResponse.json({ ok: true, users: posStore.users, source: 'fallback' });
-  }
+  return NextResponse.json({
+    ok: true,
+    me: {
+      id: userId,
+      name: profiles.get(userId)?.name ?? 'Usuario',
+      email: profiles.get(userId)?.email ?? auth.access.email,
+      role,
+      has_pin: withPin.has(userId),
+      can_approve: APPROVER_PERMISSIONS.some((p) => permissions[p]),
+      permissions,
+    },
+    users,
+  });
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { slug: string } },
-) {
+const managedInGestor = () =>
+  NextResponse.json(
+    {
+      ok: false,
+      error:
+        'Los usuarios y roles se administran desde el gestor de VORA (empresa → Usuarios). Cada supervisor define su PIN en Configuración → Mi PIN.',
+    },
+    { status: 410 },
+  );
+
+export async function POST(_request: NextRequest, { params }: { params: { slug: string } }) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
-
-  try {
-    const body = await request.json();
-    if (!body.name || !body.pin) {
-      return NextResponse.json({ ok: false, error: 'Nombre y PIN son obligatorios.' }, { status: 400 });
-    }
-
-    const created = posStore.createUser({
-      name: body.name,
-      email: body.email,
-      role: body.role || 'pos_cashier',
-      pin: body.pin,
-      assignedBranchId: body.assignedBranchId || 'b0000000-0000-0000-0000-000000000001',
-      assignedRegisterId: body.assignedRegisterId,
-      commission_rate_percent: body.commission_rate_percent,
-      is_active: body.is_active !== false,
-    });
-
-    return NextResponse.json({ ok: true, user: created }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message || 'Error al crear usuario.' }, { status: 500 });
-  }
+  return managedInGestor();
 }
 
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { slug: string } },
-) {
+export async function PUT(_request: NextRequest, { params }: { params: { slug: string } }) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
-
-  try {
-    const body = await request.json();
-    if (!body.id) {
-      return NextResponse.json({ ok: false, error: 'ID de usuario requerido.' }, { status: 400 });
-    }
-
-    const updated = posStore.updateUser(body.id, {
-      name: body.name,
-      email: body.email,
-      role: body.role,
-      pin: body.pin,
-      assignedRegisterId: body.assignedRegisterId,
-      commission_rate_percent: body.commission_rate_percent,
-      is_active: body.is_active,
-    });
-
-    if (!updated) {
-      return NextResponse.json({ ok: false, error: 'Usuario no encontrado.' }, { status: 404 });
-    }
-
-    return NextResponse.json({ ok: true, user: updated });
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message || 'Error al actualizar usuario.' }, { status: 500 });
-  }
+  return managedInGestor();
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { slug: string } },
-) {
+export async function DELETE(_request: NextRequest, { params }: { params: { slug: string } }) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
-
-  try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('id');
-
-    if (!userId) {
-      return NextResponse.json({ ok: false, error: 'ID de usuario requerido.' }, { status: 400 });
-    }
-
-    const res = posStore.deleteUser(userId);
-    if (!res.ok) {
-      return NextResponse.json({ ok: false, error: res.error }, { status: 400 });
-    }
-
-    return NextResponse.json({ ok: true, message: 'Usuario eliminado exitosamente.' });
-  } catch (err: any) {
-    return NextResponse.json({ ok: false, error: err.message || 'Error al eliminar usuario.' }, { status: 500 });
-  }
+  return managedInGestor();
 }
-

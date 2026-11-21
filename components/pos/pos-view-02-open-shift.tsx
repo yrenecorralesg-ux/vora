@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { usePos } from './pos-context';
-import { posStore } from '@/lib/pos-service';
 
 export function PosView02OpenShift() {
   const {
@@ -15,16 +14,18 @@ export function PosView02OpenShift() {
     refreshActiveShift,
     navigateTo,
     showNotification,
+    activeTenantSlug,
   } = usePos();
+  const [submitting, setSubmitting] = useState(false);
 
-  const [openingUsd, setOpeningUsd] = useState<string>('50.00');
-  const [openingVes, setOpeningVes] = useState<string>('500.00');
-  const [notes, setNotes] = useState<string>('Apertura regular de turno matutino.');
+  const [openingUsd, setOpeningUsd] = useState<string>('0.00');
+  const [openingVes, setOpeningVes] = useState<string>('0.00');
+  const [notes, setNotes] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const isCurrentRegisterOpen = Boolean(activeShift && activeShift.status === 'abierto');
 
-  const handleOpenShift = (e: React.FormEvent) => {
+  const handleOpenShift = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -36,23 +37,41 @@ export function PosView02OpenShift() {
       return;
     }
 
-    const result = posStore.openShift({
-      branchId: activeBranch.id,
-      registerId: activeRegisterId,
-      cashierUserId: activeUser.id,
-      cashierName: activeUser.name,
-      openingUsd: usdVal,
-      openingVes: vesVal,
-      notes,
-    });
-
-    if (!result.ok) {
-      setErrorMessage(result.error ?? 'Error en apertura de turno.');
-      showNotification('Bloqueo de concurrencia', result.error ?? 'Caja ocupada', 'critical');
+    if (!activeRegisterId || !activeBranch.id) {
+      setErrorMessage('Selecciona una sede y una caja registradas antes de abrir el turno.');
       return;
     }
 
-    refreshActiveShift();
+    setSubmitting(true);
+    let result: { ok?: boolean; error?: string } | null = null;
+    try {
+      const res = await fetch(`/api/t/${activeTenantSlug}/pos/shifts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'open',
+          branch_id: activeBranch.id,
+          register_id: activeRegisterId,
+          cashier_name: activeUser.name,
+          opening_usd: usdVal,
+          opening_ves: vesVal,
+          notes,
+        }),
+      });
+      result = await res.json().catch(() => null);
+    } catch {
+      result = { ok: false, error: 'Sin conexión con el servidor. El turno no se abrió.' };
+    } finally {
+      setSubmitting(false);
+    }
+
+    if (!result?.ok) {
+      setErrorMessage(result?.error ?? 'Error en apertura de turno.');
+      showNotification('No se abrió el turno', result?.error ?? 'Caja ocupada', 'critical');
+      return;
+    }
+
+    await refreshActiveShift();
     showNotification(
       'Turno aperturado exitosamente',
       `Turno abierto en ${registers.find((r) => r.id === activeRegisterId)?.name} con fondo de $${usdVal} USD y ${vesVal} VES.`,
@@ -218,7 +237,7 @@ export function PosView02OpenShift() {
           <div className="pt-2">
             <button
               type="submit"
-              disabled={isCurrentRegisterOpen}
+              disabled={isCurrentRegisterOpen || submitting}
               className={`w-full rounded-2xl py-4 text-xs font-bold uppercase tracking-widest transition-colors ${
                 isCurrentRegisterOpen
                   ? 'border border-[#DCE3DF] bg-[#F6F5F0] text-[#52635A] cursor-not-allowed'
