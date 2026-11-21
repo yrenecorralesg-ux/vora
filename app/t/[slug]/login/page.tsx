@@ -15,8 +15,6 @@ import {
   LayoutDashboard,
 } from 'lucide-react';
 import { getSupabaseClient } from '@/lib/supabase-client';
-import { posStore } from '@/lib/pos-service';
-import type { PosMockUser } from '@/lib/pos-demo-data';
 
 export default function TenantIsolatedLoginPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
@@ -78,21 +76,6 @@ export default function TenantIsolatedLoginPage({ params }: { params: { slug: st
       });
 
       if (authError || !authData.user) {
-        // Fallback demo local si es una prueba con los usuarios de posStore
-        const matchedDemo = posStore.users.find(
-          (u) =>
-            (u.email?.toLowerCase() === emailClean ||
-              u.name.toLowerCase().includes(emailClean) ||
-              emailClean === 'cajero' ||
-              emailClean === 'supervisor') &&
-            (passwordClean === u.pin || passwordClean === '1234' || passwordClean === '9999' || passwordClean === 'admin123'),
-        );
-
-        if (matchedDemo) {
-          router.replace(`/t/${params.slug}/pos`);
-          return;
-        }
-
         setError(authError?.message === 'Invalid login credentials'
           ? 'Correo o contraseña incorrectos. Verifique sus credenciales.'
           : authError?.message || 'Error al iniciar sesión.');
@@ -121,12 +104,6 @@ export default function TenantIsolatedLoginPage({ params }: { params: { slug: st
       setError(err.message || 'Error de red al conectar con el servidor.');
       setLoading(false);
     }
-  };
-
-  const handleQuickDemoLogin = (user: PosMockUser) => {
-    setEmailOrUser(user.email || user.name);
-    setPasswordOrPin(user.pin);
-    setError(null);
   };
 
   const primary = tenantBranding.primaryColor;
@@ -250,41 +227,6 @@ export default function TenantIsolatedLoginPage({ params }: { params: { slug: st
               )}
             </button>
           </form>
-
-          {/* Atajos de Personal Demo */}
-          <div className="border-t border-[#E5E9E7] pt-4">
-            <span className="block text-center text-[10px] font-bold uppercase tracking-wider text-[#52635A]">
-              Personal de prueba en sede (Demo)
-            </span>
-
-            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
-              {posStore.users.slice(0, 4).map((user) => (
-                <button
-                  key={user.id}
-                  type="button"
-                  onClick={() => handleQuickDemoLogin(user)}
-                  className="flex flex-col items-start rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-2.5 text-left transition hover:bg-white"
-                >
-                  <span className="font-bold text-[#111827] text-[11px] truncate w-full">
-                    {user.name.split('[')[0].trim()}
-                  </span>
-                  <span
-                    className="mt-0.5 rounded-full px-2 py-0.5 text-[9px] font-bold"
-                    style={{
-                      backgroundColor: `color-mix(in srgb, ${secondary} 25%, transparent)`,
-                      color: primary,
-                    }}
-                  >
-                    {user.role === 'pos_supervisor'
-                      ? 'Supervisor'
-                      : user.role === 'pos_sales_rep'
-                      ? 'Asesor'
-                      : 'Cajero'}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
 
           {/* Enlace al Portal General */}
           <div className="border-t border-[#E5E9E7] pt-4 text-center">

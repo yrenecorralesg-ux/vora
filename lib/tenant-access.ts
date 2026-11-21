@@ -11,24 +11,31 @@ export async function requireTenantFeature(
   if (!user) redirect(`/login?redirect=${encodeURIComponent(`/t/${slug}`)}`);
 
   const supabase = getSupabaseServerClient();
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('id,technical_status,commercial_status')
-    .eq('slug', slug)
-    .maybeSingle();
+  // Consultas independientes en paralelo: 2 rondas a Supabase en lugar de 4.
+  const [{ data: tenant }, admin] = await Promise.all([
+    supabase.from('tenants').select('id,technical_status,commercial_status').eq('slug', slug).maybeSingle(),
+    isSuperAdmin(user.id),
+  ]);
   if (!tenant) redirect('/access-pending');
 
-  const admin = await isSuperAdmin(user.id);
-  if (!admin) {
-    const { data: membership } = await supabase
-      .from('tenant_memberships')
-      .select('id')
+  const [{ data: membership }, { data: feature }] = await Promise.all([
+    admin
+      ? Promise.resolve({ data: { id: 'super_admin' } })
+      : supabase
+          .from('tenant_memberships')
+          .select('id')
+          .eq('tenant_id', tenant.id)
+          .eq('auth_user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle(),
+    supabase
+      .from('tenant_features')
+      .select('enabled,contracted')
       .eq('tenant_id', tenant.id)
-      .eq('auth_user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle();
-    if (!membership) redirect('/access-pending');
-  }
+      .eq('feature_key', featureKey)
+      .maybeSingle(),
+  ]);
+  if (!membership) redirect('/access-pending');
 
   const preview = admin && headers().get('x-vora-preview') === '1';
   if (
@@ -37,12 +44,6 @@ export async function requireTenantFeature(
       ['suspended', 'cancelled'].includes(tenant.commercial_status))
   )
     redirect(`/t/${slug}`);
-  const { data: feature } = await supabase
-    .from('tenant_features')
-    .select('enabled,contracted')
-    .eq('tenant_id', tenant.id)
-    .eq('feature_key', featureKey)
-    .maybeSingle();
   if (!feature?.enabled || !feature.contracted) redirect(`/t/${slug}`);
 }
 

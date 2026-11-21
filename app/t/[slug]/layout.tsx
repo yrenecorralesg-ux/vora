@@ -6,6 +6,7 @@ import { requireSession, isSuperAdmin } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
 import { CrmSidebar } from '@/components/crm-sidebar';
 import { ModuleRail } from '@/components/module-rail';
+import { TenantFrame } from '@/components/tenant-frame';
 import { canPreviewTenant } from '@/lib/tenant-preview';
 import { getFontFamily } from '@/lib/fonts';
 
@@ -83,7 +84,8 @@ export default async function TenantCrmLayout({
   }
 
   /* 3. Membresia del usuario + rol super admin ---------------------------- */
-  const [{ data: membership }, admin] = await Promise.all([
+  // Membresía, rol de plataforma, branding y módulos no dependen entre sí: una sola ronda.
+  const [{ data: membership }, admin, { data: branding }, { data: featureRows }] = await Promise.all([
     supabase
       .from('tenant_memberships')
       .select('id, role')
@@ -92,6 +94,12 @@ export default async function TenantCrmLayout({
       .eq('status', 'active')
       .maybeSingle(),
     isSuperAdmin(user.id, supabase),
+    supabase
+      .from('tenant_branding')
+      .select('primary_color, secondary_color, accent_color, logo_url, banner_url, font_family')
+      .eq('tenant_id', tenant.id)
+      .maybeSingle(),
+    supabase.from('tenant_features').select('feature_key, enabled').eq('tenant_id', tenant.id),
   ]);
 
   const hasMembership = !!membership;
@@ -107,13 +115,6 @@ export default async function TenantCrmLayout({
   }
 
   /* 4. Branding ----------------------------------------------------------- */
-  const { data: branding } = await supabase
-    .from('tenant_branding')
-    .select(
-      'primary_color, secondary_color, accent_color, logo_url, banner_url, font_family',
-    )
-    .eq('tenant_id', tenant.id)
-    .maybeSingle();
 
   const isSolee = tenant.slug === 'solee';
   const primaryColor =
@@ -152,10 +153,6 @@ export default async function TenantCrmLayout({
   }
 
   /* 6. Features habilitadas ---------------------------------------------- */
-  const { data: featureRows } = await supabase
-    .from('tenant_features')
-    .select('feature_key, enabled')
-    .eq('tenant_id', tenant.id);
 
   const enabledFeatures = (featureRows ?? [])
     .filter((f: FeatureRow) => f.enabled)
@@ -173,71 +170,48 @@ export default async function TenantCrmLayout({
     <ModuleRail slug={tenant.slug} tenantId={tenant.id} enabledFeatures={enabledFeatures} isSuperAdmin={admin} />
   );
 
-  // POS y Warehouse usan su propia barra lateral: sin el menú del CRM.
-  const vPath = headers().get('x-vora-path') ?? '';
-  const ownShell = [`/t/${params.slug}/pos`, `/t/${params.slug}/warehouse`].some(
-    (p) => vPath === p || vPath.startsWith(`${p}/`),
-  );
-  if (ownShell) {
-    return (
-      <div
-        data-tenant-root
-        className="min-h-screen bg-[#F6F2E9]"
-        style={{
-          '--crm-primary': primaryColor,
-          '--crm-secondary': secondaryColor,
-          '--crm-accent': accentColor,
-          fontFamily: getFontFamily(branding?.font_family),
-        } as React.CSSProperties}
-      >
-        <div className="flex min-h-screen">
-          {rail}
-          <div className="min-w-0 flex-1">{children}</div>
-        </div>
-      </div>
-    );
-  }
-
   /* 7. Render ------------------------------------------------------------- */
-  const wrapperStyle = {
-    '--crm-primary': primaryColor,
-    '--crm-secondary': secondaryColor,
-    '--crm-accent': accentColor,
-    fontFamily: getFontFamily(branding?.font_family),
-  } as React.CSSProperties;
-
+  // El menú del CRM se oculta en POS y Warehouse (tienen barra propia). La decisión
+  // se toma en el cliente (TenantFrame) porque el layout no se re-renderiza al navegar.
   return (
-    <div data-tenant-root className="min-h-screen bg-[#f1f3f9]" style={wrapperStyle}>
-      <div className="flex min-h-screen">
-        {rail}
-        <CrmSidebar
-          tenantId={tenant.id}
-          slug={tenant.slug}
-          tenantName={tenant.commercial_name}
-          logoUrl={logoUrl}
-          primaryColor={primaryColor}
-          secondaryColor={secondaryColor}
-          accentColor={accentColor}
-          sidebarBannerUrl={sidebarBannerUrl}
-          enabledFeatures={enabledFeatures}
-          userRole={userRole}
-          isPreview={isPreview}
-        />
-
-        <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-y-auto">
-          <main className="flex-1 p-4 pt-16 sm:p-5 sm:pt-16 md:pt-5 lg:p-6">
-            {(admin || ['tenant_admin', 'admin'].includes(userRole)) && (
-              <a
-                href={`/t/${tenant.slug}/subscription`}
-                className="mb-4 inline-block text-sm underline"
-              >
-                Suscripción y Pago Móvil
-              </a>
-            )}
-            {children}
-          </main>
-        </div>
-      </div>
+    <div
+      data-tenant-root
+      className="min-h-screen"
+      style={{
+        '--crm-primary': primaryColor,
+        '--crm-secondary': secondaryColor,
+        '--crm-accent': accentColor,
+        fontFamily: getFontFamily(branding?.font_family),
+      } as React.CSSProperties}
+    >
+      <TenantFrame
+        slug={tenant.slug}
+        rail={rail}
+        sidebar={
+          <CrmSidebar
+            tenantId={tenant.id}
+            slug={tenant.slug}
+            tenantName={tenant.commercial_name}
+            logoUrl={logoUrl}
+            primaryColor={primaryColor}
+            secondaryColor={secondaryColor}
+            accentColor={accentColor}
+            sidebarBannerUrl={sidebarBannerUrl}
+            enabledFeatures={enabledFeatures}
+            userRole={userRole}
+            isPreview={isPreview}
+          />
+        }
+        topLink={
+          (admin || ['tenant_admin', 'admin'].includes(userRole)) && (
+            <a href={`/t/${tenant.slug}/subscription`} className="mb-4 inline-block text-sm underline">
+              Suscripción y Pago Móvil
+            </a>
+          )
+        }
+      >
+        {children}
+      </TenantFrame>
     </div>
   );
 }

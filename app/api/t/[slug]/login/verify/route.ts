@@ -82,7 +82,7 @@ export async function POST(
       role === 'pos_store_admin'
     ) {
       redirectUrl = `/t/${params.slug}/pos`;
-    } else if (role === 'warehouse_manager' || role === 'warehouse_operator') {
+    } else if (role.startsWith('wh_')) {
       redirectUrl = `/t/${params.slug}/warehouse`;
     } else {
       redirectUrl = `/t/${params.slug}`;

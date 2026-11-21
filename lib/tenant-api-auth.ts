@@ -11,6 +11,8 @@ export interface TenantApiAccess {
   userId: string;
   /** Rol de la membresía, o 'super_admin' para Venesoft. */
   role: string;
+  /** Correo de la sesión, para registrar quién autoriza una operación. */
+  email: string | null;
 }
 
 export type TenantApiAuthResult =
@@ -39,15 +41,15 @@ export async function authorizeTenantApi(
   };
 
   const service = getSupabaseServiceClient();
-  const { data: tenant } = await service
-    .from('tenants')
-    .select('id')
-    .eq('slug', slug)
-    .maybeSingle();
+  // Empresa y rol de plataforma son independientes: se consultan en paralelo.
+  const [{ data: tenant }, admin] = await Promise.all([
+    service.from('tenants').select('id').eq('slug', slug).maybeSingle(),
+    isSuperAdmin(user.id, session),
+  ]);
   if (!tenant) return denied;
 
-  if (await isSuperAdmin(user.id, session))
-    return { ok: true, access: { tenantId: tenant.id, userId: user.id, role: 'super_admin' } };
+  if (admin)
+    return { ok: true, access: { tenantId: tenant.id, userId: user.id, role: 'super_admin', email: user.email ?? null } };
 
   const { data: membership } = await service
     .from('tenant_memberships')
@@ -60,6 +62,33 @@ export async function authorizeTenantApi(
 
   return {
     ok: true,
-    access: { tenantId: tenant.id, userId: user.id, role: membership.role },
+    access: { tenantId: tenant.id, userId: user.id, role: membership.role, email: user.email ?? null },
   };
+}
+
+/** Roles con todos los permisos del tenant. */
+const FULL_ACCESS_ROLES = new Set(['super_admin', 'tenant_admin']);
+
+/**
+ * Comprueba un permiso de acción (p. ej. 'pos.sales.create') para el rol de la
+ * membresía ya autorizada, según role_permissions (scope 'tenant').
+ */
+export async function hasTenantPermission(
+  access: TenantApiAccess,
+  permission: string,
+): Promise<boolean> {
+  if (FULL_ACCESS_ROLES.has(access.role)) return true;
+  const { data } = await getSupabaseServiceClient()
+    .from('role_permissions')
+    .select('permission')
+    .eq('role_key', access.role)
+    .eq('permission', permission)
+    .eq('scope', 'tenant')
+    .maybeSingle();
+  return Boolean(data);
+}
+
+/** Respuesta 403 estándar cuando falta un permiso de acción. */
+export function permissionDenied(message = 'No tienes permiso para esta operación.'): NextResponse {
+  return NextResponse.json({ ok: false, error: message }, { status: 403 });
 }
