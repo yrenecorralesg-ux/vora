@@ -209,6 +209,41 @@ async function main() {
     await assert.rejects(doc(tA, { doc_type: 'receipt', warehouse_id: whB, lines: [{ item_id: item, quantity: 1, unit_cost: 1 }] }), /Almacén no disponible/);
   });
 
+  await test('a transfer moves stock to in-transit and the destination receives it at origin cost', async () => {
+    const whB2 = (await one("INSERT INTO warehouse_warehouses(tenant_id,code,name) VALUES($1,'SUC-2','Sucursal 2') RETURNING id", [tA])).id;
+    await doc(tA, { doc_type: 'receipt', warehouse_id: whA, lines: [{ item_id: item, quantity: 10, unit_cost: 6 }] });
+    const before = await bal(item);
+    const ship = (key, qty) => one('SELECT warehouse_ship_transfer($1,$2,$3::jsonb) AS id', [tA, alice, JSON.stringify({
+      idempotency_key: key, from_warehouse_id: whA, to_warehouse_id: whB2, lines: [{ item_id: item, quantity: qty }] })]).then((r) => r.id);
+    const key = randomUUID();
+    const t1 = await ship(key, 4);
+    assert.equal(await ship(key, 4), t1); // idempotente
+    assert.equal((await bal(item)).on_hand, before.on_hand - 4);
+    const dest = () => one('SELECT on_hand::float AS on_hand, in_transit::float AS in_transit, avg_cost::float AS avg FROM warehouse_balances WHERE item_id=$1 AND warehouse_id=$2', [item, whB2]);
+    assert.deepEqual([(await dest()).on_hand, (await dest()).in_transit], [0, 4]);
+    await svc('SELECT warehouse_close_transfer($1,$2,$3,$4)', [tA, admin, t1, 'receive']);
+    const d = await dest();
+    assert.deepEqual([d.on_hand, d.in_transit], [4, 0]);
+    assert.ok(Math.abs(d.avg - before.avg) < 0.01, `costo destino ${d.avg} vs origen ${before.avg}`);
+    await assert.rejects(svc('SELECT warehouse_close_transfer($1,$2,$3,$4)', [tA, admin, t1, 'cancel']), /ya fue cerrada/);
+    // Cancelar devuelve al origen y libera el tránsito.
+    const t2 = await ship(randomUUID(), 2);
+    await svc('SELECT warehouse_close_transfer($1,$2,$3,$4)', [tA, admin, t2, 'cancel']);
+    assert.equal((await dest()).in_transit, 0);
+    assert.equal((await bal(item)).on_hand, before.on_hand - 4);
+    // No se puede enviar más de lo disponible ni al mismo almacén.
+    await assert.rejects(ship(randomUUID(), 100000), /Stock insuficiente/);
+    await assert.rejects(one('SELECT warehouse_ship_transfer($1,$2,$3::jsonb) AS id', [tA, alice, JSON.stringify({
+      idempotency_key: randomUUID(), from_warehouse_id: whA, to_warehouse_id: whA, lines: [{ item_id: item, quantity: 1 }] })]), /distintos/);
+  });
+
+  await test('new warehouse tables are readable only by members and functions only by the server', async () => {
+    await assert.rejects(as('authenticated', 'SELECT warehouse_ship_transfer($1,$2,$3::jsonb)', [tA, alice, '{}'], alice), /permission denied/);
+    await assert.rejects(as('authenticated', 'INSERT INTO tenant_role_matrix(tenant_id,role_key) VALUES($1,$2)', [tA, 'wh_clerk'], alice));
+    assert.equal((await as('authenticated', 'SELECT count(*)::int AS n FROM warehouse_transfers', [], bob)).rows[0].n, 0);
+    assert.ok((await as('authenticated', 'SELECT count(*)::int AS n FROM warehouse_transfers', [], alice)).rows[0].n >= 2);
+  });
+
   console.log(`${passed} warehouse tests passed`);
 }
 main().catch((e) => {

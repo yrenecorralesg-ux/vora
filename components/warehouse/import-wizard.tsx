@@ -49,7 +49,7 @@ export function ImportWizard({ slug, initialOperation }: { slug: string; initial
   };
 
   const missing = spec.required.filter((c) => !mapping[c]);
-  const select = 'h-9 rounded-lg border border-[#DCE3DF] bg-white px-2 text-[13px]';
+  const select = 'h-9 rounded-xl border border-[#E7E2D7] bg-white px-2 text-[13px]';
 
   return (
     <div className="space-y-4">
@@ -70,12 +70,12 @@ export function ImportWizard({ slug, initialOperation }: { slug: string; initial
           </select>
         </FieldLabel>
         <FieldLabel label="2. Archivo CSV (máx. 2 MB)">
-          <input type="file" accept=".csv,text/csv" onChange={(e) => onFile(e.target.files?.[0])} className="text-[13px] file:mr-3 file:rounded-lg file:border-0 file:bg-[#EEF3EF] file:px-3 file:py-2 file:text-[#285C49]" />
+          <input type="file" accept=".csv,text/csv" onChange={(e) => onFile(e.target.files?.[0])} className="text-[13px] file:mr-3 file:rounded-xl file:border-0 file:bg-[#EEF3EF] file:px-3 file:py-2 file:text-[#285C49]" />
         </FieldLabel>
       </div>
 
       {file && (
-        <div className="space-y-3 rounded-xl border border-[#DCE3DF] p-3">
+        <div className="space-y-3 rounded-xl border border-[#E7E2D7] p-3">
           <p className="text-[12px] text-slate-600">
             <strong>{file.name}</strong>: {file.rows} filas, {file.headers.length} columnas detectadas.
           </p>
@@ -99,7 +99,7 @@ export function ImportWizard({ slug, initialOperation }: { slug: string; initial
       )}
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={!file || missing.length > 0 || busy} onClick={validate} className="h-9 rounded-lg bg-[#285C49] px-5 text-[13px] font-semibold text-white disabled:opacity-50">
+        <button type="button" disabled={!file || missing.length > 0 || busy} onClick={validate} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#285C49] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] disabled:opacity-50">
           {busy ? 'Validando…' : '4. Validar en servidor'}
         </button>
         {file && missing.length > 0 && <span className="text-[12px] text-amber-700">Falta mapear: {missing.join(', ')}</span>}
@@ -132,7 +132,7 @@ export function ImportConfirm({ slug, jobId, hasErrors, validRows, canApply }: {
   return (
     <div className="space-y-3">
       {hasErrors && (
-        <label className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-[13px] text-amber-900">
+        <label className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900">
           <input type="checkbox" checked={partial} onChange={(e) => setPartial(e.target.checked)} className="mt-0.5" />
           <span>
             Acepto aplicar solo las {validRows} filas válidas. Las filas con error quedan registradas como rechazadas y no se aplican.
@@ -141,11 +141,11 @@ export function ImportConfirm({ slug, jobId, hasErrors, validRows, canApply }: {
       )}
       <div className="flex flex-wrap items-center gap-3">
         {canApply && (
-          <button type="button" disabled={busy || validRows === 0 || (hasErrors && !partial)} onClick={() => act('apply')} className="h-9 rounded-lg bg-[#285C49] px-5 text-[13px] font-semibold text-white disabled:opacity-50">
+          <button type="button" disabled={busy || validRows === 0 || (hasErrors && !partial)} onClick={() => act('apply')} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#285C49] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] disabled:opacity-50">
             {busy ? 'Aplicando…' : 'Confirmar importación'}
           </button>
         )}
-        <button type="button" disabled={busy} onClick={() => act('cancel')} className="h-9 rounded-lg border border-[#DCE3DF] px-4 text-[13px]">Cancelar</button>
+        <button type="button" disabled={busy} onClick={() => act('cancel')} className="h-9 rounded-xl border border-[#E7E2D7] px-4 text-[13px]">Cancelar</button>
         {msg && <p role="status" className={`text-[13px] ${msg.ok ? 'text-emerald-700' : 'text-rose-700'}`}>{msg.text}</p>}
       </div>
       {!canApply && <p className="text-[12px] text-slate-500">Tu rol puede validar pero no aplicar importaciones; pide a un administrador de almacén que la confirme.</p>}

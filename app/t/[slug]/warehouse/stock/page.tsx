@@ -1,8 +1,9 @@
 import Link from 'next/link';
+import { AlertTriangle, ArrowDownToLine, Boxes, DollarSign, Download, PackageCheck, PackageX, ShieldAlert } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { loadStock } from '@/lib/warehouse/queries';
 import { fmtCost, fmtMoney, fmtQty } from '@/lib/warehouse/format';
-import { ActionsBar, DataTable, DownloadLink, FilterBar, Kpi, KpiGrid, Panel, Pill, PrimaryLink, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, DownloadLink, EmptyState, FilterBar, Kpi, KpiGrid, Panel, Pill, PrimaryLink, SearchInput, WhHeader, btn } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,27 +23,40 @@ export default async function StockPage({
   ]);
   const q = (searchParams.q ?? '').toLowerCase().trim();
   const rows = all.filter((r) => (!searchParams.alert || r.alert) && (!q || r.sku.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)));
+  const filtered = Boolean(q || searchParams.alert || searchParams.warehouse);
   const cost = ctx.can('cost.view');
   const exportHref = `/api/t/${params.slug}/warehouse/export?kind=stock${searchParams.warehouse ? `&warehouse=${searchParams.warehouse}` : ''}`;
+  const out = all.filter((r) => r.alert === 'Sin stock').length;
+  const low = all.filter((r) => r.alert === 'Stock bajo').length;
 
   return (
-    <div className="space-y-4">
-      <WhHeader code="WH-09" title="Stock y alertas" subtitle="Stock disponible, reservado y mínimo">
-        <DownloadLink href={exportHref}>Exportar</DownloadLink>
-        {ctx.can('stock.receive') && <PrimaryLink href={`${base}/receipts`}>Ver reposición</PrimaryLink>}
+    <div className="space-y-5">
+      <WhHeader code="WH-09" icon={Boxes} title="Stock y alertas" subtitle="Stock disponible, reservado y mínimo">
+        <DownloadLink href={exportHref}>
+          <Download className="h-4 w-4" /> Exportar
+        </DownloadLink>
+        {ctx.can('stock.receive') && (
+          <PrimaryLink href={`${base}/receipts`}>
+            <ArrowDownToLine className="h-4 w-4" /> Ver reposición
+          </PrimaryLink>
+        )}
       </WhHeader>
 
       <KpiGrid>
-        <Kpi label="Líneas de stock" value={fmtQty(all.length)} />
-        <Kpi label="Agotados" value={fmtQty(all.filter((r) => r.alert === 'Sin stock').length)} tone="danger" />
-        <Kpi label="Bajo mínimo" value={fmtQty(all.filter((r) => r.alert === 'Stock bajo').length)} tone="warn" />
-        {cost ? <Kpi label="Valor (costo promedio)" value={fmtMoney(all.reduce((s, r) => s + r.value, 0))} /> : <Kpi label="Dañado (unidades)" value={fmtQty(all.reduce((s, r) => s + r.damaged, 0))} />}
+        <Kpi icon={Boxes} label="Líneas de stock" value={fmtQty(all.length)} hint="Artículo × almacén" />
+        <Kpi icon={PackageX} label="Agotados" value={fmtQty(out)} tone={out ? 'danger' : 'good'} hint={out ? 'Sin unidades disponibles' : 'Ninguno'} href={`${base}/stock?alert=1`} />
+        <Kpi icon={AlertTriangle} label="Bajo mínimo" value={fmtQty(low)} tone={low ? 'warn' : 'good'} hint={low ? 'Conviene reponer' : 'Ninguno'} href={`${base}/stock?alert=1`} />
+        {cost ? (
+          <Kpi icon={DollarSign} label="Valor del inventario" value={fmtMoney(all.reduce((s, r) => s + r.value, 0))} hint="A costo promedio ponderado" />
+        ) : (
+          <Kpi icon={ShieldAlert} label="Dañado (unidades)" value={fmtQty(all.reduce((s, r) => s + r.damaged, 0))} hint="No disponible para la venta" />
+        )}
       </KpiGrid>
 
-      <Panel>
-        <div className="space-y-3">
-          <FilterBar>
-            <input name="q" defaultValue={searchParams.q} placeholder="SKU o nombre" aria-label="Buscar" />
+      <Panel title="Existencias" description="Disponible = físico − reservado. El stock dañado no se puede vender.">
+        <div className="space-y-4">
+          <FilterBar resetHref={filtered ? `${base}/stock` : undefined}>
+            <SearchInput defaultValue={searchParams.q} placeholder="Buscar por SKU o nombre" />
             <select name="warehouse" defaultValue={searchParams.warehouse ?? ''} aria-label="Almacén">
               <option value="">Todos los almacenes</option>
               {(warehouses ?? []).map((w) => (
@@ -55,30 +69,51 @@ export default async function StockPage({
             </select>
           </FilterBar>
           <DataTable
-            head={['SKU', 'Artículo', 'Almacén', 'Físico', 'Reservado', 'Disponible', 'Dañado', 'Mínimo', 'Alerta', ...(cost ? ['Costo prom.'] : [])]}
-            empty="Sin existencias para los filtros elegidos."
+            head={['Artículo', 'Almacén', 'Físico', 'Reservado', 'Disponible', 'Dañado', 'En tránsito', 'Mínimo', 'Estado', ...(cost ? ['Costo prom.'] : [])]}
+            empty={
+              filtered ? (
+                <EmptyState icon={PackageCheck} title="Sin resultados" description="Nada coincide con los filtros elegidos." action={<Link href={`${base}/stock`} className={btn.secondary}>Ver todo el stock</Link>} />
+              ) : (
+                <EmptyState
+                  icon={Boxes}
+                  title="Aún no hay existencias"
+                  description="Registra una entrada o importa el stock inicial."
+                  action={ctx.can('stock.receive') ? <Link href={`${base}/receipts`} className={btn.primary}>Registrar entrada</Link> : undefined}
+                />
+              )
+            }
           >
-            {rows.map((r) => (
-              <tr key={`${r.item_id}-${r.warehouse_id}`}>
-                <td className="font-mono text-[11px]">
-                  <Link href={`${base}/catalog/${r.item_id}`} className="text-[#285C49] underline">{r.sku}</Link>
-                </td>
-                <td>{r.name}</td>
-                <td>{r.warehouse_code}</td>
-                <td className="tabular-nums">{fmtQty(r.on_hand)} {r.unit}</td>
-                <td className="tabular-nums">{fmtQty(r.reserved)}</td>
-                <td className="tabular-nums font-medium">{fmtQty(r.available)}</td>
-                <td className="tabular-nums">{fmtQty(r.damaged)}</td>
-                <td className="tabular-nums">{fmtQty(r.min_stock)}</td>
-                <td>{r.alert ? <Pill tone={r.alert === 'Sin stock' ? 'red' : 'amber'}>{r.alert}</Pill> : <Pill tone="green">OK</Pill>}</td>
-                {cost && <td className="tabular-nums">{fmtCost(r.avg_cost)}</td>}
-              </tr>
-            ))}
+            {rows.map((r) => {
+              const pct = r.min_stock > 0 ? Math.min(100, (r.available / (r.min_stock * 2)) * 100) : 100;
+              return (
+                <tr key={`${r.item_id}-${r.warehouse_id}`}>
+                  <td>
+                    <Link href={`${base}/catalog/${r.item_id}`} className="font-medium hover:text-[#285C49] hover:underline">{r.name}</Link>
+                    <p className="font-mono text-[11px] text-slate-500">{r.sku}</p>
+                  </td>
+                  <td className="text-slate-600">{r.warehouse_code}</td>
+                  <td className="tabular-nums">{fmtQty(r.on_hand)} <span className="text-slate-500">{r.unit}</span></td>
+                  <td className="tabular-nums text-slate-600">{fmtQty(r.reserved)}</td>
+                  <td>
+                    <span className="tabular-nums font-semibold">{fmtQty(r.available)}</span>
+                    <div className="mt-1 h-1 w-16 overflow-hidden rounded-full bg-[#F1EDE5]">
+                      <div
+                        className={`h-full rounded-full ${r.alert === 'Sin stock' ? 'bg-rose-500' : r.alert ? 'bg-amber-500' : 'bg-[#1E7A55]'}`}
+                        style={{ width: `${Math.max(4, pct)}%` }}
+                      />
+                    </div>
+                  </td>
+                  <td className="tabular-nums text-slate-600">{r.damaged ? fmtQty(r.damaged) : '—'}</td>
+                  <td className="tabular-nums text-slate-600">{r.in_transit ? fmtQty(r.in_transit) : '—'}</td>
+                  <td className="tabular-nums text-slate-600">{fmtQty(r.min_stock)}</td>
+                  <td>{r.alert === 'Sin stock' ? <Pill tone="red">Agotado</Pill> : r.alert ? <Pill tone="amber">Bajo</Pill> : <Pill tone="green">Normal</Pill>}</td>
+                  {cost && <td className="tabular-nums text-slate-600">{fmtCost(r.avg_cost)}</td>}
+                </tr>
+              );
+            })}
           </DataTable>
-          <p className="text-[11px] text-slate-500">Disponible = físico − reservado. El stock dañado no se puede vender. En tránsito se habilitará con las transferencias entre almacenes.</p>
         </div>
       </Panel>
-      <ActionsBar items={['Ver reposición', 'Exportar']} />
     </div>
   );
 }

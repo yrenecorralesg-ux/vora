@@ -1,9 +1,10 @@
+import { History } from 'lucide-react';
 import Link from 'next/link';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { loadKardex } from '@/lib/warehouse/queries';
 import { MOVEMENT_TYPES } from '@/lib/warehouse/catalog';
 import { fmtCost, fmtDate, fmtQty, signed } from '@/lib/warehouse/format';
-import { ActionsBar, DataTable, DownloadLink, FilterBar, Panel, Pill, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, DownloadLink, FilterBar, Panel, Pill, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,7 +37,7 @@ export default async function KardexPage({
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-08" title="Kardex y auditoría" subtitle={item.data ? `${item.data.sku} · ${item.data.name}` : 'Historial inmutable por artículo'}>
+      <WhHeader code="WH-08" icon={History} title="Kardex y auditoría" subtitle={item.data ? `${item.data.sku} · ${item.data.name}` : 'Historial inmutable por artículo'}>
         <DownloadLink href={`/api/t/${params.slug}/warehouse/export?kind=kardex${qs ? `&${qs}` : ''}`}>Exportar</DownloadLink>
       </WhHeader>
       <Panel>
@@ -100,7 +101,6 @@ export default async function KardexPage({
           <p className="text-[11px] text-slate-500">Los movimientos no se editan ni se eliminan: las correcciones se registran como reversos. Se muestran los 300 más recientes; exporta para ver hasta 5.000.</p>
         </div>
       </Panel>
-      <ActionsBar items={['Exportar', 'Filtrar']} />
     </div>
   );
 }

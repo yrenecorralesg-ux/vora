@@ -1,9 +1,10 @@
+import { History } from 'lucide-react';
 import Link from 'next/link';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { IMPORT_OPERATIONS } from '@/lib/warehouse/catalog';
 import { JOB_STATUS } from '@/lib/warehouse/imports-data';
 import { fmtDate, fmtQty } from '@/lib/warehouse/format';
-import { ActionsBar, DataTable, Panel, Pill, PrimaryLink, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, Pill, PrimaryLink, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export default async function ImportHistoryPage({ params }: { params: { slug: st
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-27" title="Historial de importaciones" subtitle="Auditoría y reintentos seguros">
+      <WhHeader code="WH-27" icon={History} title="Historial de importaciones" subtitle="Auditoría y reintentos seguros">
         <PrimaryLink href={base}>Nueva importación</PrimaryLink>
       </WhHeader>
       <Panel>
@@ -47,7 +48,6 @@ export default async function ImportHistoryPage({ params }: { params: { slug: st
           Reintentar es seguro: un archivo ya aplicado (mismo contenido y operación) no puede aplicarse otra vez, así no se duplican movimientos.
         </p>
       </Panel>
-      <ActionsBar items={['Ver detalle', 'Exportar']} />
     </div>
   );
 }

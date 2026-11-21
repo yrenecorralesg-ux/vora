@@ -1,8 +1,9 @@
+import { Warehouse } from 'lucide-react';
 import Link from 'next/link';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { fmtMoney, fmtQty } from '@/lib/warehouse/format';
 import { ConfigForm, type ConfigField } from '@/components/warehouse/config-form';
-import { ActionsBar, DataTable, Panel, Pill, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, Pill, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,7 @@ export default async function WarehousesPage({ params }: { params: { slug: strin
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-04" title="Almacenes y ubicaciones" subtitle="Existencias por sede y depósito" />
+      <WhHeader code="WH-04" icon={Warehouse} title="Almacenes y ubicaciones" subtitle="Existencias por sede y depósito" />
       <Panel title="Almacenes">
         <DataTable head={['Almacén', 'Sede', 'Productos con stock', ...(ctx.can('cost.view') ? ['Valor'] : []), 'Estado', '']}>
           {(warehouses ?? []).map((w) => {
@@ -70,7 +71,6 @@ export default async function WarehousesPage({ params }: { params: { slug: strin
           <ConfigForm slug={params.slug} entity="warehouse" fields={fields} initial={{ code: '', name: '', branch_id: '', address: '', status: 'active' }} submitLabel="Crear almacén" resetOnSuccess />
         </Panel>
       )}
-      <ActionsBar items={['Nuevo almacén', 'Ver stock']} />
     </div>
   );
 }

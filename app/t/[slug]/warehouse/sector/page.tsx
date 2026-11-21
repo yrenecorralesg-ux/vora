@@ -1,8 +1,9 @@
+import { Store } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { BUSINESS_SECTORS, BUSINESS_TEMPLATES } from '@/lib/warehouse/catalog';
 import { fmtDate } from '@/lib/warehouse/format';
 import { SectorForm } from '@/components/warehouse/sector-form';
-import { ActionsBar, DataTable, Panel, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,7 +15,7 @@ export default async function SectorPage({ params }: { params: { slug: string } 
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-15" title="Alta de empresa y sector" subtitle="Selección de actividad y plantilla" />
+      <WhHeader code="WH-15" icon={Store} title="Alta de empresa y sector" subtitle="Selección de actividad y plantilla" />
       {profile && (
         <Panel title="Perfil actual">
           <DataTable head={['Sector', 'Especialidad', 'Plantilla', 'Aplicada']}>
@@ -37,7 +38,6 @@ export default async function SectorPage({ params }: { params: { slug: string } 
           Aplicar una plantilla solo agrega los atributos que falten. No borra atributos existentes ni bloquea funciones de otros sectores; después puedes personalizarlos en Atributos.
         </p>
       </Panel>
-      <ActionsBar items={['Aplicar plantilla', 'Personalizar']} />
     </div>
   );
 }

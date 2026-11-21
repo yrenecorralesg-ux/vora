@@ -27,12 +27,19 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
   if (!ctx.can(PERMISSION_BY_TYPE[docType]))
     return NextResponse.json({ error: 'No tienes permiso para esta acción.' }, { status: 403 });
 
+  if (!ctx.canUseWarehouse(body.warehouse_id as string))
+    return NextResponse.json({ error: 'No tienes acceso a ese almacén.' }, { status: 403 });
+
   const key = String(body.idempotency_key ?? '');
   if (!UUID_RE.test(key)) return NextResponse.json({ error: 'Falta la clave de idempotencia.' }, { status: 400 });
   if (!Array.isArray(body.lines) || body.lines.length === 0)
     return NextResponse.json({ error: 'Agrega al menos una línea.' }, { status: 400 });
   if (body.evidence_url && !/^https:\/\/\S+$/.test(String(body.evidence_url)))
     return NextResponse.json({ error: 'La evidencia debe ser un enlace https.' }, { status: 400 });
+
+  const evidencePath = body.evidence_path ? String(body.evidence_path) : null;
+  if (evidencePath && (docType !== 'adjustment' || !evidencePath.startsWith(`${ctx.tenantId}/`) || evidencePath.includes('..')))
+    return NextResponse.json({ error: 'Evidencia inválida.' }, { status: 400 });
 
   const lines = (body.lines as Record<string, unknown>[]).map((l) => ({
     item_id: l.item_id,
@@ -91,6 +98,8 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
     p_post: post,
   });
   if (error) return dbErrorResponse(error, 'No se pudo registrar el documento.');
+  if (evidencePath)
+    await ctx.service.from('warehouse_documents').update({ evidence_path: evidencePath }).eq('tenant_id', ctx.tenantId).eq('id', data as string);
   const { data: doc } = await ctx.service
     .from('warehouse_documents')
     .select('id, number, status')

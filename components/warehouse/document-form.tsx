@@ -81,6 +81,27 @@ export function DocumentForm({
   const [warehouseId, setWarehouseId] = useState(defaultWarehouseId ?? warehouses[0]?.id ?? '');
   const [lines, setLines] = useState<DocLine[]>(initialLines);
   const [header, setHeader] = useState({ reason: reasons[0] ?? '', reference: '', notes: '', supplier_id: '', evidence_url: '' });
+  const [evidence, setEvidence] = useState<{ path: string; name: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+
+  // Evidencia del ajuste (WH-07): se sube a Storage privado y se adjunta por su ruta.
+  const uploadEvidence = async (file: File | undefined) => {
+    if (!file) return;
+    setUploading(true);
+    setResult(null);
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch(`/api/t/${slug}/warehouse/evidence`, { method: 'POST', body: fd });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) setResult({ ok: false, text: json.error ?? 'No se pudo subir la evidencia.' });
+      else setEvidence({ path: json.path, name: file.name });
+    } catch {
+      setResult({ ok: false, text: 'Sin conexión con el servidor.' });
+    } finally {
+      setUploading(false);
+    }
+  };
   const [key, setKey] = useState(newKey);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string; docId?: string } | null>(null);
@@ -120,6 +141,7 @@ export function DocumentForm({
       idempotency_key: key,
       warehouse_id: warehouseId,
       ...header,
+      evidence_path: evidence?.path ?? null,
       lines: lines.map((l) => ({
         item_id: l.item.id,
         quantity: l.quantity,
@@ -142,12 +164,13 @@ export function DocumentForm({
       text: doc.status === 'pending_approval' ? `${doc.number} quedó pendiente de aprobación.` : `${doc.number} registrado y contabilizado.`,
     });
     setLines([]);
+    setEvidence(null);
     setKey(newKey());
     onPosted?.();
     router.refresh();
   };
 
-  const cell = 'h-8 w-full rounded-md border border-[#DCE3DF] px-2 text-[13px]';
+  const cell = 'h-8 w-full rounded-md border border-[#E7E2D7] px-2 text-[13px]';
   return (
     <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -158,7 +181,7 @@ export function DocumentForm({
               setWarehouseId(e.target.value);
               if (docType === 'adjustment') lines.forEach((l) => refreshSystem(l, e.target.value));
             }}
-            className="h-9 rounded-lg border border-[#DCE3DF] bg-white px-2 text-[13px]"
+            className="h-9 rounded-xl border border-[#E7E2D7] bg-white px-2 text-[13px]"
           >
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>{w.label}</option>
@@ -167,7 +190,7 @@ export function DocumentForm({
         </FieldLabel>
         {docType === 'receipt' && (
           <FieldLabel label="Proveedor (opcional)">
-            <select value={header.supplier_id} onChange={(e) => setHeader({ ...header, supplier_id: e.target.value })} className="h-9 rounded-lg border border-[#DCE3DF] bg-white px-2 text-[13px]">
+            <select value={header.supplier_id} onChange={(e) => setHeader({ ...header, supplier_id: e.target.value })} className="h-9 rounded-xl border border-[#E7E2D7] bg-white px-2 text-[13px]">
               <option value="">—</option>
               {suppliers.map((s) => (
                 <option key={s.id} value={s.id}>{s.label}</option>
@@ -177,7 +200,7 @@ export function DocumentForm({
         )}
         {reasons.length > 0 && (
           <FieldLabel label="Motivo">
-            <select value={header.reason} onChange={(e) => setHeader({ ...header, reason: e.target.value })} className="h-9 rounded-lg border border-[#DCE3DF] bg-white px-2 text-[13px]">
+            <select value={header.reason} onChange={(e) => setHeader({ ...header, reason: e.target.value })} className="h-9 rounded-xl border border-[#E7E2D7] bg-white px-2 text-[13px]">
               {reasons.map((r) => (
                 <option key={r}>{r}</option>
               ))}
@@ -185,11 +208,24 @@ export function DocumentForm({
           </FieldLabel>
         )}
         <FieldLabel label={docType === 'return' ? 'Venta o documento de origen' : docType === 'receipt' ? 'Factura / guía del proveedor' : 'Referencia'}>
-          <input value={header.reference} maxLength={64} onChange={(e) => setHeader({ ...header, reference: e.target.value })} className="h-9 rounded-lg border border-[#DCE3DF] px-3 text-[13px]" />
+          <input value={header.reference} maxLength={64} onChange={(e) => setHeader({ ...header, reference: e.target.value })} className="h-9 rounded-xl border border-[#E7E2D7] px-3 text-[13px]" />
         </FieldLabel>
         {docType === 'adjustment' && (
-          <FieldLabel label="Evidencia (enlace https, opcional)">
-            <input value={header.evidence_url} type="url" placeholder="https://…" onChange={(e) => setHeader({ ...header, evidence_url: e.target.value })} className="h-9 rounded-lg border border-[#DCE3DF] px-3 text-[13px]" />
+          <FieldLabel label="Evidencia (foto o PDF, máx. 5 MB)">
+            {evidence ? (
+              <span className="flex h-9 items-center justify-between gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[12px] text-emerald-800">
+                <span className="truncate">{evidence.name}</span>
+                <button type="button" onClick={() => setEvidence(null)} className="shrink-0 text-emerald-700 hover:underline">Quitar</button>
+              </span>
+            ) : (
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                disabled={uploading}
+                onChange={(e) => uploadEvidence(e.target.files?.[0])}
+                className="h-9 rounded-xl border border-[#E7E2D7] bg-white px-2 py-1.5 text-[12px] file:mr-2 file:rounded-lg file:border-0 file:bg-[#285C49]/10 file:px-2 file:py-0.5 file:text-[12px] file:font-medium file:text-[#285C49]"
+              />
+            )}
           </FieldLabel>
         )}
       </div>
@@ -198,36 +234,36 @@ export function DocumentForm({
         <div className="sm:w-96">
           <ItemPicker slug={slug} onSelect={addItem} />
         </div>
-        <span className="text-[11px] text-slate-500">Agrega líneas buscando el artículo. Servicios y activos alquilables no mueven stock.</span>
+        <span className="text-[11px] text-slate-500">Haz clic en el buscador para ver el catálogo y elige un artículo; con lector de códigos, escanea y pulsa Enter. Los servicios no mueven stock.</span>
       </div>
 
       <div className="-mx-4 overflow-x-auto px-4">
         <table className="w-full min-w-[640px] text-[13px]">
           <thead>
-            <tr className="border-b border-[#DCE3DF] text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              <th className="px-2 py-2">SKU</th>
-              <th className="px-2 py-2">Producto</th>
+            <tr className="border-b border-[#E7E2D7] text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2.5">SKU</th>
+              <th className="px-3 py-2.5">Producto</th>
               {docType === 'adjustment' ? (
                 <>
-                  <th className="px-2 py-2">Existencia</th>
-                  <th className="px-2 py-2">Conteo</th>
-                  <th className="px-2 py-2">Diferencia</th>
+                  <th className="px-3 py-2.5">Existencia</th>
+                  <th className="px-3 py-2.5">Conteo</th>
+                  <th className="px-3 py-2.5">Diferencia</th>
                 </>
               ) : (
                 <>
-                  <th className="px-2 py-2">Cantidad</th>
-                  <th className="px-2 py-2">Unidad</th>
+                  <th className="px-3 py-2.5">Cantidad</th>
+                  <th className="px-3 py-2.5">Unidad</th>
                 </>
               )}
-              {docType === 'receipt' && canSeeCost && <th className="px-2 py-2">Costo unitario USD</th>}
-              {docType === 'return' && <th className="px-2 py-2">Condición</th>}
+              {docType === 'receipt' && canSeeCost && <th className="px-3 py-2.5">Costo unitario USD</th>}
+              {docType === 'return' && <th className="px-3 py-2.5">Condición</th>}
               <th className="w-8" />
             </tr>
           </thead>
           <tbody>
             {lines.length === 0 && (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-slate-500">Sin líneas. Busca un artículo para agregarlo.</td>
+                <td colSpan={7} className="py-8 text-center text-slate-500">Sin líneas todavía. Haz clic en «Buscar SKU, nombre o código…» y elige un artículo.</td>
               </tr>
             )}
             {lines.map((l) => {
@@ -235,11 +271,11 @@ export function DocumentForm({
               return (
                 <tr key={l.key} className="border-b border-[#EFECE4] align-middle">
                   <td className="px-2 py-1.5 font-mono text-[11px]">{l.item.sku}</td>
-                  <td className="px-2 py-1.5">{l.item.name}</td>
+                  <td className="px-3 py-2">{l.item.name}</td>
                   {docType === 'adjustment' ? (
                     <>
                       <td className="px-2 py-1.5 tabular-nums">{l.system == null ? '…' : fmtQty(l.system)}</td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-3 py-2">
                         <input inputMode="decimal" aria-label="Conteo" value={l.counted_qty} onChange={(e) => update(l.key, { counted_qty: e.target.value })} className={`${cell} w-24`} />
                       </td>
                       <td className={`px-2 py-1.5 tabular-nums ${diff && diff < 0 ? 'text-rose-700' : diff ? 'text-emerald-700' : ''}`}>
@@ -248,10 +284,10 @@ export function DocumentForm({
                     </>
                   ) : (
                     <>
-                      <td className="px-2 py-1.5">
+                      <td className="px-3 py-2">
                         <input inputMode="decimal" aria-label="Cantidad" value={l.quantity} onChange={(e) => update(l.key, { quantity: e.target.value })} className={`${cell} w-24`} />
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-3 py-2">
                         <select aria-label="Unidad" value={l.unit_id} onChange={(e) => update(l.key, { unit_id: e.target.value })} className={`${cell} w-24 bg-white`}>
                           {units
                             .filter((u) => family(u.id) === family(l.item.unit_id))
@@ -263,12 +299,12 @@ export function DocumentForm({
                     </>
                   )}
                   {docType === 'receipt' && canSeeCost && (
-                    <td className="px-2 py-1.5">
+                    <td className="px-3 py-2">
                       <input inputMode="decimal" aria-label="Costo unitario" value={l.unit_cost} onChange={(e) => update(l.key, { unit_cost: e.target.value })} className={`${cell} w-28`} />
                     </td>
                   )}
                   {docType === 'return' && (
-                    <td className="px-2 py-1.5">
+                    <td className="px-3 py-2">
                       <select aria-label="Condición" value={l.condition} onChange={(e) => update(l.key, { condition: e.target.value as DocLine['condition'] })} className={`${cell} w-36 bg-white`}>
                         <option value="">Inspeccionar…</option>
                         <option value="sellable">Vendible</option>
@@ -289,7 +325,7 @@ export function DocumentForm({
       </div>
 
       <FieldLabel label="Notas">
-        <textarea value={header.notes} maxLength={1000} rows={2} onChange={(e) => setHeader({ ...header, notes: e.target.value })} className="rounded-lg border border-[#DCE3DF] px-3 py-2 text-[13px]" />
+        <textarea value={header.notes} maxLength={1000} rows={2} onChange={(e) => setHeader({ ...header, notes: e.target.value })} className="rounded-xl border border-[#E7E2D7] px-3 py-2 text-[13px]" />
       </FieldLabel>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -297,7 +333,7 @@ export function DocumentForm({
           type="button"
           disabled={busy || lines.length === 0 || !warehouseId}
           onClick={submit}
-          className="h-9 rounded-lg bg-[#285C49] px-5 text-[13px] font-semibold text-white hover:bg-[#1F4A3A] disabled:opacity-50"
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#285C49] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] disabled:opacity-50"
         >
           {busy ? 'Registrando…' : docType === 'adjustment' && autoApprove ? 'Registrar ajuste' : SUBMIT_LABEL[docType]}
         </button>

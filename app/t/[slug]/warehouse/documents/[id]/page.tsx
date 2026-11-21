@@ -51,6 +51,16 @@ export default async function DocumentPage({ params }: { params: { slug: string;
               <dd>{v}</dd>
             </div>
           ))}
+          {doc.evidence_path && (
+            <div>
+              <dt className="text-[11px] text-slate-500">Evidencia</dt>
+              <dd>
+                <a href={`/api/t/${params.slug}/warehouse/evidence?path=${encodeURIComponent(doc.evidence_path)}`} target="_blank" rel="noopener noreferrer" className="font-medium text-[#285C49] hover:underline">
+                  Ver archivo adjunto
+                </a>
+              </dd>
+            </div>
+          )}
           {doc.evidence_url && (
             <div>
               <dt className="text-[11px] text-slate-500">Evidencia</dt>

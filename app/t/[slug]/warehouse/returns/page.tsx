@@ -1,8 +1,9 @@
+import { Undo2 } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { loadFormOptions } from '@/lib/warehouse/queries';
 import { DocumentForm } from '@/components/warehouse/document-form';
 import { RecentDocuments } from '@/components/warehouse/recent-documents';
-import { ActionsBar, Panel, WhHeader } from '@/components/warehouse/wh-ui';
+import { Panel, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ export default async function ReturnsPage({ params }: { params: { slug: string }
   const opts = await loadFormOptions(ctx);
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-10" title="Devoluciones" subtitle="Recepción y condición de artículos" />
+      <WhHeader code="WH-10" icon={Undo2} title="Devoluciones" subtitle="Recepción y condición de artículos" />
       <Panel title="Registrar devolución">
         <DocumentForm
           slug={params.slug}
@@ -26,7 +27,6 @@ export default async function ReturnsPage({ params }: { params: { slug: string }
         </p>
       </Panel>
       <RecentDocuments ctx={ctx} slug={params.slug} type="return" title="Devoluciones recientes" />
-      <ActionsBar items={['Registrar devolución', 'Inspeccionar']} />
     </div>
   );
 }

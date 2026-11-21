@@ -27,7 +27,7 @@ export function SectorForm({
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const s = sectors.find((x) => x.sector === sector);
   const template = templates.find((t) => t.key === (templateKey || s?.template));
-  const input = 'h-9 rounded-lg border border-[#DCE3DF] bg-white px-2 text-[13px]';
+  const input = 'h-9 rounded-xl border border-[#E7E2D7] bg-white px-2 text-[13px]';
 
   const apply = async () => {
     setBusy(true);
@@ -75,7 +75,7 @@ export function SectorForm({
         </FieldLabel>
       </div>
       {template && s && (
-        <div className="rounded-xl border border-[#DCE3DF] p-3">
+        <div className="rounded-xl border border-[#E7E2D7] p-3">
           <p className="mb-2 text-[12px] font-semibold text-[#1B3D2F]">Vista previa: atributos de “{template.name}” v{template.version}</p>
           <div className="flex flex-wrap gap-1.5">
             {template.attributes.map((a) => (
@@ -87,7 +87,7 @@ export function SectorForm({
         </div>
       )}
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={!s || busy} onClick={apply} className="h-9 rounded-lg bg-[#285C49] px-5 text-[13px] font-semibold text-white disabled:opacity-50">
+        <button type="button" disabled={!s || busy} onClick={apply} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#285C49] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] disabled:opacity-50">
           {busy ? 'Aplicando…' : 'Aplicar plantilla'}
         </button>
         <Link href={`/t/${slug}/warehouse/attributes`} className="text-[13px] text-[#285C49] underline">Personalizar atributos</Link>

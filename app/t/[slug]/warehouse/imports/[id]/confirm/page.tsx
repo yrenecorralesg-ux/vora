@@ -1,10 +1,11 @@
+import { FileCheck2 } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { IMPORT_OPERATIONS } from '@/lib/warehouse/catalog';
 import { JOB_STATUS, loadImportJob } from '@/lib/warehouse/imports-data';
 import { fmtDate, fmtQty } from '@/lib/warehouse/format';
 import { ImportConfirm } from '@/components/warehouse/import-wizard';
-import { ActionsBar, DataTable, Panel, Pill, SecondaryLink, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, Pill, SecondaryLink, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,7 +35,7 @@ export default async function ImportConfirmPage({ params }: { params: { slug: st
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-22" title="Confirmación de importación" subtitle={`${IMPORT_OPERATIONS[job.operation].label} · ${job.file_name}`}>
+      <WhHeader code="WH-22" icon={FileCheck2} title="Confirmación de importación" subtitle={`${IMPORT_OPERATIONS[job.operation].label} · ${job.file_name}`}>
         <Pill tone={st.tone}>{st.label}</Pill>
         <SecondaryLink href={`/t/${params.slug}/warehouse/imports/${job.id}`}>Ver validación</SecondaryLink>
       </WhHeader>
@@ -86,8 +87,7 @@ export default async function ImportConfirmPage({ params }: { params: { slug: st
           <ImportConfirm slug={params.slug} jobId={job.id} hasErrors={job.error_rows > 0} validRows={job.valid_rows} canApply={ctx.can('import.apply')} />
         </Panel>
       )}
-      {open && s.duplicate_of && <p className="rounded-lg bg-amber-50 px-4 py-2 text-[13px] text-amber-900">Este archivo ya fue aplicado anteriormente; no puede aplicarse otra vez.</p>}
-      <ActionsBar items={['Confirmar importación', 'Cancelar']} />
+      {open && s.duplicate_of && <p className="rounded-xl bg-amber-50 px-4 py-2 text-[13px] text-amber-900">Este archivo ya fue aplicado anteriormente; no puede aplicarse otra vez.</p>}
     </div>
   );
 }

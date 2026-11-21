@@ -1,4 +1,5 @@
 import 'server-only';
+import * as React from 'react';
 import { NextResponse } from 'next/server';
 import { redirect } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -14,6 +15,7 @@ export const WAREHOUSE_PERMISSIONS = [
   'stock.receive',
   'stock.issue',
   'stock.return',
+  'stock.transfer',
   'stock.adjust.request',
   'stock.adjust.approve',
   'import.validate',
@@ -33,48 +35,79 @@ export interface WarehouseContext extends TenantApiAccess {
   functions: Record<WarehouseFunction, boolean>;
   service: SupabaseClient;
   can: (permission: WarehousePermission) => boolean;
+  /** Almacenes permitidos al usuario; null = todos los de la empresa. */
+  allowedWarehouses: string[] | null;
+  canUseWarehouse: (warehouseId: string | null | undefined) => boolean;
+}
+
+/** Roles con todos los permisos (no se editan en la matriz). */
+export const FULL_ACCESS_ROLES = ['super_admin', 'tenant_admin'];
+
+/**
+ * Permisos efectivos de un rol en una empresa: los de role_permissions, con los
+ * de Warehouse sustituidos por la matriz de la empresa si existe (WH-12).
+ */
+export async function resolveRolePermissions(service: SupabaseClient, tenantId: string, role: string): Promise<Set<string>> {
+  const [{ data: defaults }, { data: matrix }] = await Promise.all([
+    service.from('role_permissions').select('permission').eq('role_key', role).eq('scope', 'tenant'),
+    service.from('tenant_role_matrix').select('permissions').eq('tenant_id', tenantId).eq('role_key', role).maybeSingle(),
+  ]);
+  const base = new Set((defaults ?? []).map((r) => r.permission as string));
+  if (!matrix) return base;
+  const wh = new Set<string>(WAREHOUSE_PERMISSIONS);
+  const result = new Set(Array.from(base).filter((p) => !wh.has(p)));
+  for (const p of (matrix.permissions ?? []) as string[]) if (wh.has(p)) result.add(p);
+  return result;
 }
 
 type Loaded =
   | { ok: true; ctx: WarehouseContext }
   | { ok: false; status: number; error: string; reason: 'suspended' | 'inactive' | 'setup' };
 
-/** Comprueba módulo contratado/activo, carga permisos del rol y prepara la configuración inicial. */
-async function loadContext(access: TenantApiAccess): Promise<Loaded> {
+interface TenantSnapshot {
+  commercial_name: string;
+  commercial_status: string;
+}
+
+/**
+ * Comprueba módulo contratado/activo, carga permisos del rol y prepara la configuración inicial.
+ * Las consultas independientes van en paralelo (2 rondas en lugar de 5): cada ida y vuelta a
+ * Supabase cuesta ~150-200 ms y se pagaba en cada cambio de sección.
+ */
+async function loadContext(access: TenantApiAccess, knownTenant?: TenantSnapshot | null): Promise<Loaded> {
   const service = getSupabaseServiceClient();
-  const [{ data: tenant }, { data: feature }] = await Promise.all([
-    service.from('tenants').select('commercial_name, commercial_status').eq('id', access.tenantId).maybeSingle(),
+  const fullAccess = FULL_ACCESS_ROLES.includes(access.role);
+  const [tenantRes, { data: feature }, { data: settings }, permissions, scopesRes] = await Promise.all([
+    knownTenant
+      ? Promise.resolve({ data: knownTenant })
+      : service.from('tenants').select('commercial_name, commercial_status').eq('id', access.tenantId).maybeSingle(),
     service
       .from('tenant_features')
       .select('enabled, contracted, config')
       .eq('tenant_id', access.tenantId)
       .eq('feature_key', WAREHOUSE_FEATURE)
       .maybeSingle(),
+    service.from('warehouse_settings').select('tenant_id').eq('tenant_id', access.tenantId).maybeSingle(),
+    fullAccess
+      ? Promise.resolve(new Set<string>(WAREHOUSE_PERMISSIONS))
+      : resolveRolePermissions(service, access.tenantId, access.role),
+    // Alcance por almacén: sin filas, el usuario opera en todos.
+    fullAccess
+      ? Promise.resolve({ data: null as { warehouse_id: string }[] | null })
+      : service.from('warehouse_user_scopes').select('warehouse_id').eq('tenant_id', access.tenantId).eq('auth_user_id', access.userId),
   ]);
+  const tenant = tenantRes.data as TenantSnapshot | null;
   if (!tenant || ['suspended', 'cancelled'].includes(tenant.commercial_status))
     return { ok: false, status: 403, error: 'La operación de la empresa no está habilitada.', reason: 'suspended' };
   if (!feature?.enabled || !feature.contracted)
     return { ok: false, status: 403, error: 'El módulo de inventario no está activo para esta empresa.', reason: 'inactive' };
 
-  const fullAccess = access.role === 'super_admin' || access.role === 'tenant_admin';
-  let permissions = new Set<string>(fullAccess ? WAREHOUSE_PERMISSIONS : []);
-  if (!fullAccess) {
-    const { data } = await service
-      .from('role_permissions')
-      .select('permission')
-      .eq('role_key', access.role)
-      .eq('scope', 'tenant');
-    permissions = new Set((data ?? []).map((r) => r.permission as string));
-  }
+  const scopes = scopesRes.data;
+  const allowedWarehouses: string[] | null = scopes && scopes.length ? scopes.map((s) => s.warehouse_id as string) : null;
 
   const configured = ((feature.config as { functions?: Record<string, boolean> } | null)?.functions ?? {});
   const fn = (key: WarehouseFunction) => configured[key] ?? true;
 
-  const { data: settings } = await service
-    .from('warehouse_settings')
-    .select('tenant_id')
-    .eq('tenant_id', access.tenantId)
-    .maybeSingle();
   if (!settings) {
     const { error } = await service.rpc('warehouse_bootstrap', { p_tenant: access.tenantId });
     if (error) return { ok: false, status: 500, error: 'No se pudo preparar el inventario.', reason: 'setup' };
@@ -94,6 +127,8 @@ async function loadContext(access: TenantApiAccess): Promise<Loaded> {
       },
       service,
       can: (p) => permissions.has(p),
+      allowedWarehouses,
+      canUseWarehouse: (id) => !allowedWarehouses || (Boolean(id) && allowedWarehouses.includes(String(id))),
     },
   };
 }
@@ -122,20 +157,30 @@ export async function authorizeWarehouse(
   return { ok: true, ctx };
 }
 
-/** Guardia de las páginas: redirige en lugar de responder JSON. */
-export async function requireWarehousePage(
-  slug: string,
-  opts: { permission?: WarehousePermission; fn?: WarehouseFunction } = {},
-): Promise<WarehouseContext> {
+type PageLoad =
+  | { ok: true; ctx: WarehouseContext }
+  | { ok: false; to: string };
+
+/**
+ * Contexto de la página, memoizado por petición: el layout y la página lo piden en la misma
+ * petición y antes se resolvía dos veces. Sin React.cache (fuera de Next) no memoiza.
+ */
+const memo: <T extends (...args: never[]) => unknown>(fn: T) => T =
+  ((React as unknown as { cache?: <T>(fn: T) => T }).cache) ?? ((fn) => fn);
+
+const loadPageContext = memo(async (slug: string): Promise<PageLoad> => {
   const session = getSupabaseServerClient();
   const user = await requireSession(session);
-  if (!user) redirect(`/t/${slug}/login`);
+  if (!user) return { ok: false, to: `/t/${slug}/login` };
   const service = getSupabaseServiceClient();
-  const { data: tenant } = await service.from('tenants').select('id').eq('slug', slug).maybeSingle();
-  if (!tenant) redirect('/access-pending');
+  const [{ data: tenant }, admin] = await Promise.all([
+    service.from('tenants').select('id, commercial_name, commercial_status').eq('slug', slug).maybeSingle(),
+    isSuperAdmin(user.id, session),
+  ]);
+  if (!tenant) return { ok: false, to: '/access-pending' };
 
   let role = 'super_admin';
-  if (!(await isSuperAdmin(user.id, session))) {
+  if (!admin) {
     const { data: membership } = await service
       .from('tenant_memberships')
       .select('role')
@@ -143,12 +188,22 @@ export async function requireWarehousePage(
       .eq('auth_user_id', user.id)
       .eq('status', 'active')
       .maybeSingle();
-    if (!membership) redirect('/access-pending');
+    if (!membership) return { ok: false, to: '/access-pending' };
     role = membership.role;
   }
 
-  const loaded = await loadContext({ tenantId: tenant.id, userId: user.id, role });
-  if (!loaded.ok) redirect(`/t/${slug}/warehouse/inactive?reason=${loaded.reason}`);
+  const loaded = await loadContext({ tenantId: tenant.id, userId: user.id, role, email: user.email ?? null }, tenant);
+  if (!loaded.ok) return { ok: false, to: `/t/${slug}/warehouse/inactive?reason=${loaded.reason}` };
+  return { ok: true, ctx: loaded.ctx };
+});
+
+/** Guardia de las páginas: redirige en lugar de responder JSON. */
+export async function requireWarehousePage(
+  slug: string,
+  opts: { permission?: WarehousePermission; fn?: WarehouseFunction } = {},
+): Promise<WarehouseContext> {
+  const loaded = await loadPageContext(slug);
+  if (!loaded.ok) redirect(loaded.to);
   const { ctx } = loaded;
   if (opts.fn && !ctx.functions[opts.fn]) redirect(`/t/${slug}/warehouse`);
   if (opts.permission && !ctx.can(opts.permission)) redirect(`/t/${slug}/warehouse`);

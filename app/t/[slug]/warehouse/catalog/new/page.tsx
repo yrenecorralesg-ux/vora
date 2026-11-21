@@ -1,3 +1,4 @@
+import { Package } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { loadItemFormData } from '@/lib/warehouse/item-data';
 import { ItemForm } from '@/components/warehouse/item-form';
@@ -11,7 +12,7 @@ export default async function NewItemPage({ params, searchParams }: { params: { 
   const data = await loadItemFormData(ctx);
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-03" title="Nuevo artículo" subtitle="Datos, atributos, precio y códigos" />
+      <WhHeader code="WH-03" icon={Package} title="Nuevo artículo" subtitle="Datos, atributos, precio y códigos" />
       <Panel>
         <ItemForm
           slug={params.slug}

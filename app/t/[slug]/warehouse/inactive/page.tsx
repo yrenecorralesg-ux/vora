@@ -47,9 +47,9 @@ export default async function WarehouseInactivePage({ params, searchParams }: { 
         <p className="mt-4 text-[13px] text-slate-600">Pide al administrador de VORA que active el módulo.</p>
       )}
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <Link href={`/t/${params.slug}/pos`} className="inline-flex h-9 items-center rounded-lg border border-[#DCE3DF] px-4 text-[13px]">Ir al POS</Link>
+        <Link href={`/t/${params.slug}/pos`} className="inline-flex h-9 items-center rounded-xl border border-[#E7E2D7] px-4 text-[13px]">Ir al POS</Link>
         {admin && (
-          <Link href="/admin/tenants" className="inline-flex h-9 items-center rounded-lg bg-[#285C49] px-4 text-[13px] font-semibold text-white">Abrir el gestor</Link>
+          <Link href="/admin/tenants" className="inline-flex h-9 items-center rounded-xl bg-[#285C49] px-4 text-[13px] font-semibold text-white">Abrir el gestor</Link>
         )}
       </div>
     </div>

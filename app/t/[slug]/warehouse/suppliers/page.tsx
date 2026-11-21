@@ -52,11 +52,44 @@ export default async function SuppliersPage({
     .eq('slug', params.slug)
     .maybeSingle();
 
-  const { data: branding } = await supabase
+  // El branding se pide junto con los proveedores (misma ronda a Supabase).
+  const brandingQuery = supabase
     .from('tenant_branding')
     .select('secondary_color, banner_url')
     .eq('tenant_id', tenant?.id ?? '')
     .maybeSingle();
+
+  const [{ data: suppliers }, { data: branding }] = await Promise.all([
+    service
+      .from('warehouse_supplier_profiles')
+      .select(`
+        id,
+        code,
+        name,
+        tax_id,
+        contact_name,
+        email,
+        phone,
+        address,
+        city,
+        category,
+        status,
+        notes,
+        created_at,
+        terms:warehouse_supplier_terms (
+          payment_terms_days,
+          currency,
+          credit_limit,
+          discount_percentage,
+          lead_time_days,
+          preferred_payment_method,
+          bank_details
+        )
+      `)
+      .eq('tenant_id', tenant?.id ?? '')
+      .order('name', { ascending: true }),
+    brandingQuery,
+  ]);
 
   let headerBannerUrl: string | null = null;
   if (branding?.banner_url) {
@@ -69,36 +102,6 @@ export default async function SuppliersPage({
 
   const secondaryColor = branding?.secondary_color ?? '#285C49';
   const tenantName = tenant?.commercial_name ?? params.slug;
-
-  // Consultar proveedores con sus términos comerciales
-  const { data: suppliers } = await service
-    .from('warehouse_supplier_profiles')
-    .select(`
-      id,
-      code,
-      name,
-      tax_id,
-      contact_name,
-      email,
-      phone,
-      address,
-      city,
-      category,
-      status,
-      notes,
-      created_at,
-      terms:warehouse_supplier_terms (
-        payment_terms_days,
-        currency,
-        credit_limit,
-        discount_percentage,
-        lead_time_days,
-        preferred_payment_method,
-        bank_details
-      )
-    `)
-    .eq('tenant_id', tenant?.id ?? '')
-    .order('name', { ascending: true });
 
   const totalCount = suppliers?.length ?? 0;
   const activeCount = suppliers?.filter((s) => s.status === 'active').length ?? 0;
@@ -293,7 +296,7 @@ export default async function SuppliersPage({
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700"
+                                  className="h-8 w-8 rounded-xl text-slate-400 hover:text-slate-700"
                                   title="Editar"
                                 >
                                   <Edit2 className="h-3.5 w-3.5" />
@@ -304,7 +307,7 @@ export default async function SuppliersPage({
                               asChild
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 rounded-lg text-slate-400 hover:text-slate-700"
+                              className="h-8 w-8 rounded-xl text-slate-400 hover:text-slate-700"
                               title="Ver ficha completa"
                             >
                               <Link href={`/t/${params.slug}/warehouse/suppliers/${s.id}`}>

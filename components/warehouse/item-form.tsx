@@ -30,7 +30,7 @@ export interface ItemFormValues {
   attributes: Record<string, string>;
 }
 
-const input = 'h-9 rounded-lg border border-[#DCE3DF] bg-white px-3 text-[13px]';
+const input = 'h-9 rounded-xl border border-[#E7E2D7] bg-white px-3 text-[13px]';
 
 /** WH-03 · Ficha de producto: datos, atributos dinámicos, precio y códigos. */
 export function ItemForm({
@@ -133,7 +133,7 @@ export function ItemForm({
           {canCreateCategory && (
             <span className="flex gap-1">
               <input value={newCat} maxLength={80} placeholder="Nueva categoría" onChange={(e) => setNewCat(e.target.value)} className={`${input} h-8 flex-1`} />
-              <button type="button" disabled={!newCat.trim()} onClick={addCategory} className="rounded-lg border border-[#DCE3DF] px-2 text-[12px] disabled:opacity-50">Crear</button>
+              <button type="button" disabled={!newCat.trim()} onClick={addCategory} className="rounded-xl border border-[#E7E2D7] px-2 text-[12px] disabled:opacity-50">Crear</button>
             </span>
           )}
         </FieldLabel>
@@ -150,7 +150,7 @@ export function ItemForm({
           {err('min_stock')}
         </FieldLabel>
         <FieldLabel label="Códigos de barras (uno por línea)">
-          <textarea rows={2} value={v.barcodes} onChange={(e) => set({ barcodes: e.target.value })} className="rounded-lg border border-[#DCE3DF] px-3 py-2 font-mono text-[12px]" />
+          <textarea rows={2} value={v.barcodes} onChange={(e) => set({ barcodes: e.target.value })} className="rounded-xl border border-[#E7E2D7] px-3 py-2 font-mono text-[12px]" />
           {err('barcodes')}
         </FieldLabel>
         <FieldLabel label="Estado">
@@ -160,7 +160,7 @@ export function ItemForm({
           </select>
         </FieldLabel>
         <FieldLabel label="Descripción" className="sm:col-span-2 lg:col-span-3">
-          <textarea rows={2} maxLength={2000} value={v.description} onChange={(e) => set({ description: e.target.value })} className="rounded-lg border border-[#DCE3DF] px-3 py-2 text-[13px]" />
+          <textarea rows={2} maxLength={2000} value={v.description} onChange={(e) => set({ description: e.target.value })} className="rounded-xl border border-[#E7E2D7] px-3 py-2 text-[13px]" />
         </FieldLabel>
       </div>
 
@@ -199,7 +199,7 @@ export function ItemForm({
 
       {canEdit && (
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={save} className="h-9 rounded-lg bg-[#285C49] px-5 text-[13px] font-semibold text-white hover:bg-[#1F4A3A] disabled:opacity-50">
+          <button type="button" onClick={save} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#285C49] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] disabled:opacity-50">
             {busy ? 'Guardando…' : v.id ? 'Guardar cambios' : 'Crear artículo'}
           </button>
           {msg && <p role="status" className={`text-[13px] ${msg.ok ? 'text-emerald-700' : 'text-rose-700'}`}>{msg.text}</p>}

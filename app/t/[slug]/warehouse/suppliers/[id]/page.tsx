@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   Truck,
   Building2,
   Mail,
@@ -54,23 +53,28 @@ export default async function SupplierDetailPage({
     .eq('slug', params.slug)
     .maybeSingle();
 
-  const { data: branding } = await supabase
+  // El branding se pide junto con los proveedores (misma ronda a Supabase).
+  const brandingQuery = supabase
     .from('tenant_branding')
     .select('secondary_color')
     .eq('tenant_id', tenant?.id ?? '')
     .maybeSingle();
 
+  const [{ data: supplier }, { data: branding }] = await Promise.all([
+    service
+      .from('warehouse_supplier_profiles')
+      .select(`
+        *,
+        terms:warehouse_supplier_terms (*)
+      `)
+      .eq('tenant_id', tenant?.id ?? '')
+      .eq('id', params.id)
+      .maybeSingle(),
+    brandingQuery,
+  ]);
+
   const secondaryColor = branding?.secondary_color ?? '#285C49';
 
-  const { data: supplier } = await service
-    .from('warehouse_supplier_profiles')
-    .select(`
-      *,
-      terms:warehouse_supplier_terms (*)
-    `)
-    .eq('tenant_id', tenant?.id ?? '')
-    .eq('id', params.id)
-    .maybeSingle();
 
   if (!supplier) {
     notFound();
@@ -83,16 +87,6 @@ export default async function SupplierDetailPage({
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto">
-      {/* Botón de retorno */}
-      <div>
-        <Button asChild variant="ghost" size="sm" className="gap-1.5 text-xs text-slate-500 hover:text-slate-800 -ml-2">
-          <Link href={`/t/${params.slug}/warehouse/suppliers`}>
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Volver a Proveedores
-          </Link>
-        </Button>
-      </div>
-
       {/* Header del Proveedor */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl bg-white border border-slate-100 p-6 shadow-xs">
         <div className="flex items-start gap-4">

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import {
   ArrowDownToLine,
+  ArrowLeftRight,
   ArrowUpFromLine,
   BarChart3,
   Boxes,
@@ -48,6 +49,7 @@ const NAV: { group: string; links: NavLink[] }[] = [
       { label: 'Salidas', href: '/issues', icon: ArrowUpFromLine },
       { label: 'Ajustes', href: '/adjustments', icon: ClipboardCheck },
       { label: 'Devoluciones', href: '/returns', icon: Undo2 },
+      { label: 'Transferencias', href: '/transfers', icon: ArrowLeftRight },
       { label: 'Kardex', href: '/kardex', icon: History },
       { label: 'Escaneo', href: '/scan', icon: ScanBarcode },
     ],

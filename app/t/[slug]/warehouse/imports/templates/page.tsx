@@ -1,6 +1,7 @@
+import { FileDown } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { IMPORT_COLUMN_LABELS, IMPORT_OPERATIONS, ITEM_TYPES, type ImportOperation } from '@/lib/warehouse/catalog';
-import { ActionsBar, DataTable, DownloadLink, Panel, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, DownloadLink, Panel, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export default async function TemplatesPage({ params }: { params: { slug: string
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-20" title="Descargar plantilla" subtitle={profile ? `Formato para ${profile.sector}` : 'Formato según tipo de empresa'} />
+      <WhHeader code="WH-20" icon={FileDown} title="Descargar plantilla" subtitle={profile ? `Formato para ${profile.sector}` : 'Formato según tipo de empresa'} />
       <Panel title="Plantillas">
         <DataTable head={['Plantilla', 'Columnas principales', 'Formato']}>
           {(Object.keys(IMPORT_OPERATIONS) as ImportOperation[]).map((op) => (
@@ -61,7 +62,6 @@ export default async function TemplatesPage({ params }: { params: { slug: string
           </div>
         </div>
       </Panel>
-      <ActionsBar items={['Descargar CSV', 'Descargar XLSX (próximamente)']} />
     </div>
   );
 }

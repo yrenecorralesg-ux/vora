@@ -1,8 +1,9 @@
+import { ArrowDownToLine } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { loadFormOptions } from '@/lib/warehouse/queries';
 import { DocumentForm } from '@/components/warehouse/document-form';
 import { RecentDocuments } from '@/components/warehouse/recent-documents';
-import { ActionsBar, Panel, WhHeader } from '@/components/warehouse/wh-ui';
+import { Panel, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ export default async function ReceiptsPage({ params }: { params: { slug: string 
   const opts = await loadFormOptions(ctx);
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-05" title="Entrada de inventario" subtitle="Recepción controlada de mercancía" />
+      <WhHeader code="WH-05" icon={ArrowDownToLine} title="Entrada de inventario" subtitle="Recepción controlada de mercancía" />
       <Panel title="Nueva entrada">
         <DocumentForm
           slug={params.slug}
@@ -28,7 +29,6 @@ export default async function ReceiptsPage({ params }: { params: { slug: string 
         )}
       </Panel>
       <RecentDocuments ctx={ctx} slug={params.slug} type="receipt" title="Entradas recientes" />
-      <ActionsBar items={['Registrar entrada', 'Agregar línea']} />
     </div>
   );
 }

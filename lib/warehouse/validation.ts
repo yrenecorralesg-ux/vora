@@ -296,6 +296,7 @@ export async function validateImport(
         err('sku', sku, 'Este artículo no maneja existencias.');
       const whId = whByCode.get(get('warehouse').toUpperCase());
       if (!whId) err('warehouse', get('warehouse'), 'Almacén inexistente.');
+      else if (!ctx.canUseWarehouse(whId)) err('warehouse', get('warehouse'), 'No tienes acceso a ese almacén.');
       const qty = parseNumber(get('quantity'));
       if (qty === null || qty <= 0) err('quantity', get('quantity'), 'La cantidad debe ser mayor a cero (sin stock negativo).');
       const cost = parseNumber(get('unit_cost'));

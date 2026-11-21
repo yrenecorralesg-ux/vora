@@ -1,6 +1,7 @@
+import { Tags } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { ConfigForm, type ConfigField } from '@/components/warehouse/config-form';
-import { ActionsBar, DataTable, Panel, Pill, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, Pill, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +28,7 @@ export default async function AttributesPage({ params }: { params: { slug: strin
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-16" title="Capacidades y atributos" subtitle="Campos dinámicos por categoría" />
+      <WhHeader code="WH-16" icon={Tags} title="Capacidades y atributos" subtitle="Campos dinámicos por categoría" />
       <Panel title="Atributos">
         <DataTable head={['Campo', 'Tipo', 'Obligatorio', 'Aplica a', 'Origen', 'Estado', '']} empty="Sin atributos. Aplica una plantilla de sector o crea uno.">
           {(attrs ?? []).map((a) => (
@@ -71,7 +72,6 @@ export default async function AttributesPage({ params }: { params: { slug: strin
           />
         </Panel>
       )}
-      <ActionsBar items={['Nuevo atributo', 'Guardar']} />
     </div>
   );
 }

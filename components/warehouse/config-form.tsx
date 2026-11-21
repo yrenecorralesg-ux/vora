@@ -53,7 +53,7 @@ export function ConfigForm({
     router.refresh();
   };
 
-  const input = 'h-9 rounded-lg border border-[#DCE3DF] bg-white px-3 text-[13px] disabled:bg-slate-50';
+  const input = 'h-9 rounded-xl border border-[#E7E2D7] bg-white px-3 text-[13px] disabled:bg-slate-50';
   return (
     <form onSubmit={submit} className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -92,7 +92,7 @@ export function ConfigForm({
         })}
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" disabled={busy} className="h-9 rounded-lg bg-[#285C49] px-5 text-[13px] font-semibold text-white hover:bg-[#1F4A3A] disabled:opacity-50">
+        <button type="submit" disabled={busy} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#285C49] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] disabled:opacity-50">
           {busy ? 'Guardando…' : submitLabel}
         </button>
         {msg && <p role="status" className={`text-[13px] ${msg.ok ? 'text-emerald-700' : 'text-rose-700'}`}>{msg.text}</p>}

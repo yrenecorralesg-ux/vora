@@ -1,8 +1,9 @@
+import { Settings } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { loadFormOptions } from '@/lib/warehouse/queries';
 import { fmtDate } from '@/lib/warehouse/format';
 import { ConfigForm } from '@/components/warehouse/config-form';
-import { ActionsBar, DataTable, Panel, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,7 +19,7 @@ export default async function SettingsPage({ params }: { params: { slug: string 
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-13" title="Configuración de inventario" subtitle="Reglas por empresa y almacén" />
+      <WhHeader code="WH-13" icon={Settings} title="Configuración de inventario" subtitle="Reglas por empresa y almacén" />
       <Panel title="Parámetros">
         <ConfigForm
           slug={params.slug}
@@ -55,7 +56,6 @@ export default async function SettingsPage({ params }: { params: { slug: string 
           ))}
         </DataTable>
       </Panel>
-      <ActionsBar items={['Guardar', 'Auditoría']} />
     </div>
   );
 }

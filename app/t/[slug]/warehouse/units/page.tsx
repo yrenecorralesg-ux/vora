@@ -1,7 +1,8 @@
+import { Ruler } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { fmtQty } from '@/lib/warehouse/format';
 import { ConfigForm, type ConfigField } from '@/components/warehouse/config-form';
-import { ActionsBar, DataTable, Panel, Pill, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, Pill, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ export default async function UnitsPage({ params }: { params: { slug: string } }
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-18" title="Unidades y conversiones" subtitle="Compra, almacén y venta" />
+      <WhHeader code="WH-18" icon={Ruler} title="Unidades y conversiones" subtitle="Compra, almacén y venta" />
       <Panel title="Unidades">
         <DataTable head={['Unidad', 'Símbolo', 'Base', 'Factor', 'Estado', '']}>
           {(units ?? []).map((u) => (
@@ -55,7 +56,6 @@ export default async function UnitsPage({ params }: { params: { slug: string } }
           <ConfigForm slug={params.slug} entity="unit" fields={fields()} initial={{ code: '', name: '', symbol: '', base_unit_id: '', factor: '1', status: 'active' }} submitLabel="Nueva unidad" resetOnSuccess />
         </Panel>
       )}
-      <ActionsBar items={['Nueva unidad', 'Guardar']} />
     </div>
   );
 }

@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { FieldLabel } from '@/components/warehouse/wh-ui';
 import { whGet, whPost } from '@/lib/warehouse/client';
 import { fmtQty } from '@/lib/warehouse/format';
 import type { PickedItem } from '@/components/warehouse/item-picker';
+import { CameraScanner } from '@/components/warehouse/camera-scanner';
 
 interface ScanLine {
   item: PickedItem;
@@ -29,7 +30,7 @@ export function Scanner({ slug, warehouses, defaultWarehouseId }: { slug: string
   const [key, setKey] = useState(() => crypto.randomUUID());
   const [busy, setBusy] = useState(false);
 
-  const scan = async (raw: string) => {
+  const scan = useCallback(async (raw: string) => {
     const value = raw.trim();
     setCode('');
     if (!value) return;
@@ -46,7 +47,7 @@ export function Scanner({ slug, warehouses, defaultWarehouseId }: { slug: string
       return found ? ls.map((l) => (l.item.id === item.id ? { ...l, quantity: l.quantity + 1 } : l)) : [{ item, code: value, quantity: 1 }, ...ls];
     });
     setLast({ ok: true, text: `${item.sku} · ${item.name} (+1)` });
-  };
+  }, [slug]);
 
   const save = async () => {
     setBusy(true);
@@ -86,11 +87,11 @@ export function Scanner({ slug, warehouses, defaultWarehouseId }: { slug: string
               }
             }}
             placeholder="Escanea o escribe el código y presiona Enter"
-            className="h-12 rounded-lg border-2 border-[#285C49] px-4 font-mono text-[15px]"
+            className="h-12 rounded-xl border-2 border-[#285C49] px-4 font-mono text-[15px]"
           />
         </FieldLabel>
         <FieldLabel label="Almacén">
-          <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="h-12 rounded-lg border border-[#DCE3DF] bg-white px-2 text-[13px]">
+          <select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="h-12 rounded-xl border border-[#E7E2D7] bg-white px-2 text-[13px]">
             {warehouses.map((w) => (
               <option key={w.id} value={w.id}>{w.label}</option>
             ))}
@@ -98,8 +99,10 @@ export function Scanner({ slug, warehouses, defaultWarehouseId }: { slug: string
         </FieldLabel>
       </div>
 
+      <CameraScanner onCode={scan} />
+
       {last && (
-        <p role="status" className={`rounded-lg px-3 py-2 text-[13px] ${last.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
+        <p role="status" className={`rounded-xl px-3 py-2 text-[13px] ${last.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-rose-50 text-rose-800'}`}>
           {last.text}{' '}
           {last.create && (
             <Link href={`/t/${slug}/warehouse/catalog/new?barcode=${encodeURIComponent(last.create)}`} className="underline">Dar de alta o vincular</Link>
@@ -110,11 +113,11 @@ export function Scanner({ slug, warehouses, defaultWarehouseId }: { slug: string
       <div className="-mx-4 overflow-x-auto px-4">
         <table className="w-full min-w-[520px] text-[13px]">
           <thead>
-            <tr className="border-b border-[#DCE3DF] text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-              <th className="px-2 py-2">Código leído</th>
-              <th className="px-2 py-2">Producto</th>
-              <th className="px-2 py-2">Cantidad</th>
-              <th className="px-2 py-2">Acción</th>
+            <tr className="border-b border-[#E7E2D7] text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+              <th className="px-3 py-2.5">Código leído</th>
+              <th className="px-3 py-2.5">Producto</th>
+              <th className="px-3 py-2.5">Cantidad</th>
+              <th className="px-3 py-2.5">Acción</th>
             </tr>
           </thead>
           <tbody>
@@ -126,8 +129,8 @@ export function Scanner({ slug, warehouses, defaultWarehouseId }: { slug: string
             {lines.map((l) => (
               <tr key={l.item.id} className="border-b border-[#EFECE4]">
                 <td className="px-2 py-1.5 font-mono text-[11px]">{l.code}</td>
-                <td className="px-2 py-1.5"><span className="font-mono text-[11px] text-slate-500">{l.item.sku}</span> {l.item.name}</td>
-                <td className="px-2 py-1.5">
+                <td className="px-3 py-2"><span className="font-mono text-[11px] text-slate-500">{l.item.sku}</span> {l.item.name}</td>
+                <td className="px-3 py-2">
                   <input
                     inputMode="decimal"
                     aria-label="Cantidad"
@@ -136,10 +139,10 @@ export function Scanner({ slug, warehouses, defaultWarehouseId }: { slug: string
                       const n = Number(e.target.value.replace(',', '.'));
                       if (Number.isFinite(n) && n >= 0) setLines((ls) => ls.map((x) => (x.item.id === l.item.id ? { ...x, quantity: n } : x)));
                     }}
-                    className="h-8 w-24 rounded-md border border-[#DCE3DF] px-2"
+                    className="h-8 w-24 rounded-md border border-[#E7E2D7] px-2"
                   />
                 </td>
-                <td className="px-2 py-1.5">
+                <td className="px-3 py-2">
                   <button type="button" aria-label="Quitar" onClick={() => setLines((ls) => ls.filter((x) => x.item.id !== l.item.id))} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600">
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -151,7 +154,7 @@ export function Scanner({ slug, warehouses, defaultWarehouseId }: { slug: string
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" disabled={busy || !lines.length || lines.some((l) => l.quantity <= 0)} onClick={save} className="h-9 rounded-lg bg-[#285C49] px-5 text-[13px] font-semibold text-white disabled:opacity-50">
+        <button type="button" disabled={busy || !lines.length || lines.some((l) => l.quantity <= 0)} onClick={save} className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#285C49] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] disabled:opacity-50">
           {busy ? 'Guardando…' : `Guardar entrada (${fmtQty(total)} uds.)`}
         </button>
         <span className="text-[12px] text-slate-500">Se valora al costo promedio vigente. Para registrar costos de compra usa Entradas.</span>

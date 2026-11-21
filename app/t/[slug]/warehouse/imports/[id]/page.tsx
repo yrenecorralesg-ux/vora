@@ -1,9 +1,10 @@
+import { FileWarning } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { IMPORT_OPERATIONS } from '@/lib/warehouse/catalog';
 import { JOB_STATUS, loadImportJob } from '@/lib/warehouse/imports-data';
 import { fmtDate, fmtQty } from '@/lib/warehouse/format';
-import { ActionsBar, DataTable, DownloadLink, Kpi, KpiGrid, Panel, Pill, PrimaryLink, SecondaryLink, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, DownloadLink, Kpi, KpiGrid, Panel, Pill, PrimaryLink, SecondaryLink, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export default async function ImportValidationPage({ params }: { params: { slug:
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-21" title="Validación de importación" subtitle={`${IMPORT_OPERATIONS[job.operation].label} · ${job.file_name}`}>
+      <WhHeader code="WH-21" icon={FileWarning} title="Validación de importación" subtitle={`${IMPORT_OPERATIONS[job.operation].label} · ${job.file_name}`}>
         <Pill tone={st.tone}>{st.label}</Pill>
         {job.error_rows > 0 && <DownloadLink href={`/api/t/${params.slug}/warehouse/export?kind=import-errors&job=${job.id}`}>Descargar errores</DownloadLink>}
         <SecondaryLink href={`${base}?operation=${job.operation}`}>Validar de nuevo</SecondaryLink>
@@ -41,7 +42,7 @@ export default async function ImportValidationPage({ params }: { params: { slug:
       </KpiGrid>
 
       {job.summary.duplicate_of && (
-        <p className="rounded-lg bg-amber-50 px-4 py-2 text-[13px] text-amber-900">
+        <p className="rounded-xl bg-amber-50 px-4 py-2 text-[13px] text-amber-900">
           Este mismo archivo ya fue importado y aplicado antes. Para no duplicar movimientos, no podrá aplicarse de nuevo.
         </p>
       )}
@@ -63,7 +64,6 @@ export default async function ImportValidationPage({ params }: { params: { slug:
         )}
         {errors.length >= 500 && <p className="mt-2 text-[12px] text-slate-500">Se muestran los primeros errores; descarga el archivo para verlos todos.</p>}
       </Panel>
-      <ActionsBar items={['Descargar errores', 'Validar de nuevo']} />
     </div>
   );
 }

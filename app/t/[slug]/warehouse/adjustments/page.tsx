@@ -1,10 +1,11 @@
+import { ClipboardCheck } from 'lucide-react';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { loadFormOptions } from '@/lib/warehouse/queries';
 import { ADJUSTMENT_REASONS } from '@/lib/warehouse/catalog';
 import { DocumentForm } from '@/components/warehouse/document-form';
 import { DocumentActions } from '@/components/warehouse/document-actions';
 import { RecentDocuments } from '@/components/warehouse/recent-documents';
-import { ActionsBar, Panel, WhHeader } from '@/components/warehouse/wh-ui';
+import { Panel, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export default async function AdjustmentsPage({ params }: { params: { slug: stri
   const selfApproveAllowed = ['tenant_admin', 'super_admin'].includes(ctx.role);
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-07" title="Ajustes de inventario" subtitle="Diferencias con autorización y evidencia" />
+      <WhHeader code="WH-07" icon={ClipboardCheck} title="Ajustes de inventario" subtitle="Diferencias con autorización y evidencia" />
       <Panel title="Nuevo ajuste">
         <DocumentForm
           slug={params.slug}
@@ -52,7 +53,6 @@ export default async function AdjustmentsPage({ params }: { params: { slug: stri
         }
       />
       <RecentDocuments ctx={ctx} slug={params.slug} type="adjustment" title="Historial de ajustes" />
-      <ActionsBar items={['Solicitar aprobación', 'Adjuntar evidencia']} />
     </div>
   );
 }

@@ -32,7 +32,7 @@ export function DocumentActions({
     router.refresh();
   };
 
-  const btn = 'h-8 rounded-lg px-3 text-[12px] font-semibold disabled:opacity-50';
+  const btn = 'h-8 rounded-xl px-3 text-[12px] font-semibold disabled:opacity-50';
   if (confirming) {
     const needsNote = confirming !== 'approve';
     return (
@@ -43,7 +43,7 @@ export function DocumentActions({
             maxLength={500}
             onChange={(e) => setNote(e.target.value)}
             placeholder={confirming === 'reverse' ? 'Motivo del reverso (obligatorio)' : 'Motivo del rechazo'}
-            className="h-8 min-w-[180px] flex-1 rounded-lg border border-[#DCE3DF] px-2 text-[12px]"
+            className="h-8 min-w-[180px] flex-1 rounded-xl border border-[#E7E2D7] px-2 text-[12px]"
           />
         )}
         <button
@@ -54,7 +54,7 @@ export function DocumentActions({
         >
           {busy ? '…' : confirming === 'approve' ? 'Confirmar aprobación' : confirming === 'reject' ? 'Confirmar rechazo' : 'Confirmar reverso'}
         </button>
-        <button type="button" onClick={() => setConfirming(null)} className={`${btn} border border-[#DCE3DF]`}>Cancelar</button>
+        <button type="button" onClick={() => setConfirming(null)} className={`${btn} border border-[#E7E2D7]`}>Cancelar</button>
         {error && <span role="alert" className="text-[12px] text-rose-700">{error}</span>}
       </div>
     );

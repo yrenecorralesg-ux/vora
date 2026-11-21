@@ -1,3 +1,4 @@
+import { Package } from 'lucide-react';
 import { notFound } from 'next/navigation';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { loadItemFormData } from '@/lib/warehouse/item-data';
@@ -5,7 +6,7 @@ import { loadKardex, loadStock } from '@/lib/warehouse/queries';
 import { MOVEMENT_TYPES, type ItemType } from '@/lib/warehouse/catalog';
 import { fmtCost, fmtDate, fmtQty, signed } from '@/lib/warehouse/format';
 import { ItemForm } from '@/components/warehouse/item-form';
-import { ActionsBar, DataTable, Panel, Pill, SecondaryLink, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, Pill, SecondaryLink, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,7 @@ export default async function ItemPage({ params }: { params: { slug: string; id:
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-03" title="Ficha de producto" subtitle={`${item.sku} · ${item.name}`}>
+      <WhHeader code="WH-03" icon={Package} title="Ficha de producto" subtitle={`${item.sku} · ${item.name}`}>
         {item.track_stock && <SecondaryLink href={`${base}/kardex?item=${item.id}`}>Ver movimientos</SecondaryLink>}
       </WhHeader>
 
@@ -95,7 +96,6 @@ export default async function ItemPage({ params }: { params: { slug: string; id:
         </Panel>
       )}
 
-      <ActionsBar items={['Guardar cambios', 'Ver movimientos']} />
     </div>
   );
 }

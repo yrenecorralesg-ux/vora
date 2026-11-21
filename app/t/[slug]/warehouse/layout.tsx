@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { requireWarehousePage, type WarehouseContext, type WarehouseFunction, type WarehousePermission } from '@/lib/warehouse/access';
 import { WarehouseSidebar } from '@/components/warehouse/wh-sidebar';
+import { WhBackBar } from '@/components/warehouse/back-bar';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,6 +11,7 @@ const LINK_RULES: { href: string; permission?: WarehousePermission; fn?: Warehou
   { href: '/issues', permission: 'stock.issue' },
   { href: '/adjustments', permission: 'stock.adjust.request' },
   { href: '/returns', permission: 'stock.return' },
+  { href: '/transfers', permission: 'stock.transfer' },
   { href: '/scan', permission: 'stock.receive', fn: 'wh_scanner' },
   { href: '/imports', permission: 'import.validate', fn: 'wh_imports' },
   { href: '/reports', permission: 'report.view', fn: 'wh_reports' },
@@ -44,7 +46,10 @@ export default async function WarehouseLayout({ children, params }: { children: 
     <div className="flex min-h-screen flex-col bg-[#F6F5F0] md:flex-row">
       <WarehouseSidebar slug={params.slug} tenantName={ctx.tenantName} hidden={hidden} />
       <main className="min-w-0 flex-1 p-4 pb-20 sm:p-5 lg:p-6">
-        <div className="mx-auto max-w-7xl space-y-4">{children}</div>
+        <div className="mx-auto max-w-7xl space-y-4">
+          <WhBackBar slug={params.slug} />
+          {children}
+        </div>
       </main>
     </div>
   );

@@ -38,7 +38,18 @@ export async function loadStock(
     .limit(5000);
   if (opts.warehouseId) q = q.eq('warehouse_id', opts.warehouseId);
   if (opts.itemId) q = q.eq('item_id', opts.itemId);
-  const { data } = await q;
+  // Artículos sin saldo (solo en la vista de todos los almacenes): misma ronda que los saldos.
+  let items = opts.warehouseId
+    ? null
+    : ctx.service
+        .from('warehouse_items')
+        .select('id, sku, name, min_stock, warehouse_units(symbol)')
+        .eq('tenant_id', ctx.tenantId)
+        .eq('track_stock', true)
+        .eq('status', 'active')
+        .limit(5000);
+  if (items && opts.itemId) items = items.eq('id', opts.itemId);
+  const [{ data }, trackedRes] = await Promise.all([q, items ?? Promise.resolve({ data: null })]);
 
   const rows: StockRow[] = (data ?? []).map((b) => {
     const item = first(b.warehouse_items as One<{ sku: string; name: string; min_stock: number; warehouse_units: One<{ symbol: string }> }>)!;
@@ -68,15 +79,7 @@ export async function loadStock(
   });
 
   if (!opts.warehouseId) {
-    let items = ctx.service
-      .from('warehouse_items')
-      .select('id, sku, name, min_stock, warehouse_units(symbol)')
-      .eq('tenant_id', ctx.tenantId)
-      .eq('track_stock', true)
-      .eq('status', 'active')
-      .limit(5000);
-    if (opts.itemId) items = items.eq('id', opts.itemId);
-    const { data: tracked } = await items;
+    const tracked = trackedRes.data;
     const withBalance = new Set(rows.map((r) => r.item_id));
     for (const i of tracked ?? []) {
       if (withBalance.has(i.id)) continue;
@@ -207,7 +210,8 @@ export async function loadDashboard(ctx: WarehouseContext) {
   const yesterday = new Date(today.getTime() - 86_400_000);
   const count = (table: string) =>
     ctx.service.from(table).select('id', { count: 'exact', head: true }).eq('tenant_id', ctx.tenantId);
-  const [items, warehouses, movesToday, movesYesterday, pending, stock, recent] = await Promise.all([
+  const since = new Date(today.getTime() - 13 * 86_400_000);
+  const [items, warehouses, movesToday, movesYesterday, pending, stock, recent, window] = await Promise.all([
     count('warehouse_items').eq('status', 'active'),
     count('warehouse_warehouses').eq('status', 'active'),
     count('warehouse_movements').gte('created_at', today.toISOString()),
@@ -215,7 +219,38 @@ export async function loadDashboard(ctx: WarehouseContext) {
     count('warehouse_documents').eq('status', 'pending_approval'),
     loadStock(ctx, {}),
     loadKardex(ctx, {}, 8),
+    ctx.service
+      .from('warehouse_movements')
+      .select('created_at, quantity, bucket')
+      .eq('tenant_id', ctx.tenantId)
+      .gte('created_at', since.toISOString())
+      .limit(10000),
   ]);
+
+  // Serie diaria de los últimos 14 días: unidades que entran y que salen (saldo vendible).
+  const dayKey = (d: Date) => d.toLocaleDateString('en-CA', { timeZone: 'America/Caracas' });
+  const series = Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(since.getTime() + i * 86_400_000);
+    return { day: dayKey(d), label: d.toLocaleDateString('es-VE', { day: '2-digit', month: 'short', timeZone: 'America/Caracas' }), entradas: 0, salidas: 0 };
+  });
+  const byDay = new Map(series.map((p) => [p.day, p]));
+  for (const m of window.data ?? []) {
+    if (m.bucket !== 'on_hand') continue;
+    const p = byDay.get(dayKey(new Date(m.created_at)));
+    if (!p) continue;
+    const q = Number(m.quantity);
+    if (q > 0) p.entradas += q;
+    else p.salidas += -q;
+  }
+
+  // Artículos con mayor valor en existencia (suma de almacenes).
+  const valueByItem = new Map<string, { sku: string; name: string; value: number }>();
+  for (const r of stock) {
+    const v = valueByItem.get(r.item_id) ?? { sku: r.sku, name: r.name, value: 0 };
+    v.value += r.value;
+    valueByItem.set(r.item_id, v);
+  }
+  const topValue = Array.from(valueByItem.values()).sort((a, b) => b.value - a.value).slice(0, 5);
   const alerts = stock.filter((s) => s.alert);
   return {
     items: items.count ?? 0,
@@ -227,6 +262,8 @@ export async function loadDashboard(ctx: WarehouseContext) {
     value: stock.reduce((s, r) => s + r.value, 0),
     topAlerts: alerts.slice(0, 6),
     recent,
+    series: series.map(({ label, entradas, salidas }) => ({ label, entradas, salidas })),
+    topValue,
   };
 }
 

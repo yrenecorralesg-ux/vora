@@ -49,6 +49,8 @@ export const MOVEMENT_TYPES: Record<string, string> = {
   pos_return: 'Devolución POS',
   import: 'Importación',
   reversal: 'Reverso',
+  transfer_out: 'Transferencia (salida)',
+  transfer_in: 'Transferencia (entrada)',
 };
 
 export const ISSUE_REASONS = ['Consumo interno', 'Merma', 'Vencimiento', 'Muestra', 'Donación', 'Salida autorizada'];
@@ -59,6 +61,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   'stock.receive': 'Registrar entradas',
   'stock.issue': 'Registrar salidas',
   'stock.return': 'Registrar devoluciones',
+  'stock.transfer': 'Transferir entre almacenes',
   'stock.adjust.request': 'Solicitar ajustes',
   'stock.adjust.approve': 'Aprobar ajustes y reversos',
   'import.validate': 'Validar importaciones',
@@ -68,6 +71,19 @@ export const PERMISSION_LABELS: Record<string, string> = {
   'warehouse.configure': 'Configurar almacenes, unidades y atributos',
 };
 
+/** Roles cuya matriz de Warehouse puede ajustar cada empresa (WH-12). */
+export const EDITABLE_ROLES = [
+  'wh_manager',
+  'wh_supervisor',
+  'wh_clerk',
+  'wh_scanner',
+  'wh_auditor',
+  'pos_store_admin',
+  'pos_supervisor',
+  'pos_cashier',
+  'pos_auditor',
+];
+
 export const ROLE_LABELS: Record<string, string> = {
   tenant_admin: 'Administrador de empresa',
   wh_manager: 'Administrador de almacén',
@@ -75,6 +91,10 @@ export const ROLE_LABELS: Record<string, string> = {
   wh_clerk: 'Almacenista',
   wh_scanner: 'Operador de escaneo',
   wh_auditor: 'Auditor / contador',
+  pos_store_admin: 'Administrador de tienda (POS)',
+  pos_supervisor: 'Supervisor de caja (POS)',
+  pos_cashier: 'Cajero (POS)',
+  pos_auditor: 'Auditor (POS)',
 };
 
 /* -------------------------------------------------------------------------- */

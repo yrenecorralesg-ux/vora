@@ -1,10 +1,11 @@
+import { FileSpreadsheet } from 'lucide-react';
 import Link from 'next/link';
 import { requireWarehousePage } from '@/lib/warehouse/access';
 import { IMPORT_OPERATIONS, type ImportOperation } from '@/lib/warehouse/catalog';
 import { JOB_STATUS } from '@/lib/warehouse/imports-data';
 import { fmtDate } from '@/lib/warehouse/format';
 import { ImportWizard } from '@/components/warehouse/import-wizard';
-import { ActionsBar, DataTable, Panel, Pill, SecondaryLink, WhHeader } from '@/components/warehouse/wh-ui';
+import { DataTable, Panel, Pill, SecondaryLink, WhHeader } from '@/components/warehouse/wh-ui';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export default async function ImportsPage({ params, searchParams }: { params: { 
 
   return (
     <div className="space-y-4">
-      <WhHeader code="WH-19" title="Centro de importaciones" subtitle="Excel, CSV y cargas masivas">
+      <WhHeader code="WH-19" icon={FileSpreadsheet} title="Centro de importaciones" subtitle="Excel, CSV y cargas masivas">
         <SecondaryLink href={`${base}/templates`}>Descargar plantilla</SecondaryLink>
         <SecondaryLink href={`${base}/history`}>Ver historial</SecondaryLink>
       </WhHeader>
@@ -48,7 +49,6 @@ export default async function ImportsPage({ params, searchParams }: { params: { 
       <Panel title="Nueva importación">
         <ImportWizard slug={params.slug} initialOperation={searchParams.operation as ImportOperation | undefined} />
       </Panel>
-      <ActionsBar items={['Nueva importación', 'Ver historial']} />
     </div>
   );
 }
