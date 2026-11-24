@@ -4,15 +4,11 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
-  ShieldCheck,
-  Store,
   KeyRound,
   AlertCircle,
   ArrowRight,
   Loader2,
   Mail,
-  Warehouse,
-  LayoutDashboard,
 } from 'lucide-react';
 
 export default function TenantIsolatedLoginPage({ params }: { params: { slug: string } }) {
@@ -125,22 +121,6 @@ export default function TenantIsolatedLoginPage({ params }: { params: { slug: st
         <h1 className="mt-4 text-center text-2xl font-black tracking-tight text-[#111827]">
           {tenantBranding.name}
         </h1>
-        <p className="mt-1 text-center text-xs font-semibold text-[#52635A]">
-          Portal Corporativo de Acceso · Punto de Venta y Almacén
-        </p>
-
-        <div className="mt-2 flex justify-center">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold"
-            style={{
-              backgroundColor: `color-mix(in srgb, ${secondary} 25%, transparent)`,
-              color: primary,
-            }}
-          >
-            <Store className="h-3.5 w-3.5" />
-            <span>Acceso Aislado por Empresa (/t/{params.slug})</span>
-          </span>
-        </div>
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-md">
