@@ -14,7 +14,6 @@ import {
   Warehouse,
   LayoutDashboard,
 } from 'lucide-react';
-import { getSupabaseClient } from '@/lib/supabase-client';
 
 export default function TenantIsolatedLoginPage({ params }: { params: { slug: string } }) {
   const router = useRouter();
@@ -67,38 +66,24 @@ export default function TenantIsolatedLoginPage({ params }: { params: { slug: st
     const passwordClean = passwordOrPin.trim();
 
     try {
-      const supabase = getSupabaseClient();
-
-      // 1. Intentar inicio de sesión en Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: emailClean,
-        password: passwordClean,
-      });
-
-      if (authError || !authData.user) {
-        setError(authError?.message === 'Invalid login credentials'
-          ? 'Correo o contraseña incorrectos. Verifique sus credenciales.'
-          : authError?.message || 'Error al iniciar sesión.');
-        setLoading(false);
-        return;
-      }
-
-      // 2. Verificar membresía y rol específico para este tenant
-      const verifyRes = await fetch(`/api/t/${params.slug}/login/verify`, {
+      const res = await fetch(`/api/t/${params.slug}/login`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: emailClean,
+          password: passwordClean,
+        }),
       });
-      const verifyData = await verifyRes.json();
 
-      if (!verifyRes.ok || !verifyData.ok) {
-        // El usuario tiene cuenta pero NO pertenece a esta empresa
-        await supabase.auth.signOut();
-        setError(verifyData.error || 'Acceso restringido: Esta cuenta no está asignada a esta empresa.');
+      const data = await res.json();
+
+      if (!res.ok || !data.ok) {
+        setError(data.error || 'Credenciales inválidas o sin acceso a esta empresa.');
         setLoading(false);
         return;
       }
 
-      // 3. Redirigir según el rol del usuario
-      const destUrl = verifyData.redirect_url || `/t/${params.slug}`;
+      const destUrl = data.redirect_url || `/t/${params.slug}`;
       router.replace(destUrl);
     } catch (err: any) {
       setError(err.message || 'Error de red al conectar con el servidor.');

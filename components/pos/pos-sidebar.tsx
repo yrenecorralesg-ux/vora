@@ -13,10 +13,8 @@ import {
   BarChart2,
   Settings,
   LogOut,
-  ArrowLeft,
 } from 'lucide-react';
 import { usePos } from './pos-context';
-import { getSupabaseClient } from '@/lib/supabase-client';
 
 export function PosSidebar() {
   const router = useRouter();
@@ -32,12 +30,11 @@ export function PosSidebar() {
 
   const handleLogout = async () => {
     try {
-      const supabase = getSupabaseClient();
-      await supabase.auth.signOut();
+      await fetch(`/api/t/${activeTenantSlug}/logout`, { method: 'POST' });
     } catch {
       // Ignorar error de red en logout local
     }
-    router.push('/login');
+    router.replace(`/t/${activeTenantSlug}/login`);
   };
 
   const navItems = [
@@ -226,20 +223,12 @@ export function PosSidebar() {
                 ? 'Cajera'
                 : activeUser.role === 'pos_supervisor'
                   ? 'Supervisor'
-                  : 'Admin Tienda'}
+                  : activeUser.role === 'pos_sales_rep'
+                    ? 'Asesor'
+                    : 'Admin Tienda'}
             </span>
           </div>
         </div>
-
-        {/* Enlace Volver al Gestor */}
-        <Link
-          href="/admin/tenants"
-          className="flex items-center gap-2.5 rounded-2xl px-3.5 py-2 text-xs font-semibold transition hover:text-white"
-          style={{ color: accentColor }}
-        >
-          <ArrowLeft className="h-4 w-4 shrink-0" />
-          <span>Volver al Gestor</span>
-        </Link>
 
         {/* Botón Cerrar Sesión */}
         <button

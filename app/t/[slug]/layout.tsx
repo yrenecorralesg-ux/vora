@@ -3,7 +3,8 @@ import { redirect } from 'next/navigation';
 import { Ban, ShieldAlert } from 'lucide-react';
 
 import { requireSession, isSuperAdmin } from '@/lib/auth';
-import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
+import { getTenantSession } from '@/lib/tenant-session';
 import { CrmSidebar } from '@/components/crm-sidebar';
 import { ModuleRail } from '@/components/module-rail';
 import { TenantFrame } from '@/components/tenant-frame';
@@ -52,20 +53,17 @@ export default async function TenantCrmLayout({
   params: { slug: string };
 }) {
   const currentPath = headers().get('x-vora-path') || '';
-  if (currentPath.endsWith('/login') || currentPath.includes('/login?')) {
+  if (currentPath.endsWith('/login') || currentPath.includes('/login?') || currentPath.endsWith('/login/')) {
     return <>{children}</>;
   }
 
-  const supabase = getSupabaseServerClient();
+  // 1. Sesión dedicada de empresa mediante cookie vora_session_[slug]
+  const tenantSession = await getTenantSession(params.slug);
 
-  /* 1. Sesion ------------------------------------------------------------- */
-  const user = await requireSession(supabase);
-  if (!user) {
-    redirect(`/login?redirect=/t/${params.slug}`);
-  }
+  const service = getSupabaseServiceClient();
 
-  /* 2. Resolver tenant por slug ------------------------------------------- */
-  const { data: tenant, error: tenantErr } = await supabase
+  // 2. Resolver tenant por slug
+  const { data: tenant, error: tenantErr } = await service
     .from('tenants')
     .select('id, commercial_name, slug, commercial_status')
     .eq('slug', params.slug)
@@ -78,43 +76,40 @@ export default async function TenantCrmLayout({
     );
   }
 
-  // Tenant inexistente -> lo tratamos como sin acceso.
   if (!tenant) {
     return <NoAccessPage />;
   }
 
-  /* 3. Membresia del usuario + rol super admin ---------------------------- */
-  // Membresía, rol de plataforma, branding y módulos no dependen entre sí: una sola ronda.
-  const [{ data: membership }, admin, { data: branding }, { data: featureRows }] = await Promise.all([
-    supabase
+  // 3. Aislamiento total: Si no hay sesión de empresa, exigir inicio de sesión en el portal de la empresa
+  if (!tenantSession) {
+    const supabase = getSupabaseServerClient();
+    const user = await requireSession(supabase);
+    if (!user) {
+      redirect(`/t/${params.slug}/login`);
+    }
+
+    const { data: membership } = await service
       .from('tenant_memberships')
       .select('id, role')
       .eq('tenant_id', tenant.id)
       .eq('auth_user_id', user.id)
       .eq('status', 'active')
-      .maybeSingle(),
-    isSuperAdmin(user.id, supabase),
-    supabase
+      .maybeSingle();
+
+    if (!membership) {
+      redirect(`/t/${params.slug}/login`);
+    }
+  }
+
+  /* 4. Branding y Features ------------------------------------------------ */
+  const [{ data: branding }, { data: featureRows }] = await Promise.all([
+    service
       .from('tenant_branding')
       .select('primary_color, secondary_color, accent_color, logo_url, banner_url, font_family')
       .eq('tenant_id', tenant.id)
       .maybeSingle(),
-    supabase.from('tenant_features').select('feature_key, enabled').eq('tenant_id', tenant.id),
+    service.from('tenant_features').select('feature_key, enabled').eq('tenant_id', tenant.id),
   ]);
-
-  const hasMembership = !!membership;
-  const isPreview = canPreviewTenant(
-    admin,
-    headers().get('x-vora-preview') === '1',
-    hasMembership,
-  );
-
-  // Sin membresia ni super admin en vista previa -> sin acceso.
-  if (!hasMembership && !admin) {
-    return <NoAccessPage />;
-  }
-
-  /* 4. Branding ----------------------------------------------------------- */
 
   const isSolee = tenant.slug === 'solee';
   const primaryColor =
@@ -137,13 +132,13 @@ export default async function TenantCrmLayout({
     }
   }
 
-  /* 5. Tenant suspendido (no super admin en preview) ---------------------- */
+  /* 5. Tenant suspendido ------------------------------------------------- */
   const isSuspended =
     tenant.commercial_status === 'suspended' ||
     tenant.commercial_status === 'cancelled';
   const isSubscription =
     headers().get('x-vora-path') === `/t/${params.slug}/subscription`;
-  if (isSuspended && !isPreview && !isSubscription) {
+  if (isSuspended && !isSubscription) {
     return (
       <SuspendedPage
         tenantName={tenant.commercial_name}
@@ -163,11 +158,13 @@ export default async function TenantCrmLayout({
     enabledFeatures.push('crm.dashboard');
   }
 
-  const userRole = membership?.role ?? (admin ? 'super_admin' : 'member');
+  const userRole = tenantSession?.role ?? 'member';
+  const admin = false;
+  const isPreview = false;
 
   // Selector POS ↔ Warehouse, común a todo el portal de la empresa.
   const rail = (
-    <ModuleRail slug={tenant.slug} tenantId={tenant.id} enabledFeatures={enabledFeatures} isSuperAdmin={admin} />
+    <ModuleRail slug={tenant.slug} tenantId={tenant.id} enabledFeatures={enabledFeatures} isSuperAdmin={false} />
   );
 
   /* 7. Render ------------------------------------------------------------- */

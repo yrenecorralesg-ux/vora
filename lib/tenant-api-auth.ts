@@ -5,11 +5,12 @@ import {
   getSupabaseServerClient,
   getSupabaseServiceClient,
 } from '@/lib/supabase-server';
+import { getTenantSession } from '@/lib/tenant-session';
 
 export interface TenantApiAccess {
   tenantId: string;
   userId: string;
-  /** Rol de la membresía, o 'super_admin' para Venesoft. */
+  /** Rol de la membresía en la empresa. */
   role: string;
   /** Correo de la sesión, para registrar quién autoriza una operación. */
   email: string | null;
@@ -20,13 +21,33 @@ export type TenantApiAuthResult =
   | { ok: false; response: NextResponse };
 
 /**
- * Autorización común de las rutas /api/t/[slug]/*: exige sesión y membresía
- * activa en el tenant del slug (o Super Admin). Las consultas posteriores con
- * el cliente de servicio DEBEN filtrar por access.tenantId.
+ * Autorización común de las rutas /api/t/[slug]/*: exige sesión activa
+ * y membresía exclusiva en el tenant del slug.
+ * Los tokens del Gestor de Gestores (super_admin sin membresía en la empresa)
+ * son rechazados para garantizar el aislamiento total por empresa.
  */
 export async function authorizeTenantApi(
   slug: string,
 ): Promise<TenantApiAuthResult> {
+  // 1. Prioridad: Sesión dedicada de empresa mediante cookie vora_session_[slug]
+  try {
+    const tenantSession = await getTenantSession(slug);
+    if (tenantSession && tenantSession.slug.toLowerCase() === slug.toLowerCase()) {
+      return {
+        ok: true,
+        access: {
+          tenantId: tenantSession.tenantId,
+          userId: tenantSession.userId,
+          role: tenantSession.role,
+          email: tenantSession.email,
+        },
+      };
+    }
+  } catch {
+    // Si no se puede leer el cookieStore, continuar con la verificación estándar
+  }
+
+  // 2. Sesión estándar de Supabase Auth
   const session = getSupabaseServerClient();
   const user = await requireSession(session);
   if (!user)
@@ -37,20 +58,14 @@ export async function authorizeTenantApi(
 
   const denied = {
     ok: false as const,
-    response: NextResponse.json({ error: 'Sin acceso.' }, { status: 403 }),
+    response: NextResponse.json({ error: 'Sin acceso a esta empresa.' }, { status: 403 }),
   };
 
   const service = getSupabaseServiceClient();
-  // Empresa y rol de plataforma son independientes: se consultan en paralelo.
-  const [{ data: tenant }, admin] = await Promise.all([
-    service.from('tenants').select('id').eq('slug', slug).maybeSingle(),
-    isSuperAdmin(user.id, session),
-  ]);
+  const { data: tenant } = await service.from('tenants').select('id').eq('slug', slug).maybeSingle();
   if (!tenant) return denied;
 
-  if (admin)
-    return { ok: true, access: { tenantId: tenant.id, userId: user.id, role: 'super_admin', email: user.email ?? null } };
-
+  // 3. Exigir membresía activa específica en esta empresa
   const { data: membership } = await service
     .from('tenant_memberships')
     .select('role')
@@ -58,7 +73,10 @@ export async function authorizeTenantApi(
     .eq('auth_user_id', user.id)
     .eq('status', 'active')
     .maybeSingle();
-  if (!membership) return denied;
+
+  if (!membership) {
+    return denied;
+  }
 
   return {
     ok: true,

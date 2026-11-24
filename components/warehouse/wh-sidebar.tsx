@@ -27,6 +27,7 @@ import {
   Undo2,
   Warehouse,
   X,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -145,6 +146,21 @@ export function WarehouseSidebar({ slug, tenantName, hidden = [] }: { slug: stri
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-4 border-r border-[#1E6B4E]/30 bg-[#144D37] p-4 text-white shadow-lg md:flex print:hidden">
         <Brand tenantName={tenantName} />
         <NavList base={base} pathname={pathname} hidden={hidden} />
+        <div className="border-t border-white/10 pt-3">
+          <button
+            type="button"
+            onClick={async () => {
+              try {
+                await fetch(`/api/t/${slug}/logout`, { method: 'POST' });
+              } catch {}
+              window.location.href = `/t/${slug}/login`;
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-semibold text-[#F87171] transition hover:bg-[#B91C1C]/20 hover:text-white"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
       </aside>
 
       <div className="sticky top-0 z-30 flex items-center gap-3 bg-[#144D37] px-4 py-3 text-white md:hidden print:hidden">

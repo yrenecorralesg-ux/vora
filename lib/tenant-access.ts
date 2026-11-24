@@ -1,74 +1,36 @@
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
 import { isSuperAdmin, requireSession } from '@/lib/auth';
+import { getTenantSession } from '@/lib/tenant-session';
 
 export async function requireTenantFeature(
   slug: string,
   featureKey: string,
 ): Promise<void> {
-  const user = await requireSession();
-  if (!user) redirect(`/login?redirect=${encodeURIComponent(`/t/${slug}`)}`);
+  const tenantSession = await getTenantSession(slug);
 
-  const supabase = getSupabaseServerClient();
-  // Consultas independientes en paralelo: 2 rondas a Supabase en lugar de 4.
-  const [{ data: tenant }, admin] = await Promise.all([
-    supabase.from('tenants').select('id,technical_status,commercial_status').eq('slug', slug).maybeSingle(),
-    isSuperAdmin(user.id),
-  ]);
-  if (!tenant) redirect('/access-pending');
-
-  const [{ data: membership }, { data: feature }] = await Promise.all([
-    admin
-      ? Promise.resolve({ data: { id: 'super_admin' } })
-      : supabase
-          .from('tenant_memberships')
-          .select('id')
-          .eq('tenant_id', tenant.id)
-          .eq('auth_user_id', user.id)
-          .eq('status', 'active')
-          .maybeSingle(),
-    supabase
-      .from('tenant_features')
-      .select('enabled,contracted')
-      .eq('tenant_id', tenant.id)
-      .eq('feature_key', featureKey)
-      .maybeSingle(),
-  ]);
-  if (!membership) redirect('/access-pending');
-
-  const preview = admin && headers().get('x-vora-preview') === '1';
-  if (
-    !preview &&
-    (tenant.technical_status !== 'ready' ||
-      ['suspended', 'cancelled'].includes(tenant.commercial_status))
-  )
-    redirect(`/t/${slug}`);
-  if (!feature?.enabled || !feature.contracted) redirect(`/t/${slug}`);
-}
-
-
-export async function requirePosPermission(
-  slug: string,
-  permission: string,
-): Promise<{ tenantId: string; userId: string; role: string }> {
-  const user = await requireSession();
-  if (!user) redirect(`/login?redirect=${encodeURIComponent(`/t/${slug}/pos`)}`);
-
-  const supabase = getSupabaseServerClient();
-  const { data: tenant } = await supabase
+  const service = getSupabaseServiceClient();
+  const { data: tenant } = await service
     .from('tenants')
-    .select('id, technical_status, commercial_status')
+    .select('id,technical_status,commercial_status')
     .eq('slug', slug)
     .maybeSingle();
 
-  if (!tenant) redirect('/access-pending');
+  if (!tenant) redirect(`/t/${slug}/login`);
 
-  const admin = await isSuperAdmin(user.id, supabase);
-  let userRole = 'super_admin';
+  let userId: string;
+  let userRole: string;
 
-  if (!admin) {
-    const { data: membership } = await supabase
+  if (tenantSession && tenantSession.slug.toLowerCase() === slug.toLowerCase()) {
+    userId = tenantSession.userId;
+    userRole = tenantSession.role;
+  } else {
+    // Si no hay cookie de empresa, verificar si hay sesión con membresía activa
+    const user = await requireSession();
+    if (!user) redirect(`/t/${slug}/login`);
+
+    const { data: membership } = await service
       .from('tenant_memberships')
       .select('role')
       .eq('tenant_id', tenant.id)
@@ -76,21 +38,79 @@ export async function requirePosPermission(
       .eq('status', 'active')
       .maybeSingle();
 
-    if (!membership) redirect('/access-pending');
+    if (!membership) redirect(`/t/${slug}/login`);
+    userId = user.id;
     userRole = membership.role;
-
-    if (userRole !== 'tenant_admin') {
-      const { data: perm } = await supabase
-        .from('role_permissions')
-        .select('id')
-        .eq('role_key', userRole)
-        .eq('permission', permission)
-        .eq('scope', 'tenant')
-        .maybeSingle();
-
-      if (!perm) redirect(`/t/${slug}`);
-    }
   }
 
-  return { tenantId: tenant.id, userId: user.id, role: userRole };
+  const { data: feature } = await service
+    .from('tenant_features')
+    .select('enabled,contracted')
+    .eq('tenant_id', tenant.id)
+    .eq('feature_key', featureKey)
+    .maybeSingle();
+
+  if (
+    tenant.technical_status !== 'ready' ||
+    ['suspended', 'cancelled'].includes(tenant.commercial_status)
+  ) {
+    redirect(`/t/${slug}`);
+  }
+
+  if (!feature?.enabled || !feature.contracted) {
+    redirect(`/t/${slug}`);
+  }
+}
+
+export async function requirePosPermission(
+  slug: string,
+  permission: string,
+): Promise<{ tenantId: string; userId: string; role: string }> {
+  const tenantSession = await getTenantSession(slug);
+
+  const service = getSupabaseServiceClient();
+  const { data: tenant } = await service
+    .from('tenants')
+    .select('id, technical_status, commercial_status')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  if (!tenant) redirect(`/t/${slug}/login`);
+
+  let userId: string;
+  let userRole: string;
+
+  if (tenantSession && tenantSession.slug.toLowerCase() === slug.toLowerCase()) {
+    userId = tenantSession.userId;
+    userRole = tenantSession.role;
+  } else {
+    const user = await requireSession();
+    if (!user) redirect(`/t/${slug}/login`);
+
+    const { data: membership } = await service
+      .from('tenant_memberships')
+      .select('role')
+      .eq('tenant_id', tenant.id)
+      .eq('auth_user_id', user.id)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (!membership) redirect(`/t/${slug}/login`);
+    userId = user.id;
+    userRole = membership.role;
+  }
+
+  if (userRole !== 'tenant_admin' && userRole !== 'pos_store_admin') {
+    const { data: perm } = await service
+      .from('role_permissions')
+      .select('id')
+      .eq('role_key', userRole)
+      .eq('permission', permission)
+      .eq('scope', 'tenant')
+      .maybeSingle();
+
+    if (!perm) redirect(`/t/${slug}`);
+  }
+
+  return { tenantId: tenant.id, userId, role: userRole };
 }
