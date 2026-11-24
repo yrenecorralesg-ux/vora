@@ -206,7 +206,7 @@ export function PosSidebar() {
             <span className="text-base font-bold tracking-tight text-white leading-tight truncate" title={displayName}>
               {displayName}
             </span>
-            <span className="text-[11px] font-medium text-white/60 truncate">
+            <span className="text-[11px] font-medium truncate" style={{ color: accentColor }}>
               Portal de Gestión
             </span>
           </div>

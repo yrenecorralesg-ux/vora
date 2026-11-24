@@ -68,11 +68,14 @@ export default async function WarehouseLayout({ children, params }: { children: 
 
   return (
     <div
+      data-tenant-root
       className="flex min-h-screen flex-col bg-[#F6F5F0] md:flex-row"
       style={{
         '--crm-primary': primaryColor,
         '--crm-secondary': secondaryColor,
         '--crm-accent': accentColor,
+        '--crm-ink': `color-mix(in srgb, ${primaryColor} 40%, #111827)`,
+        '--crm-heading': `color-mix(in srgb, ${primaryColor} 82%, #111827)`,
       } as React.CSSProperties}
     >
       <WarehouseSidebar

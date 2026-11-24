@@ -63,6 +63,8 @@ export function PosModuleContent() {
         '--crm-primary': tenantBranding.primaryColor,
         '--crm-secondary': tenantBranding.secondaryColor,
         '--crm-accent': tenantBranding.accentColor,
+        '--crm-ink': `color-mix(in srgb, ${tenantBranding.primaryColor} 40%, #111827)`,
+        '--crm-heading': `color-mix(in srgb, ${tenantBranding.primaryColor} 82%, #111827)`,
         fontFamily: tenantBranding.fontFamily,
       } as React.CSSProperties}
     >

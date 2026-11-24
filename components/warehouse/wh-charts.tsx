@@ -8,8 +8,8 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
  * codificación secundaria: leyenda con nombres, 2px entre barras y tooltip.
  */
 const SERIES = [
-  { key: 'entradas', label: 'Entradas', color: '#1E7A55' },
-  { key: 'salidas', label: 'Salidas', color: '#C97857' },
+  { key: 'entradas', label: 'Entradas', color: 'var(--crm-primary, #1E7A55)' },
+  { key: 'salidas', label: 'Salidas', color: 'var(--crm-secondary, #C97857)' },
 ] as const;
 
 const qty = new Intl.NumberFormat('es-VE', { maximumFractionDigits: 2 });
@@ -20,13 +20,13 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
   if (!active || !payload?.length) return null;
   return (
     <div className="rounded-xl border border-[#E7E2D7] bg-white px-3 py-2 text-[12px] shadow-lg">
-      <p className="mb-1 font-semibold text-[#1B3D2F]">{label}</p>
+      <p className="mb-1 font-semibold text-[var(--crm-ink,#18181B)]">{label}</p>
       {SERIES.map((s) => {
         const v = payload.find((p) => p.dataKey === s.key)?.value ?? 0;
         return (
           <p key={s.key} className="flex items-center gap-2 text-slate-600">
             <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: s.color }} />
-            {s.label}: <span className="font-semibold tabular-nums text-[#1B3D2F]">{qty.format(v)}</span>
+            {s.label}: <span className="font-semibold tabular-nums text-[var(--crm-ink,#18181B)]">{qty.format(v)}</span>
           </p>
         );
       })}

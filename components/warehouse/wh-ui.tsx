@@ -13,7 +13,7 @@ import { cn } from '@/lib/utils';
 export const WH = {
   primary: 'var(--crm-primary, #285C49)',
   primaryHover: 'color-mix(in srgb, var(--crm-primary, #285C49) 85%, black)',
-  ink: '#1B3D2F',
+  ink: 'var(--crm-ink, #18181B)',
   border: '#E7E2D7',
   soft: '#F8F6F1',
 } as const;
@@ -23,7 +23,7 @@ export const btn = {
   primary:
     'inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[var(--crm-primary,#285C49)] px-4 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crm-primary,#285C49)]/40 disabled:opacity-50',
   secondary:
-    'inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[#E7E2D7] bg-white px-4 text-[13px] font-medium text-[#1B3D2F] shadow-sm transition hover:border-[var(--crm-primary,#285C49)]/40 hover:bg-[#F8F6F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crm-primary,#285C49)]/30 disabled:opacity-50',
+    'inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[#E7E2D7] bg-white px-4 text-[13px] font-medium text-[var(--crm-ink,#18181B)] shadow-sm transition hover:border-[var(--crm-primary,#285C49)]/40 hover:bg-[#F8F6F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crm-primary,#285C49)]/30 disabled:opacity-50',
   ghost:
     'inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-[var(--crm-primary,#285C49)] transition hover:bg-[var(--crm-primary,#285C49)]/10',
   danger:
@@ -32,7 +32,7 @@ export const btn = {
 
 /** Campo de formulario con el mismo acabado en todas las vistas. */
 export const field =
-  'h-9 w-full rounded-xl border border-[#E7E2D7] bg-white px-3 text-[13px] text-[#1B3D2F] shadow-sm transition placeholder:text-slate-400 focus:border-[var(--crm-primary,#285C49)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary,#285C49)]/15 disabled:bg-slate-50';
+  'h-9 w-full rounded-xl border border-[#E7E2D7] bg-white px-3 text-[13px] text-[var(--crm-ink,#18181B)] shadow-sm transition placeholder:text-slate-400 focus:border-[var(--crm-primary,#285C49)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary,#285C49)]/15 disabled:bg-slate-50';
 
 export function WhHeader({
   code,
@@ -56,7 +56,7 @@ export function WhHeader({
           </div>
         )}
         <div className="min-w-0">
-          <h1 className="truncate text-xl font-bold tracking-tight text-[#1B3D2F] sm:text-2xl">{title}</h1>
+          <h1 className="truncate text-xl font-bold tracking-tight text-[var(--crm-heading,var(--crm-primary,#285C49))] sm:text-2xl">{title}</h1>
           <p className="mt-0.5 text-[13px] text-slate-500">
             {subtitle}
             <span className="ml-2 align-middle font-mono text-[10px] text-slate-400" title="Código de vista del documento de especificación">
@@ -75,10 +75,10 @@ export function KpiGrid({ children }: { children: ReactNode }) {
 }
 
 const TONES = {
-  default: { value: 'text-[#1B3D2F]', icon: 'bg-[var(--crm-primary,#285C49)]/10 text-[var(--crm-primary,#285C49)]' },
+  default: { value: 'text-[var(--crm-ink,#18181B)]', icon: 'bg-[var(--crm-primary,#285C49)]/10 text-[var(--crm-primary,#285C49)]' },
   warn: { value: 'text-amber-700', icon: 'bg-amber-100 text-amber-700' },
   danger: { value: 'text-rose-700', icon: 'bg-rose-100 text-rose-700' },
-  good: { value: 'text-emerald-700', icon: 'bg-emerald-100 text-emerald-700' },
+  good: { value: 'text-[var(--crm-primary,#285C49)]', icon: 'bg-[var(--crm-primary,#285C49)]/10 text-[var(--crm-primary,#285C49)]' },
 } as const;
 
 export function Kpi({
@@ -139,7 +139,7 @@ export function Panel({
       {(title || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#EFEBE2] px-5 py-3.5">
           <div>
-            {title && <h2 className="text-[14px] font-semibold text-[#1B3D2F]">{title}</h2>}
+            {title && <h2 className="text-[14px] font-semibold text-[var(--crm-ink,#18181B)]">{title}</h2>}
             {description && <p className="text-[12px] text-slate-500">{description}</p>}
           </div>
           {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -169,7 +169,7 @@ export function EmptyState({
           <Icon className="h-6 w-6" />
         </div>
       )}
-      <p className="text-[14px] font-semibold text-[#1B3D2F]">{title}</p>
+      <p className="text-[14px] font-semibold text-[var(--crm-ink,#18181B)]">{title}</p>
       {description && <p className="mt-1 max-w-sm text-[12px] text-slate-500">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
@@ -189,7 +189,7 @@ export function DataTable({ head, children, empty }: { head: ReactNode[]; childr
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#F1EDE5] text-[#1B3D2F] [&>tr]:transition-colors [&>tr:hover]:bg-[#F8F6F1]/70 [&>tr>td]:px-5 [&>tr>td]:py-3">
+        <tbody className="divide-y divide-[#F1EDE5] text-[var(--crm-ink,#18181B)] [&>tr]:transition-colors [&>tr:hover]:bg-[#F8F6F1]/70 [&>tr>td]:px-5 [&>tr>td]:py-3">
           {hasRows ? (
             children
           ) : (

@@ -13,7 +13,7 @@ export default function WarehouseLoading() {
           <div className={`${bar} h-5 w-56`} />
           <div className={`${bar} h-3 w-40`} />
         </div>
-        <Loader2 className="h-5 w-5 animate-spin text-[#285C49]" aria-hidden />
+        <Loader2 className="h-5 w-5 animate-spin text-[var(--crm-primary,#285C49)]" aria-hidden />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

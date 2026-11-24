@@ -223,4 +223,59 @@
 [data-tenant-root] .accent-\[\#1E6B4E\] {
   accent-color: var(--crm-secondary) !important;
 }
+[data-tenant-root] .bg-\[\#285C49\] {
+  background-color: var(--crm-primary) !important;
+}
+[data-tenant-root] .bg-\[\#285C49\]\/10 {
+  background-color: color-mix(in srgb, var(--crm-primary) 10%, transparent) !important;
+}
+[data-tenant-root] .bg-\[\#1E7A55\] {
+  background-color: var(--crm-primary) !important;
+}
+[data-tenant-root] .hover\:bg-\[\#1F4A3A\]:hover,
+[data-tenant-root] .hover\:bg-\[\#285C49\]:hover {
+  background-color: color-mix(in srgb, var(--crm-primary) 85%, black) !important;
+}
+[data-tenant-root] .hover\:bg-\[\#285C49\]\/10:hover {
+  background-color: color-mix(in srgb, var(--crm-primary) 10%, transparent) !important;
+}
+[data-tenant-root] .text-\[\#285C49\],
+[data-tenant-root] .hover\:text-\[\#285C49\]:hover {
+  color: var(--crm-primary) !important;
+}
+[data-tenant-root] .border-\[\#285C49\],
+[data-tenant-root] .focus\:border-\[\#285C49\]:focus {
+  border-color: var(--crm-primary) !important;
+}
+[data-tenant-root] .border-\[\#285C49\]\/30,
+[data-tenant-root] .hover\:border-\[\#285C49\]\/30:hover {
+  border-color: color-mix(in srgb, var(--crm-primary) 30%, transparent) !important;
+}
+[data-tenant-root] .border-\[\#285C49\]\/40,
+[data-tenant-root] .hover\:border-\[\#285C49\]\/40:hover {
+  border-color: color-mix(in srgb, var(--crm-primary) 40%, transparent) !important;
+}
+[data-tenant-root] .text-\[\#1B3D2F\] {
+  color: var(--crm-ink, color-mix(in srgb, var(--crm-primary) 40%, #111827)) !important;
+}
+[data-tenant-root] .bg-\[\#EEF3EF\],
+[data-tenant-root] .file\:bg-\[\#EEF3EF\]::file-selector-button,
+[data-tenant-root] .file\:bg-\[\#285C49\]\/10::file-selector-button {
+  background-color: color-mix(in srgb, var(--crm-primary) 10%, transparent) !important;
+}
+[data-tenant-root] .file\:text-\[\#285C49\]::file-selector-button {
+  color: var(--crm-primary) !important;
+}
+[data-tenant-root] .text-\[\#144D37\] {
+  color: var(--crm-primary) !important;
+}
+[data-tenant-root] .hover\:bg-\[\#144D37\]:hover {
+  background-color: var(--crm-primary) !important;
+}
+[data-tenant-root] .bg-\[\#1E6B4E\]\/10,
+[data-tenant-root] .bg-\[\#1E6B4E\]\/5,
+[data-tenant-root] .hover\:bg-\[\#1E6B4E\]\/10:hover,
+[data-tenant-root] .hover\:bg-\[\#1E6B4E\]\/20:hover {
+  background-color: color-mix(in srgb, var(--crm-secondary) 12%, transparent) !important;
+}
 

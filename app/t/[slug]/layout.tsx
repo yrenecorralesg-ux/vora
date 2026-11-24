@@ -178,6 +178,8 @@ export default async function TenantCrmLayout({
         '--crm-primary': primaryColor,
         '--crm-secondary': secondaryColor,
         '--crm-accent': accentColor,
+        '--crm-ink': `color-mix(in srgb, ${primaryColor} 40%, #111827)`,
+        '--crm-heading': `color-mix(in srgb, ${primaryColor} 82%, #111827)`,
         fontFamily: getFontFamily(branding?.font_family),
       } as React.CSSProperties}
     >

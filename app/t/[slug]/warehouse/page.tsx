@@ -90,7 +90,7 @@ export default async function WarehouseDashboard({ params }: { params: { slug: s
               <Link
                 key={href}
                 href={href}
-                className="group flex items-center gap-3 rounded-xl border border-[#EFEBE2] px-3 py-2.5 text-[13px] font-medium text-[#1B3D2F] transition hover:border-[var(--crm-primary,#285C49)]/30 hover:bg-[#F8F6F1]"
+                className="group flex items-center gap-3 rounded-xl border border-[#EFEBE2] px-3 py-2.5 text-[13px] font-medium text-[var(--crm-ink,#18181B)] transition hover:border-[var(--crm-primary,#285C49)]/30 hover:bg-[#F8F6F1]"
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--crm-primary,#285C49)]/10 text-[var(--crm-primary,#285C49)] transition group-hover:bg-[var(--crm-primary,#285C49)] group-hover:text-white">
                   <Icon className="h-4 w-4" />
@@ -140,13 +140,13 @@ export default async function WarehouseDashboard({ params }: { params: { slug: s
                   return (
                     <li key={v.sku}>
                       <div className="flex items-baseline justify-between gap-2 text-[13px]">
-                        <span className="truncate font-medium text-[#1B3D2F]">
+                        <span className="truncate font-medium text-[var(--crm-ink,#18181B)]">
                           {v.name} <span className="font-mono text-[11px] text-slate-500">{v.sku}</span>
                         </span>
-                        <span className="shrink-0 tabular-nums font-semibold text-[#1B3D2F]">{fmtMoney(v.value)}</span>
+                        <span className="shrink-0 tabular-nums font-semibold text-[var(--crm-ink,#18181B)]">{fmtMoney(v.value)}</span>
                       </div>
                       <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#F1EDE5]">
-                        <div className="h-full rounded-full bg-[#1E7A55]" style={{ width: `${Math.max(2, pct)}%` }} />
+                        <div className="h-full rounded-full bg-[var(--crm-primary,#1E7A55)]" style={{ width: `${Math.max(2, pct)}%` }} />
                       </div>
                     </li>
                   );
