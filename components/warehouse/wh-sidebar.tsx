@@ -83,37 +83,90 @@ const NAV: { group: string; links: NavLink[] }[] = [
 ];
 
 function NavList({ base, pathname, hidden, onNavigate }: { base: string; pathname: string; hidden: string[]; onNavigate?: () => void }) {
+  const isModuleActive = pathname === base || pathname === `${base}/`;
   const groups = NAV.map((g) => ({ ...g, links: g.links.filter((l) => !hidden.includes(l.href)) })).filter((g) => g.links.length);
   return (
-    <nav aria-label="Warehouse" className="flex-1 space-y-4 overflow-y-auto pr-1">
-      {groups.map(({ group, links }) => (
-        <div key={group}>
-          <p className="mb-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-[#A9BEA5]/70">{group}</p>
-          <ul className="space-y-0.5">
-            {links.map(({ label, href, icon: Icon, exact }) => {
-              const full = `${base}${href}`;
-              const active = exact ? pathname === full : pathname === full || pathname.startsWith(`${full}/`);
-              return (
-                <li key={href}>
-                  <Link
-                    href={full}
-                    onClick={onNavigate}
-                    aria-current={active ? 'page' : undefined}
-                    className={cn(
-                      'flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-semibold transition',
-                      active ? 'bg-[#1E6B4E] text-white shadow-sm' : 'text-[#D7E3DC] hover:bg-[#1E6B4E]/40 hover:text-white',
-                    )}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{label}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+    <div className="flex flex-1 flex-col gap-3 overflow-hidden">
+      {/* 1. Módulo Principal en Primer Orden */}
+      <Link
+        href={base}
+        onClick={onNavigate}
+        className={cn(
+          'flex items-center gap-3 rounded-2xl p-3 text-left transition-all border shadow-sm',
+          isModuleActive
+            ? 'bg-[#1E6B4E] border-white/40 text-white shadow-md'
+            : 'bg-black/20 border-white/10 hover:border-white/25 text-white/90 hover:bg-white/5',
+        )}
+      >
+        <div
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-xs',
+            isModuleActive ? 'bg-white/20' : 'bg-[#1E6B4E]',
+          )}
+        >
+          <Warehouse className="h-5 w-5" />
         </div>
-      ))}
-    </nav>
+        <div className="flex flex-col min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-sm font-black tracking-wide text-white uppercase">
+              Módulo Warehouse
+            </span>
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border bg-white/15 border-white/25 text-white">
+              Principal
+            </span>
+          </div>
+          <span className="text-[10px] font-medium text-[#A9BEA5] truncate">
+            Almacén e Inventario
+          </span>
+        </div>
+      </Link>
+
+      {/* 2. Submódulos y Funciones en Orden Jerárquico */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex items-center gap-1.5 px-3 py-1">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#A9BEA5]/80">
+            Funciones del Módulo
+          </span>
+        </div>
+
+        <nav
+          aria-label="Submódulos de Warehouse"
+          className="ml-4 pl-3 border-l-2 border-[#1E6B4E]/60 flex-1 space-y-3.5 overflow-y-auto pr-1"
+        >
+          {groups.map(({ group, links }) => (
+            <div key={group}>
+              <p className="mb-1 px-2 text-[10px] font-bold uppercase tracking-wider text-[#A9BEA5]/70">
+                {group}
+              </p>
+              <ul className="space-y-0.5">
+                {links.map(({ label, href, icon: Icon, exact }) => {
+                  const full = `${base}${href}`;
+                  const active = exact ? pathname === full : pathname === full || pathname.startsWith(`${full}/`);
+                  return (
+                    <li key={href}>
+                      <Link
+                        href={full}
+                        onClick={onNavigate}
+                        aria-current={active ? 'page' : undefined}
+                        className={cn(
+                          'group flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[12.5px] font-semibold transition',
+                          active
+                            ? 'bg-[#1E6B4E] text-white shadow-xs font-bold'
+                            : 'text-[#D7E3DC] hover:bg-[#1E6B4E]/40 hover:text-white',
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-105" />
+                        <span className="truncate">{label}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </nav>
+      </div>
+    </div>
   );
 }
 

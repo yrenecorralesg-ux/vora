@@ -37,23 +37,18 @@ export function PosSidebar() {
     router.replace(`/t/${activeTenantSlug}/login`);
   };
 
-  const navItems = [
-    {
-      id: 'pos',
-      label: 'POS',
-      icon: Store,
-      isActive: [
-        'POS-01',
-        'POS-02',
-        'POS-03-04',
-        'POS-06',
-        'POS-11',
-        'POS-12',
-        'POS-14',
-        'POS-15',
-      ].includes(currentView),
-      onClick: () => navigateTo('POS-01'),
-    },
+  const isPosModuleActive = [
+    'POS-01',
+    'POS-02',
+    'POS-03-04',
+    'POS-06',
+    'POS-11',
+    'POS-12',
+    'POS-14',
+    'POS-15',
+  ].includes(currentView);
+
+  const submodules = [
     {
       id: 'sales',
       label: 'Ventas',
@@ -170,31 +165,96 @@ export function PosSidebar() {
           style={{ backgroundColor: `color-mix(in srgb, ${secondaryColor} 40%, transparent)` }}
         />
 
-        {/* Módulos Principales de Navegación del PDF */}
-        <nav className="flex flex-col gap-1.5">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={item.onClick}
-                className={`flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm font-semibold transition-all ${item.isActive
-                  ? 'text-white shadow-sm'
-                  : 'hover:text-white'
-                  }`}
-                style={
-                  item.isActive
-                    ? { backgroundColor: secondaryColor }
-                    : { color: accentColor }
-                }
+        {/* 1. Módulo Principal en Primer Orden */}
+        <div className="flex flex-col gap-3">
+          <button
+            type="button"
+            onClick={() => navigateTo('POS-01')}
+            className={`flex items-center gap-3 rounded-2xl p-3 text-left transition-all border shadow-sm ${
+              isPosModuleActive
+                ? 'border-white/40 text-white'
+                : 'border-white/10 hover:border-white/25 text-white/90 hover:bg-white/5'
+            }`}
+            style={{
+              backgroundColor: isPosModuleActive
+                ? secondaryColor
+                : 'rgba(0, 0, 0, 0.2)',
+            }}
+          >
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-xs"
+              style={{
+                backgroundColor: isPosModuleActive
+                  ? 'rgba(255, 255, 255, 0.2)'
+                  : secondaryColor,
+              }}
+            >
+              <Store className="h-5 w-5" />
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-sm font-black tracking-wide text-white uppercase">
+                  Módulo POS
+                </span>
+                <span
+                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
+                  style={{
+                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+                    borderColor: 'rgba(255, 255, 255, 0.25)',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  Principal
+                </span>
+              </div>
+              <span
+                className="text-[10px] font-medium truncate"
+                style={{ color: accentColor }}
               >
-                <Icon className="h-4 w-4 shrink-0" />
-                <span>{item.label}</span>
-              </button>
-            );
-          })}
-        </nav>
+                Caja y Terminal de Venta
+              </span>
+            </div>
+          </button>
+
+          {/* 2. Submódulos y Funciones en Orden Jerárquico */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-1.5 px-3 py-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
+                Funciones del Módulo
+              </span>
+            </div>
+
+            <nav
+              className="ml-4 pl-3 border-l-2 flex flex-col gap-1"
+              style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
+              aria-label="Submódulos de POS"
+            >
+              {submodules.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={item.onClick}
+                    className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-semibold transition-all ${
+                      item.isActive
+                        ? 'text-white shadow-xs'
+                        : 'hover:text-white hover:bg-white/10'
+                    }`}
+                    style={
+                      item.isActive
+                        ? { backgroundColor: secondaryColor }
+                        : { color: accentColor }
+                    }
+                  >
+                    <Icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-105" />
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
       </div>
 
       {/* Pie de Barra Lateral: Operador y Salida */}

@@ -7,15 +7,26 @@ export const dynamic = 'force-dynamic';
 
 // Requisitos de cada enlace de la barra lateral (las páginas vuelven a validarlos en servidor).
 const LINK_RULES: { href: string; permission?: WarehousePermission; fn?: WarehouseFunction }[] = [
-  { href: '/receipts', permission: 'stock.receive' },
-  { href: '/issues', permission: 'stock.issue' },
-  { href: '/adjustments', permission: 'stock.adjust.request' },
-  { href: '/returns', permission: 'stock.return' },
-  { href: '/transfers', permission: 'stock.transfer' },
+  { href: '', fn: 'wh_dashboard' },
+  { href: '/catalog', fn: 'wh_catalog' },
+  { href: '/stock', fn: 'wh_stock' },
+  { href: '/receipts', permission: 'stock.receive', fn: 'wh_receipts' },
+  { href: '/issues', permission: 'stock.issue', fn: 'wh_issues' },
+  { href: '/adjustments', permission: 'stock.adjust.request', fn: 'wh_adjustments' },
+  { href: '/returns', permission: 'stock.return', fn: 'wh_returns' },
+  { href: '/transfers', permission: 'stock.transfer', fn: 'wh_transfers' },
+  { href: '/kardex', fn: 'wh_kardex' },
   { href: '/scan', permission: 'stock.receive', fn: 'wh_scanner' },
+  { href: '/warehouses', fn: 'wh_warehouses' },
   { href: '/imports', permission: 'import.validate', fn: 'wh_imports' },
+  { href: '/suppliers', fn: 'wh_suppliers' },
   { href: '/reports', permission: 'report.view', fn: 'wh_reports' },
   { href: '/pos', fn: 'wh_pos_integration' },
+  { href: '/settings', permission: 'warehouse.configure', fn: 'wh_settings' },
+  { href: '/sector', permission: 'warehouse.configure', fn: 'wh_sector' },
+  { href: '/attributes', permission: 'warehouse.configure', fn: 'wh_attributes' },
+  { href: '/units', permission: 'warehouse.configure', fn: 'wh_units' },
+  { href: '/roles', permission: 'warehouse.configure', fn: 'wh_roles' },
 ];
 
 async function hiddenLinks(ctx: WarehouseContext): Promise<string[]> {
@@ -26,7 +37,9 @@ async function hiddenLinks(ctx: WarehouseContext): Promise<string[]> {
     .eq('tenant_id', ctx.tenantId)
     .eq('feature_key', 'warehouse.suppliers')
     .maybeSingle();
-  if (!suppliers?.enabled || !suppliers.contracted) hidden.push('/suppliers');
+  if (suppliers && (!suppliers.enabled || !suppliers.contracted)) {
+    if (!hidden.includes('/suppliers')) hidden.push('/suppliers');
+  }
   return hidden;
 }
 

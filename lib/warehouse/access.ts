@@ -7,6 +7,8 @@ import { authorizeTenantApi, type TenantApiAccess } from '@/lib/tenant-api-auth'
 import { isSuperAdmin, requireSession } from '@/lib/auth';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
 
+import { getTenantSession } from '@/lib/tenant-session';
+
 export const WAREHOUSE_FEATURE = 'warehouse.inventory';
 
 /** Permisos granulares de la sección 7 del documento. */
@@ -27,7 +29,27 @@ export const WAREHOUSE_PERMISSIONS = [
 export type WarehousePermission = (typeof WAREHOUSE_PERMISSIONS)[number];
 
 /** Funciones del módulo activables por empresa desde Core. */
-export type WarehouseFunction = 'wh_imports' | 'wh_scanner' | 'wh_pos_integration' | 'wh_reports';
+export type WarehouseFunction =
+  | 'wh_dashboard'
+  | 'wh_catalog'
+  | 'wh_stock'
+  | 'wh_receipts'
+  | 'wh_issues'
+  | 'wh_adjustments'
+  | 'wh_returns'
+  | 'wh_transfers'
+  | 'wh_kardex'
+  | 'wh_scanner'
+  | 'wh_warehouses'
+  | 'wh_imports'
+  | 'wh_suppliers'
+  | 'wh_reports'
+  | 'wh_pos_integration'
+  | 'wh_settings'
+  | 'wh_sector'
+  | 'wh_attributes'
+  | 'wh_units'
+  | 'wh_roles';
 
 export interface WarehouseContext extends TenantApiAccess {
   tenantName: string;
@@ -120,10 +142,26 @@ async function loadContext(access: TenantApiAccess, knownTenant?: TenantSnapshot
       tenantName: tenant.commercial_name,
       permissions,
       functions: {
-        wh_imports: fn('wh_imports'),
+        wh_dashboard: fn('wh_dashboard'),
+        wh_catalog: fn('wh_catalog'),
+        wh_stock: fn('wh_stock'),
+        wh_receipts: fn('wh_receipts'),
+        wh_issues: fn('wh_issues'),
+        wh_adjustments: fn('wh_adjustments'),
+        wh_returns: fn('wh_returns'),
+        wh_transfers: fn('wh_transfers'),
+        wh_kardex: fn('wh_kardex'),
         wh_scanner: fn('wh_scanner'),
-        wh_pos_integration: fn('wh_pos_integration'),
+        wh_warehouses: fn('wh_warehouses'),
+        wh_imports: fn('wh_imports'),
+        wh_suppliers: fn('wh_suppliers'),
         wh_reports: fn('wh_reports'),
+        wh_pos_integration: fn('wh_pos_integration'),
+        wh_settings: fn('wh_settings'),
+        wh_sector: fn('wh_sector'),
+        wh_attributes: fn('wh_attributes'),
+        wh_units: fn('wh_units'),
+        wh_roles: fn('wh_roles'),
       },
       service,
       can: (p) => permissions.has(p),
@@ -169,30 +207,48 @@ const memo: <T extends (...args: never[]) => unknown>(fn: T) => T =
   ((React as unknown as { cache?: <T>(fn: T) => T }).cache) ?? ((fn) => fn);
 
 const loadPageContext = memo(async (slug: string): Promise<PageLoad> => {
-  const session = getSupabaseServerClient();
-  const user = await requireSession(session);
-  if (!user) return { ok: false, to: `/t/${slug}/login` };
+  const tenantSession = await getTenantSession(slug);
   const service = getSupabaseServiceClient();
-  const [{ data: tenant }, admin] = await Promise.all([
-    service.from('tenants').select('id, commercial_name, commercial_status').eq('slug', slug).maybeSingle(),
-    isSuperAdmin(user.id, session),
-  ]);
-  if (!tenant) return { ok: false, to: '/access-pending' };
+  const { data: tenant } = await service
+    .from('tenants')
+    .select('id, commercial_name, commercial_status')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (!tenant) return { ok: false, to: `/t/${slug}/login` };
 
-  let role = 'super_admin';
-  if (!admin) {
-    const { data: membership } = await service
-      .from('tenant_memberships')
-      .select('role')
-      .eq('tenant_id', tenant.id)
-      .eq('auth_user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle();
-    if (!membership) return { ok: false, to: '/access-pending' };
-    role = membership.role;
+  let userId: string;
+  let role: string;
+  let email: string | null = null;
+
+  if (tenantSession && tenantSession.slug.toLowerCase() === slug.toLowerCase()) {
+    userId = tenantSession.userId;
+    role = tenantSession.role;
+    email = tenantSession.email ?? null;
+  } else {
+    const session = getSupabaseServerClient();
+    const user = await requireSession(session);
+    if (!user) return { ok: false, to: `/t/${slug}/login` };
+    const admin = await isSuperAdmin(user.id, session);
+    if (admin) {
+      userId = user.id;
+      role = 'super_admin';
+      email = user.email ?? null;
+    } else {
+      const { data: membership } = await service
+        .from('tenant_memberships')
+        .select('role')
+        .eq('tenant_id', tenant.id)
+        .eq('auth_user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+      if (!membership) return { ok: false, to: `/t/${slug}/login` };
+      userId = user.id;
+      role = membership.role;
+      email = user.email ?? null;
+    }
   }
 
-  const loaded = await loadContext({ tenantId: tenant.id, userId: user.id, role, email: user.email ?? null }, tenant);
+  const loaded = await loadContext({ tenantId: tenant.id, userId, role, email }, tenant);
   if (!loaded.ok) return { ok: false, to: `/t/${slug}/warehouse/inactive?reason=${loaded.reason}` };
   return { ok: true, ctx: loaded.ctx };
 });
