@@ -11,8 +11,8 @@ import { cn } from '@/lib/utils';
  */
 
 export const WH = {
-  primary: '#285C49',
-  primaryHover: '#1F4A3A',
+  primary: 'var(--crm-primary, #285C49)',
+  primaryHover: 'color-mix(in srgb, var(--crm-primary, #285C49) 85%, black)',
   ink: '#1B3D2F',
   border: '#E7E2D7',
   soft: '#F8F6F1',
@@ -21,18 +21,18 @@ export const WH = {
 /** Clases de botón reutilizables (también en formularios cliente). */
 export const btn = {
   primary:
-    'inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[#285C49] px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1F4A3A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#285C49]/40 disabled:opacity-50',
+    'inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[var(--crm-primary,#285C49)] px-4 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crm-primary,#285C49)]/40 disabled:opacity-50',
   secondary:
-    'inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[#E7E2D7] bg-white px-4 text-[13px] font-medium text-[#1B3D2F] shadow-sm transition hover:border-[#285C49]/40 hover:bg-[#F8F6F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#285C49]/30 disabled:opacity-50',
+    'inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-[#E7E2D7] bg-white px-4 text-[13px] font-medium text-[#1B3D2F] shadow-sm transition hover:border-[var(--crm-primary,#285C49)]/40 hover:bg-[#F8F6F1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crm-primary,#285C49)]/30 disabled:opacity-50',
   ghost:
-    'inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-[#285C49] transition hover:bg-[#285C49]/10',
+    'inline-flex h-8 items-center justify-center gap-1.5 rounded-lg px-2.5 text-[12px] font-medium text-[var(--crm-primary,#285C49)] transition hover:bg-[var(--crm-primary,#285C49)]/10',
   danger:
     'inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-rose-200 bg-white px-4 text-[13px] font-medium text-rose-700 transition hover:bg-rose-50 disabled:opacity-50',
 } as const;
 
 /** Campo de formulario con el mismo acabado en todas las vistas. */
 export const field =
-  'h-9 w-full rounded-xl border border-[#E7E2D7] bg-white px-3 text-[13px] text-[#1B3D2F] shadow-sm transition placeholder:text-slate-400 focus:border-[#285C49] focus:outline-none focus:ring-2 focus:ring-[#285C49]/15 disabled:bg-slate-50';
+  'h-9 w-full rounded-xl border border-[#E7E2D7] bg-white px-3 text-[13px] text-[#1B3D2F] shadow-sm transition placeholder:text-slate-400 focus:border-[var(--crm-primary,#285C49)] focus:outline-none focus:ring-2 focus:ring-[var(--crm-primary,#285C49)]/15 disabled:bg-slate-50';
 
 export function WhHeader({
   code,
@@ -51,7 +51,7 @@ export function WhHeader({
     <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         {Icon && (
-          <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#285C49] text-white shadow-sm sm:flex">
+          <div className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--crm-primary,#285C49)] text-white shadow-sm sm:flex">
             <Icon className="h-5 w-5" />
           </div>
         )}
@@ -75,7 +75,7 @@ export function KpiGrid({ children }: { children: ReactNode }) {
 }
 
 const TONES = {
-  default: { value: 'text-[#1B3D2F]', icon: 'bg-[#285C49]/10 text-[#285C49]' },
+  default: { value: 'text-[#1B3D2F]', icon: 'bg-[var(--crm-primary,#285C49)]/10 text-[var(--crm-primary,#285C49)]' },
   warn: { value: 'text-amber-700', icon: 'bg-amber-100 text-amber-700' },
   danger: { value: 'text-rose-700', icon: 'bg-rose-100 text-rose-700' },
   good: { value: 'text-emerald-700', icon: 'bg-emerald-100 text-emerald-700' },
@@ -100,7 +100,7 @@ export function Kpi({
     <div
       className={cn(
         'h-full rounded-2xl border border-[#E7E2D7] bg-white p-4 shadow-[0_1px_2px_rgba(27,61,47,0.04)] transition',
-        href && 'hover:-translate-y-0.5 hover:border-[#285C49]/30 hover:shadow-md',
+        href && 'hover:-translate-y-0.5 hover:border-[var(--crm-primary,#285C49)]/30 hover:shadow-md',
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -115,7 +115,7 @@ export function Kpi({
       {hint && <p className="mt-1 text-[11px] text-slate-500">{hint}</p>}
     </div>
   );
-  return href ? <Link href={href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#285C49]/30 rounded-2xl">{body}</Link> : body;
+  return href ? <Link href={href} className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--crm-primary,#285C49)]/30 rounded-2xl">{body}</Link> : body;
 }
 
 export function Panel({
@@ -165,7 +165,7 @@ export function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
       {Icon && (
-        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[#285C49]/10 text-[#285C49]">
+        <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--crm-primary,#285C49)]/10 text-[var(--crm-primary,#285C49)]">
           <Icon className="h-6 w-6" />
         </div>
       )}
@@ -258,7 +258,7 @@ export function FilterBar({ children, resetHref }: { children: ReactNode; resetH
   return (
     <form
       method="get"
-      className="flex flex-wrap items-center gap-2 [&_input]:h-9 [&_input]:rounded-xl [&_input]:border [&_input]:border-[#E7E2D7] [&_input]:bg-white [&_input]:px-3 [&_input]:text-[13px] [&_input]:shadow-sm [&_input:focus]:border-[#285C49] [&_input:focus]:outline-none [&_input:focus]:ring-2 [&_input:focus]:ring-[#285C49]/15 [&_select]:h-9 [&_select]:rounded-xl [&_select]:border [&_select]:border-[#E7E2D7] [&_select]:bg-white [&_select]:px-3 [&_select]:text-[13px] [&_select]:shadow-sm [&_select:focus]:border-[#285C49] [&_select:focus]:outline-none"
+      className="flex flex-wrap items-center gap-2 [&_input]:h-9 [&_input]:rounded-xl [&_input]:border [&_input]:border-[#E7E2D7] [&_input]:bg-white [&_input]:px-3 [&_input]:text-[13px] [&_input]:shadow-sm [&_input:focus]:border-[var(--crm-primary,#285C49)] [&_input:focus]:outline-none [&_input:focus]:ring-2 [&_input:focus]:ring-[var(--crm-primary,#285C49)]/15 [&_select]:h-9 [&_select]:rounded-xl [&_select]:border [&_select]:border-[#E7E2D7] [&_select]:bg-white [&_select]:px-3 [&_select]:text-[13px] [&_select]:shadow-sm [&_select:focus]:border-[var(--crm-primary,#285C49)] [&_select:focus]:outline-none"
     >
       {children}
       <button type="submit" className={btn.secondary}>
@@ -295,7 +295,7 @@ export function FieldLabel({ label, children, className }: { label: string; chil
 /** Enlace de texto con el color de la marca. */
 export function TextLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <Link href={href} className="font-medium text-[#285C49] hover:underline">
+    <Link href={href} className="font-medium text-[var(--crm-primary,#285C49)] hover:underline">
       {children}
     </Link>
   );

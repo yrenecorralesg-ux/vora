@@ -34,6 +34,13 @@ import { cn } from '@/lib/utils';
 
 type NavLink = { label: string; href: string; icon: typeof Package; exact?: boolean };
 
+export interface WarehouseSidebarBranding {
+  primaryColor?: string;
+  secondaryColor?: string;
+  accentColor?: string;
+  logoUrl?: string | null;
+}
+
 const WAREHOUSE_LINKS: NavLink[] = [
   { label: 'Dashboard', href: '', icon: LayoutDashboard, exact: true },
   { label: 'Catálogo', href: '/catalog', icon: Package },
@@ -63,17 +70,36 @@ const POS_SUBMODULES = [
   { label: 'Configuración', href: '/pos', icon: Settings },
 ];
 
-function Brand({ tenantName }: { tenantName: string }) {
+function Brand({
+  tenantName,
+  branding,
+}: {
+  tenantName: string;
+  branding?: WarehouseSidebarBranding;
+}) {
+  const secondaryColor = branding?.secondaryColor || '#1E6B4E';
+  const accentColor = branding?.accentColor || '#A9BEA5';
+
   return (
     <div className="flex items-center gap-3 px-1 pt-1 pb-3 border-b border-white/10">
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#1E6B4E] text-white shadow-sm font-black text-sm uppercase">
-        {tenantName.slice(0, 2).toUpperCase()}
-      </div>
+      {branding?.logoUrl ? (
+        <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm p-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={branding.logoUrl} alt={tenantName} className="h-full w-full object-contain" />
+        </div>
+      ) : (
+        <div
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl text-white shadow-sm font-black text-sm uppercase"
+          style={{ backgroundColor: secondaryColor }}
+        >
+          {tenantName.slice(0, 2).toUpperCase()}
+        </div>
+      )}
       <div className="flex flex-col min-w-0">
         <span className="text-base font-bold tracking-tight text-white leading-tight truncate" title={tenantName}>
           {tenantName}
         </span>
-        <span className="text-[11px] font-medium text-[#A9BEA5] truncate">
+        <span className="text-[11px] font-medium truncate" style={{ color: accentColor }}>
           Portal de Gestión
         </span>
       </div>
@@ -86,16 +112,21 @@ function NavContent({
   slug,
   pathname,
   hidden,
+  branding,
   onNavigate,
 }: {
   base: string;
   slug: string;
   pathname: string;
   hidden: string[];
+  branding?: WarehouseSidebarBranding;
   onNavigate?: () => void;
 }) {
   const [whExpanded, setWhExpanded] = useState(true);
   const [posExpanded, setPosExpanded] = useState(false);
+
+  const secondaryColor = branding?.secondaryColor || '#1E6B4E';
+  const accentColor = branding?.accentColor || '#A9BEA5';
 
   const activeWhLinks = WAREHOUSE_LINKS.filter((l) => !hidden.includes(l.href));
 
@@ -122,7 +153,10 @@ function NavContent({
 
         {/* Desglose de Submódulos Warehouse */}
         {whExpanded && (
-          <div className="ml-4 mt-1 pl-3 border-l-2 border-[#1E6B4E]/60 flex flex-col gap-1 max-h-[50vh] overflow-y-auto pr-1">
+          <div
+            className="ml-4 mt-1 pl-3 border-l-2 flex flex-col gap-1 max-h-[50vh] overflow-y-auto pr-1"
+            style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
+          >
             {activeWhLinks.map(({ label, href, icon: Icon, exact }) => {
               const full = `${base}${href}`;
               const active = exact ? pathname === full : pathname === full || pathname.startsWith(`${full}/`);
@@ -135,9 +169,14 @@ function NavContent({
                   className={cn(
                     'flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all',
                     active
-                      ? 'bg-[#1E6B4E] text-white shadow-xs font-bold'
-                      : 'text-[#D7E3DC] hover:bg-[#1E6B4E]/40 hover:text-white',
+                      ? 'text-white shadow-xs font-bold'
+                      : 'hover:text-white hover:bg-white/10',
                   )}
+                  style={
+                    active
+                      ? { backgroundColor: secondaryColor }
+                      : { color: accentColor }
+                  }
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{label}</span>
@@ -169,7 +208,10 @@ function NavContent({
 
         {/* Desglose de Submódulos POS */}
         {posExpanded && (
-          <div className="ml-4 mt-1 pl-3 border-l-2 border-[#1E6B4E]/60 flex flex-col gap-1">
+          <div
+            className="ml-4 mt-1 pl-3 border-l-2 flex flex-col gap-1"
+            style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
+          >
             {POS_SUBMODULES.map((item, idx) => {
               const Icon = item.icon;
               return (
@@ -177,7 +219,7 @@ function NavContent({
                   key={`${item.label}-${idx}`}
                   href={`/t/${slug}${item.href}`}
                   onClick={onNavigate}
-                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-[#D7E3DC] hover:bg-[#1E6B4E]/40 hover:text-white transition-all"
+                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/10 hover:text-white transition-all"
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   <span className="truncate">{item.label}</span>
@@ -192,21 +234,26 @@ function NavContent({
 }
 
 /**
- * Barra lateral de Warehouse con desglose jerárquico por módulos desplegables al hacer clic.
+ * Barra lateral de Warehouse con colores de marca y desglose jerárquico por módulos desplegables.
  */
 export function WarehouseSidebar({
   slug,
   tenantName,
   hidden = [],
+  branding,
 }: {
   slug: string;
   tenantName: string;
   hidden?: string[];
+  branding?: WarehouseSidebarBranding;
 }) {
   const pathname = usePathname();
   const base = `/t/${slug}/warehouse`;
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [pathname]);
+
+  const primaryBg = branding?.primaryColor || '#144D37';
+  const secondaryColor = branding?.secondaryColor || '#1E6B4E';
 
   const handleLogout = async () => {
     try {
@@ -219,10 +266,22 @@ export function WarehouseSidebar({
 
   return (
     <>
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-[#1E6B4E]/30 bg-[#144D37] p-4 text-white shadow-xl md:flex print:hidden z-20">
+      <aside
+        className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col justify-between border-r border-white/10 p-4 text-white shadow-xl md:flex print:hidden z-20"
+        style={{
+          backgroundColor: primaryBg,
+          borderColor: `color-mix(in srgb, ${secondaryColor} 25%, transparent)`,
+        }}
+      >
         <div className="flex flex-col gap-5 overflow-hidden">
-          <Brand tenantName={tenantName} />
-          <NavContent base={base} slug={slug} pathname={pathname} hidden={hidden} />
+          <Brand tenantName={tenantName} branding={branding} />
+          <NavContent
+            base={base}
+            slug={slug}
+            pathname={pathname}
+            hidden={hidden}
+            branding={branding}
+          />
         </div>
 
         <div className="border-t border-white/10 pt-3">
@@ -238,7 +297,10 @@ export function WarehouseSidebar({
       </aside>
 
       {/* Versión Móvil */}
-      <div className="sticky top-0 z-30 flex items-center justify-between bg-[#144D37] px-4 py-3 text-white md:hidden print:hidden border-b border-[#1E6B4E]/30">
+      <div
+        className="sticky top-0 z-30 flex items-center justify-between px-4 py-3 text-white md:hidden print:hidden border-b border-white/10"
+        style={{ backgroundColor: primaryBg }}
+      >
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -250,7 +312,10 @@ export function WarehouseSidebar({
           </button>
           <span className="truncate font-bold">{tenantName}</span>
         </div>
-        <span className="text-[10px] uppercase tracking-wider text-[#A9BEA5] font-semibold">
+        <span
+          className="text-[10px] uppercase tracking-wider font-semibold"
+          style={{ color: branding?.accentColor || '#A9BEA5' }}
+        >
           Warehouse
         </span>
       </div>
@@ -263,10 +328,13 @@ export function WarehouseSidebar({
             className="absolute inset-0 bg-black/50"
             onClick={() => setOpen(false)}
           />
-          <aside className="absolute inset-y-0 left-0 flex w-64 flex-col justify-between bg-[#144D37] p-4 text-white shadow-xl">
+          <aside
+            className="absolute inset-y-0 left-0 flex w-64 flex-col justify-between p-4 text-white shadow-xl"
+            style={{ backgroundColor: primaryBg }}
+          >
             <div className="flex flex-col gap-5 overflow-hidden">
               <div className="flex items-center justify-between">
-                <Brand tenantName={tenantName} />
+                <Brand tenantName={tenantName} branding={branding} />
                 <button
                   type="button"
                   aria-label="Cerrar menú"
@@ -281,6 +349,7 @@ export function WarehouseSidebar({
                 slug={slug}
                 pathname={pathname}
                 hidden={hidden}
+                branding={branding}
                 onNavigate={() => setOpen(false)}
               />
             </div>

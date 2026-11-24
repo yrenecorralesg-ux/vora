@@ -90,9 +90,9 @@ export default async function WarehouseDashboard({ params }: { params: { slug: s
               <Link
                 key={href}
                 href={href}
-                className="group flex items-center gap-3 rounded-xl border border-[#EFEBE2] px-3 py-2.5 text-[13px] font-medium text-[#1B3D2F] transition hover:border-[#285C49]/30 hover:bg-[#F8F6F1]"
+                className="group flex items-center gap-3 rounded-xl border border-[#EFEBE2] px-3 py-2.5 text-[13px] font-medium text-[#1B3D2F] transition hover:border-[var(--crm-primary,#285C49)]/30 hover:bg-[#F8F6F1]"
               >
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#285C49]/10 text-[#285C49] transition group-hover:bg-[#285C49] group-hover:text-white">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--crm-primary,#285C49)]/10 text-[var(--crm-primary,#285C49)] transition group-hover:bg-[var(--crm-primary,#285C49)] group-hover:text-white">
                   <Icon className="h-4 w-4" />
                 </span>
                 {label}
@@ -117,7 +117,7 @@ export default async function WarehouseDashboard({ params }: { params: { slug: s
             {d.topAlerts.map((a) => (
               <tr key={`${a.item_id}-${a.warehouse_id}`}>
                 <td>
-                  <Link href={`${base}/catalog/${a.item_id}`} className="font-medium hover:text-[#285C49] hover:underline">{a.name}</Link>
+                  <Link href={`${base}/catalog/${a.item_id}`} className="font-medium hover:text-[var(--crm-primary,#285C49)] hover:underline">{a.name}</Link>
                   <p className="font-mono text-[11px] text-slate-500">{a.sku}</p>
                 </td>
                 <td className="text-slate-600">{a.warehouse_code}</td>

@@ -58,7 +58,7 @@ export function MovementsChart({ data }: { data: Point[] }) {
               <CartesianGrid vertical={false} stroke="#EFEBE2" />
               <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b' }} interval="preserveStartEnd" minTickGap={12} />
               <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748b' }} allowDecimals={false} width={44} />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: '#285C49', fillOpacity: 0.06 }} />
+              <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--crm-primary, #285C49)', fillOpacity: 0.06 }} />
               {SERIES.map((s) => (
                 <Bar key={s.key} dataKey={s.key} name={s.label} fill={s.color} radius={[4, 4, 0, 0]} maxBarSize={18} />
               ))}

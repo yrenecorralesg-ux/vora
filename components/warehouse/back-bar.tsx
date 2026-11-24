@@ -77,7 +77,7 @@ export function WhBackBar({ slug }: { slug: string }) {
     <button
       type="button"
       onClick={goBack}
-      className="group inline-flex items-center gap-1.5 rounded-lg px-2 py-1 -ml-2 text-[12px] font-medium text-slate-500 transition hover:bg-white hover:text-[#285C49]"
+      className="group inline-flex items-center gap-1.5 rounded-lg px-2 py-1 -ml-2 text-[12px] font-medium text-slate-500 transition hover:bg-white hover:text-[var(--crm-primary,#285C49)]"
     >
       <ArrowLeft className="h-3.5 w-3.5 transition group-hover:-translate-x-0.5" />
       Volver a {labelFor(targetRel)}

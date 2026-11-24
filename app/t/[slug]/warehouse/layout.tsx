@@ -53,11 +53,39 @@ export default async function WarehouseLayout({ children, params }: { children: 
 
   // Redirige a /warehouse/inactive con el motivo si el módulo no puede abrirse.
   const ctx = await requireWarehousePage(params.slug);
-  const hidden = await hiddenLinks(ctx);
+  const [hidden, { data: branding }] = await Promise.all([
+    hiddenLinks(ctx),
+    ctx.service
+      .from('tenant_branding')
+      .select('primary_color, secondary_color, accent_color, logo_url, font_family')
+      .eq('tenant_id', ctx.tenantId)
+      .maybeSingle(),
+  ]);
+
+  const primaryColor = branding?.primary_color || '#144D37';
+  const secondaryColor = branding?.secondary_color || '#1E6B4E';
+  const accentColor = branding?.accent_color || '#A9BEA5';
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F6F5F0] md:flex-row">
-      <WarehouseSidebar slug={params.slug} tenantName={ctx.tenantName} hidden={hidden} />
+    <div
+      className="flex min-h-screen flex-col bg-[#F6F5F0] md:flex-row"
+      style={{
+        '--crm-primary': primaryColor,
+        '--crm-secondary': secondaryColor,
+        '--crm-accent': accentColor,
+      } as React.CSSProperties}
+    >
+      <WarehouseSidebar
+        slug={params.slug}
+        tenantName={ctx.tenantName}
+        hidden={hidden}
+        branding={{
+          primaryColor,
+          secondaryColor,
+          accentColor,
+          logoUrl: branding?.logo_url ?? null,
+        }}
+      />
       <main className="min-w-0 flex-1 p-4 pb-20 sm:p-5 lg:p-6">
         <div className="mx-auto max-w-7xl space-y-4">
           <WhBackBar slug={params.slug} />
