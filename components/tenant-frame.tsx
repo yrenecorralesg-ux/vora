@@ -32,14 +32,12 @@ export function TenantFrame({
   if (isOwnShellPath(pathname, slug)) {
     return (
       <div className="flex min-h-screen bg-[#F6F2E9]">
-        {rail}
         <div className="min-w-0 flex-1">{children}</div>
       </div>
     );
   }
   return (
     <div className="flex min-h-screen bg-[#f1f3f9]">
-      {rail}
       {sidebar}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-y-auto">
         <main className="flex-1 p-4 pt-16 sm:p-5 sm:pt-16 md:pt-5 lg:p-6">

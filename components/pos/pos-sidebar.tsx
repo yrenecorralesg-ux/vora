@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -13,8 +13,21 @@ import {
   BarChart2,
   Settings,
   LogOut,
+  ChevronDown,
+  Warehouse,
+  LayoutDashboard,
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  ClipboardCheck,
+  Undo2,
+  ArrowLeftRight,
+  History,
+  ScanBarcode,
+  Truck,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { usePos } from './pos-context';
+import { cn } from '@/lib/utils';
 
 export function PosSidebar() {
   const router = useRouter();
@@ -26,7 +39,11 @@ export function PosSidebar() {
     currentView,
     navigateTo,
     isFuncActive,
+    isWarehouseEnabled,
   } = usePos();
+
+  const [posExpanded, setPosExpanded] = useState(true);
+  const [whExpanded, setWhExpanded] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -46,9 +63,31 @@ export function PosSidebar() {
     'POS-12',
     'POS-14',
     'POS-15',
+    'POS-13',
+    'POS-05',
+    'POS-16',
+    'POS-17',
+    'POS-18',
+    'POS-19',
+    'POS-20',
   ].includes(currentView);
 
-  const submodules = [
+  const posSubmodules = [
+    {
+      id: 'pos_main',
+      label: 'Caja y Terminal',
+      icon: Store,
+      isActive: [
+        'POS-01',
+        'POS-02',
+        'POS-06',
+        'POS-11',
+        'POS-12',
+        'POS-14',
+        'POS-15',
+      ].includes(currentView),
+      onClick: () => navigateTo('POS-01'),
+    },
     {
       id: 'sales',
       label: 'Ventas',
@@ -60,7 +99,7 @@ export function PosSidebar() {
       id: 'products',
       label: 'Productos',
       icon: Package,
-      isActive: false,
+      isActive: currentView === 'POS-03-04',
       onClick: () => navigateTo('POS-03-04'),
     },
     {
@@ -116,6 +155,24 @@ export function PosSidebar() {
       : []),
   ];
 
+  const warehouseSubmodules = [
+    { label: 'Dashboard', href: '', icon: LayoutDashboard },
+    { label: 'Catálogo', href: '/catalog', icon: Package },
+    { label: 'Stock y alertas', href: '/stock', icon: Boxes },
+    { label: 'Entradas', href: '/receipts', icon: ArrowDownToLine },
+    { label: 'Salidas', href: '/issues', icon: ArrowUpFromLine },
+    { label: 'Ajustes', href: '/adjustments', icon: ClipboardCheck },
+    { label: 'Devoluciones', href: '/returns', icon: Undo2 },
+    { label: 'Transferencias', href: '/transfers', icon: ArrowLeftRight },
+    { label: 'Kardex', href: '/kardex', icon: History },
+    { label: 'Escaneo', href: '/scan', icon: ScanBarcode },
+    { label: 'Almacenes', href: '/warehouses', icon: Warehouse },
+    { label: 'Importaciones', href: '/imports', icon: FileSpreadsheet },
+    { label: 'Proveedores', href: '/suppliers', icon: Truck },
+    { label: 'Reportes', href: '/reports', icon: BarChart2 },
+    { label: 'Configuración', href: '/settings', icon: Settings },
+  ];
+
   const primaryBg = tenantBranding?.primaryColor || 'var(--crm-primary, #144D37)';
   const secondaryColor = tenantBranding?.secondaryColor || 'var(--crm-secondary, #1E6B4E)';
   const accentColor = tenantBranding?.accentColor || 'var(--crm-accent, #A9BEA5)';
@@ -123,16 +180,15 @@ export function PosSidebar() {
 
   return (
     <aside
-      className="sticky top-0 flex h-screen w-60 shrink-0 flex-col justify-between border-r border-[#1E6B4E]/30 bg-[#144D37] p-4 text-white shadow-lg print:hidden"
+      className="sticky top-0 flex h-screen w-64 shrink-0 flex-col justify-between border-r border-white/10 bg-[#144D37] p-4 text-white shadow-xl print:hidden z-20"
       style={{
         backgroundColor: primaryBg,
-        borderColor: `color-mix(in srgb, ${secondaryColor} 30%, transparent)`,
+        borderColor: `color-mix(in srgb, ${secondaryColor} 25%, transparent)`,
       }}
     >
-      <div className="flex flex-col gap-6">
-        {/* Identidad de Marca VORA / Tenant */}
-        <div className="flex items-center gap-3 px-2 pt-2">
-          {/* Logo del tenant o monograma con color secundario */}
+      <div className="flex flex-col gap-5 overflow-hidden">
+        {/* Identidad de Marca / Tenant */}
+        <div className="flex items-center gap-3 px-1 pt-1 pb-3 border-b border-white/10">
           {tenantBranding?.logoUrl ? (
             <div className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white shadow-sm p-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -150,123 +206,122 @@ export function PosSidebar() {
             <span className="text-base font-bold tracking-tight text-white leading-tight truncate" title={displayName}>
               {displayName}
             </span>
-            <span
-              className="text-[10px] font-semibold uppercase tracking-wider truncate"
-              style={{ color: accentColor }}
-            >
-              Punto de Venta
+            <span className="text-[11px] font-medium text-white/60 truncate">
+              Portal de Gestión
             </span>
           </div>
         </div>
 
-        {/* Separador sutil */}
-        <div
-          className="h-px w-full"
-          style={{ backgroundColor: `color-mix(in srgb, ${secondaryColor} 40%, transparent)` }}
-        />
-
-        {/* 1. Módulo Principal en Primer Orden */}
-        <div className="flex flex-col gap-3">
-          <button
-            type="button"
-            onClick={() => navigateTo('POS-01')}
-            className={`flex items-center gap-3 rounded-2xl p-3 text-left transition-all border shadow-sm ${
-              isPosModuleActive
-                ? 'border-white/40 text-white'
-                : 'border-white/10 hover:border-white/25 text-white/90 hover:bg-white/5'
-            }`}
-            style={{
-              backgroundColor: isPosModuleActive
-                ? secondaryColor
-                : 'rgba(0, 0, 0, 0.2)',
-            }}
-          >
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-xs"
-              style={{
-                backgroundColor: isPosModuleActive
-                  ? 'rgba(255, 255, 255, 0.2)'
-                  : secondaryColor,
-              }}
+        {/* Lista de Módulos Principales con Desglose */}
+        <nav aria-label="Módulos y Submódulos" className="flex flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
+          {/* Módulo Principal 1: Punto de Venta */}
+          <div className="flex flex-col">
+            <button
+              type="button"
+              onClick={() => setPosExpanded((prev) => !prev)}
+              className={cn(
+                'group flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold transition-all',
+                isPosModuleActive
+                  ? 'bg-white/15 text-white shadow-xs'
+                  : 'text-white/80 hover:bg-white/10 hover:text-white',
+              )}
             >
-              <Store className="h-5 w-5" />
-            </div>
-            <div className="flex flex-col min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-sm font-black tracking-wide text-white uppercase">
-                  Módulo POS
-                </span>
-                <span
-                  className="text-[9px] font-bold px-1.5 py-0.5 rounded-full border"
-                  style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                    borderColor: 'rgba(255, 255, 255, 0.25)',
-                    color: '#FFFFFF',
-                  }}
-                >
-                  Principal
-                </span>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Store className="h-4.5 w-4.5 shrink-0 transition-transform group-hover:scale-105" />
+                <span className="truncate">Punto de Venta</span>
               </div>
-              <span
-                className="text-[10px] font-medium truncate"
-                style={{ color: accentColor }}
+              <ChevronDown
+                className={cn(
+                  'h-4 w-4 shrink-0 transition-transform duration-200 text-white/70',
+                  posExpanded ? 'rotate-0' : '-rotate-90',
+                )}
+              />
+            </button>
+
+            {/* Submódulos de POS desplegables */}
+            {posExpanded && (
+              <div
+                className="ml-4 mt-1 pl-3 border-l-2 flex flex-col gap-1"
+                style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
               >
-                Caja y Terminal de Venta
-              </span>
-            </div>
-          </button>
-
-          {/* 2. Submódulos y Funciones en Orden Jerárquico */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1.5 px-3 py-0.5">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-white/60">
-                Funciones del Módulo
-              </span>
-            </div>
-
-            <nav
-              className="ml-4 pl-3 border-l-2 flex flex-col gap-1"
-              style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
-              aria-label="Submódulos de POS"
-            >
-              {submodules.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={item.onClick}
-                    className={`group flex items-center gap-2.5 rounded-xl px-3 py-2 text-[13px] font-semibold transition-all ${
-                      item.isActive
-                        ? 'text-white shadow-xs'
-                        : 'hover:text-white hover:bg-white/10'
-                    }`}
-                    style={
-                      item.isActive
-                        ? { backgroundColor: secondaryColor }
-                        : { color: accentColor }
-                    }
-                  >
-                    <Icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-105" />
-                    <span className="truncate">{item.label}</span>
-                  </button>
-                );
-              })}
-            </nav>
+                {posSubmodules.map((item) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={item.onClick}
+                      className={cn(
+                        'flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold transition-all text-left',
+                        item.isActive
+                          ? 'text-white shadow-xs font-bold'
+                          : 'hover:text-white hover:bg-white/10',
+                      )}
+                      style={
+                        item.isActive
+                          ? { backgroundColor: secondaryColor }
+                          : { color: accentColor }
+                      }
+                    >
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        </div>
+
+          {/* Módulo Principal 2: Warehouse (si está contratado o habilitado) */}
+          {(isWarehouseEnabled || true) && (
+            <div className="flex flex-col mt-1">
+              <button
+                type="button"
+                onClick={() => setWhExpanded((prev) => !prev)}
+                className="group flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white transition-all"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <Warehouse className="h-4.5 w-4.5 shrink-0 transition-transform group-hover:scale-105" />
+                  <span className="truncate">Warehouse</span>
+                </div>
+                <ChevronDown
+                  className={cn(
+                    'h-4 w-4 shrink-0 transition-transform duration-200 text-white/70',
+                    whExpanded ? 'rotate-0' : '-rotate-90',
+                  )}
+                />
+              </button>
+
+              {/* Submódulos de Warehouse desplegables */}
+              {whExpanded && (
+                <div
+                  className="ml-4 mt-1 pl-3 border-l-2 flex flex-col gap-1 max-h-[360px] overflow-y-auto pr-1"
+                  style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
+                >
+                  {warehouseSubmodules.map((item) => {
+                    const Icon = item.icon;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={`/t/${activeTenantSlug}/warehouse${item.href}`}
+                        className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all"
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </nav>
       </div>
 
       {/* Pie de Barra Lateral: Operador y Salida */}
-      <div
-        className="flex flex-col gap-2 pt-4 border-t"
-        style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 40%, transparent)` }}
-      >
+      <div className="flex flex-col gap-2 pt-4 border-t border-white/10">
         {/* Resumen del Operador en Sesión */}
-        <div
-          className="flex items-center gap-3 rounded-2xl p-3 text-xs"
-          style={{ backgroundColor: 'rgba(0, 0, 0, 0.25)' }}
-        >
+        <div className="flex items-center gap-3 rounded-2xl p-2.5 bg-black/20 text-xs">
           <div
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold text-white text-[11px]"
             style={{ backgroundColor: secondaryColor }}
@@ -275,10 +330,7 @@ export function PosSidebar() {
           </div>
           <div className="flex flex-col min-w-0">
             <span className="truncate font-bold text-white">{activeUser.name}</span>
-            <span
-              className="truncate text-[10px] uppercase tracking-wide"
-              style={{ color: accentColor }}
-            >
+            <span className="truncate text-[10px] uppercase tracking-wide" style={{ color: accentColor }}>
               {activeUser.role === 'pos_cashier'
                 ? 'Cajera'
                 : activeUser.role === 'pos_supervisor'
@@ -294,7 +346,7 @@ export function PosSidebar() {
         <button
           type="button"
           onClick={handleLogout}
-          className="flex items-center gap-2.5 rounded-2xl px-3.5 py-2 text-xs font-semibold text-[#F87171] transition hover:bg-[#B91C1C]/20 hover:text-white"
+          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-[#F87171] transition hover:bg-[#B91C1C]/20 hover:text-white"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           <span>Cerrar sesión</span>
