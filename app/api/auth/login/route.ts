@@ -43,7 +43,11 @@ export async function POST(request: NextRequest) {
   });
 
   if (error || !data.session) {
-    return NextResponse.json({ error: 'Email o contraseña incorrectos.' }, { status: 401 });
+    console.error('[auth/login] Supabase auth error:', error?.message || 'No session');
+    return NextResponse.json(
+      { error: error?.message || 'Email o contraseña incorrectos.' },
+      { status: 401 },
+    );
   }
 
   const response = NextResponse.json({ session: data.session });
