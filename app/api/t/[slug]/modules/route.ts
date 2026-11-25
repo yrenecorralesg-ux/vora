@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import {
-  getSupabaseServerClient,
-  getSupabaseServiceClient,
-} from '@/lib/supabase-server';
-import { isSuperAdmin, requireSession } from '@/lib/auth';
+  authorizeTenantApi,
+  hasConfigPermission,
+  permissionDenied,
+} from '@/lib/tenant-api-auth';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
  * GET /api/t/[slug]/modules
@@ -13,38 +17,11 @@ export async function GET(
   _req: Request,
   { params }: { params: { slug: string } },
 ) {
-  const session = await getSupabaseServerClient().auth.getUser();
-  if (!session.data.user)
-    return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
   const service = getSupabaseServiceClient();
+  const tenantId = auth.access.tenantId;
 
-  const { data: tenant } = await service
-    .from('tenants')
-    .select('id')
-    .eq('slug', params.slug)
-    .maybeSingle();
-
-  if (!tenant) {
-    return NextResponse.json(
-      { error: 'Tenant no encontrado.' },
-      { status: 404 },
-    );
-  }
-
-  if (!(await isSuperAdmin(session.data.user.id))) {
-    const { data: membership } = await service
-      .from('tenant_memberships')
-      .select('id')
-      .eq('tenant_id', tenant.id)
-      .eq('auth_user_id', session.data.user.id)
-      .eq('status', 'active')
-      .maybeSingle();
-    if (!membership)
-      return NextResponse.json(
-        { error: 'Permisos insuficientes.' },
-        { status: 403 },
-      );
-  }
   const [{ data: catalog }, { data: tenantFeats }] = await Promise.all([
     service
       .from('features')
@@ -54,12 +31,12 @@ export async function GET(
       .order('sort_order', { ascending: true }),
     service
       .from('tenant_features')
-      .select('feature_key, enabled, config, config_state, release_status')
-      .eq('tenant_id', tenant.id),
+      .select('feature_key, enabled, contracted, config, config_state, release_status')
+      .eq('tenant_id', tenantId),
   ]);
 
   return NextResponse.json({
-    tenantId: tenant.id,
+    tenantId,
     catalog: catalog ?? [],
     tenantFeatures: tenantFeats ?? [],
   });
@@ -67,58 +44,22 @@ export async function GET(
 
 /**
  * PATCH /api/t/[slug]/modules
- * Allows toggling a module or sub-function for this tenant.
+ * Persiste en la base de datos los módulos activos y sus sub-funciones para la empresa.
  */
 export async function PATCH(
   req: Request,
   { params }: { params: { slug: string } },
 ) {
-  const supabase = getSupabaseServerClient();
-  const user = await requireSession(supabase);
-  if (!user) {
-    return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
+  const auth = await authorizeTenantApi(params.slug);
+  if (!auth.ok) return auth.response;
+
+  if (!(await hasConfigPermission(auth.access))) {
+    return permissionDenied('Tu rol no permite cambiar la configuración de módulos.');
   }
 
-  const session = await getSupabaseServerClient().auth.getUser();
-  if (!session.data.user)
-    return NextResponse.json({ error: 'No autenticado.' }, { status: 401 });
   const service = getSupabaseServiceClient();
-  const { data: tenant } = await service
-    .from('tenants')
-    .select('id')
-    .eq('slug', params.slug)
-    .maybeSingle();
+  const tenantId = auth.access.tenantId;
 
-  if (!tenant) {
-    return NextResponse.json(
-      { error: 'Tenant no encontrado.' },
-      { status: 404 },
-    );
-  }
-
-  const admin = await isSuperAdmin(user.id, supabase);
-  if (!admin) {
-    const { data: membership } = await service
-      .from('tenant_memberships')
-      .select('role')
-      .eq('tenant_id', tenant.id)
-      .eq('auth_user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle();
-
-    if (!membership || !['tenant_admin', 'admin'].includes(membership.role)) {
-      return NextResponse.json(
-        { error: 'Permisos insuficientes.' },
-        { status: 403 },
-      );
-    }
-  }
-
-  if (!admin)
-    return NextResponse.json(
-      { error: 'La contratación de servicios se administra desde VORA Core.' },
-      { status: 403 },
-    );
   const body = await req.json().catch(() => ({}));
   const { feature_key, enabled, config } = body;
 
@@ -129,7 +70,7 @@ export async function PATCH(
     );
   }
 
-  // A planned module is visible in the catalog but cannot be activated yet.
+  // Un módulo planificado no puede activarse aún.
   const { data: catalogFeature, error: catalogError } = await service
     .from('features')
     .select('implementation_status')
@@ -154,27 +95,42 @@ export async function PATCH(
 
   const { data: assignment } = await service
     .from('tenant_features')
-    .select('contracted')
-    .eq('tenant_id', tenant.id)
+    .select('contracted, config')
+    .eq('tenant_id', tenantId)
     .eq('feature_key', feature_key)
     .maybeSingle();
-  if (enabled && !assignment?.contracted)
+  if (!assignment?.contracted)
     return NextResponse.json(
-      { error: 'El servicio no está contratado.' },
+      { error: 'El servicio no está contratado. Solo los módulos contratados pueden configurarse.' },
       { status: 409 },
     );
-  const updateData: Record<string, unknown> = { enabled };
-  if (config !== undefined) {
-    updateData.config = config;
-  }
+
+  const existingCfg =
+    assignment?.config && typeof assignment.config === 'object'
+      ? (assignment.config as Record<string, unknown>)
+      : {};
+  const incomingCfg =
+    config && typeof config === 'object' ? (config as Record<string, unknown>) : undefined;
+  const mergedCfg = incomingCfg
+    ? {
+        ...existingCfg,
+        ...incomingCfg,
+        functions: {
+          ...((existingCfg.functions as Record<string, boolean> | undefined) ?? {}),
+          ...((incomingCfg.functions as Record<string, boolean> | undefined) ?? {}),
+        },
+      }
+    : existingCfg;
 
   const { data, error } = await service
     .from('tenant_features')
     .upsert(
       {
-        tenant_id: tenant.id,
+        tenant_id: tenantId,
         feature_key,
-        ...updateData,
+        contracted: assignment.contracted,
+        enabled,
+        config: mergedCfg,
       },
       { onConflict: 'tenant_id,feature_key' },
     )

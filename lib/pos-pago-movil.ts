@@ -43,7 +43,7 @@ export function cleanVePhone(raw: string): string {
   return digits;
 }
 
-/** Formatea teléfono venezolano sin guiones (ej. 04266553049). */
+/** Formatea teléfono venezolano sin guiones (ej. 04141234567). */
 export function formatVePhone(raw: string): string {
   const digits = cleanVePhone(raw);
   return /^04\d{9}$/.test(digits) ? digits : raw.replace(/[\s\-()]/g, '').trim();
@@ -51,7 +51,7 @@ export function formatVePhone(raw: string): string {
 
 /**
  * Extrae prefijo (V/J/G) y solo dígitos de Cédula o RIF.
- * Si el usuario ingresa solo dígitos (ej. "32130926"), asume prefijo "V".
+ * Si el usuario ingresa solo dígitos (ej. "12345678"), asume prefijo "V".
  */
 export function splitVeTaxId(raw: string): { prefix: 'V' | 'J' | 'G'; dni: string } {
   const cleaned = raw.trim().toUpperCase().replace(/[\s.\-]/g, '');
@@ -67,7 +67,7 @@ export function splitVeTaxId(raw: string): { prefix: 'V' | 'J' | 'G'; dni: strin
   };
 }
 
-/** Normaliza Cédula o RIF sin guiones (ej. 32130926, V32130926 o J401928374). */
+/** Normaliza Cédula o RIF sin guiones (ej. 12345678, V12345678 o J123456789). */
 export function normalizeVeTaxId(raw: string): string {
   const cleaned = raw.trim().toUpperCase().replace(/[\s.\-]/g, '');
   const m = cleaned.match(/^([VJG])?(\d{5,11})$/);
@@ -110,10 +110,10 @@ export function validatePagoMovilConfig(raw: unknown): { ok: true; value: PosPag
     return { ok: false, error: 'Selecciona un código de banco válido (4 dígitos).' };
   }
   if (!/^04(12|14|16|24|26)\d{7}$/.test(phoneDigits)) {
-    return { ok: false, error: 'Ingresa un celular venezolano válido de 11 dígitos sin guiones (ej. 04266553049).' };
+    return { ok: false, error: 'Ingresa un celular venezolano válido de 11 dígitos sin guiones (ej. 04141234567).' };
   }
   if (!/^(?:[VJG])?\d{5,11}$/.test(taxCleaned)) {
-    return { ok: false, error: 'Ingresa una cédula (ej. 32130926) o RIF (ej. J401928374) sin guiones.' };
+    return { ok: false, error: 'Ingresa una cédula (ej. 12345678) o RIF (ej. J123456789) sin guiones.' };
   }
   if (holder_name.length > 100) {
     return { ok: false, error: 'El nombre del titular no puede superar 100 caracteres.' };

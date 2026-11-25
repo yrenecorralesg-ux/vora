@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { Settings, Palette, Layers, CreditCard, Building2 } from 'lucide-react';
+import { Palette, CreditCard, Building2 } from 'lucide-react';
 
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { hasConfigPermission } from '@/lib/tenant-api-auth';
@@ -11,9 +11,6 @@ import {
   CardTitle,
   CardDescription,
 } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { DemoBanner, DemoBadge } from '@/components/demo-banner';
 import { TenantModulesConfig } from '@/components/tenant-modules-config';
 
 export const dynamic = 'force-dynamic';
@@ -97,7 +94,7 @@ export default async function SettingsPage({
 
   const { data: featureRows } = await supabase
     .from('tenant_features')
-    .select('feature_key, enabled, features ( name, category )')
+    .select('feature_key, enabled, contracted, config, features ( name, category )')
     .eq('tenant_id', tenant?.id ?? '');
 
   const { data: plan } = await supabase
@@ -110,7 +107,6 @@ export default async function SettingsPage({
     ...f,
     features: Array.isArray(f.features) ? f.features[0] : f.features,
   }));
-  const enabledCount = features.filter((f) => f.enabled).length;
 
   const primaryColor = (branding as BrandingRow | null)?.primary_color ?? '#042071';
   const secondaryColor = (branding as BrandingRow | null)?.secondary_color ?? '#63DCE5';
@@ -118,12 +114,10 @@ export default async function SettingsPage({
 
   return (
     <div className="space-y-6">
-      <DemoBanner message="Demo — La edicion no esta disponible. Se muestran los datos reales de configuracion del tenant." />
-
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Ajustes</h1>
         <p className="text-sm text-muted-foreground">
-          Configuracion de la cuenta <DemoBadge />
+          Configuración de módulos, funciones y datos de la empresa
         </p>
       </div>
 
@@ -186,9 +180,9 @@ export default async function SettingsPage({
               </p>
             </div>
           </div>
-          <Button variant="outline" disabled>
-            Editar branding
-          </Button>
+          <p className="text-xs text-muted-foreground">
+            La identidad visual se administra desde VORA Core.
+          </p>
         </CardContent>
       </Card>
 
@@ -206,8 +200,8 @@ export default async function SettingsPage({
               <CreditCard className="h-5 w-5 text-muted-foreground" />
             </div>
             <div>
-              <CardTitle className="text-lg">Plan y facturacion</CardTitle>
-              <CardDescription>Subscription actual</CardDescription>
+              <CardTitle className="text-lg">Plan y facturación</CardTitle>
+              <CardDescription>Suscripción actual</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -218,10 +212,9 @@ export default async function SettingsPage({
               {(plan as PlanRow | null)?.name ?? 'Sin plan asignado'}
             </span>
           </p>
-          <Button variant="outline" disabled className="mt-4">
-            <Settings className="mr-2 h-4 w-4" />
-            Gestionar plan
-          </Button>
+          <p className="mt-2 text-xs text-muted-foreground">
+            La contratación de plan y facturación se gestiona desde VORA Core.
+          </p>
         </CardContent>
       </Card>
     </div>

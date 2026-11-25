@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
-import { getTenantSettings, toClientSettings } from '@/lib/pos/server';
+import { getTenantSettings, loadPosConfig, toClientSettings } from '@/lib/pos/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -49,14 +49,15 @@ export async function GET(
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
-  const settings = await getTenantSettings(getSupabaseServiceClient(), auth.access.tenantId);
+  const config = await loadPosConfig(getSupabaseServiceClient(), auth.access.tenantId);
+  const settings = config.settings;
   return NextResponse.json({
     ok: true,
     rate: settings.active_exchange_rate,
     source: settings.exchange_rate_source,
     url: settings.exchange_rate_api_url ?? DEFAULT_RATE_URL,
     timestamp: settings.exchange_rate_updated_at,
-    settings: toClientSettings(settings),
+    settings: toClientSettings(settings, config.pagoMovilConfig),
   });
 }
 
@@ -137,12 +138,13 @@ export async function POST(
       entity_id: tenantId,
       description: `Tasa actualizada a ${patch.active_exchange_rate} VES/USD (${patch.exchange_rate_source})`,
     });
-  const updated = await getTenantSettings(service, tenantId);
+  const updatedConfig = await loadPosConfig(service, tenantId);
+  const updated = updatedConfig.settings;
   return NextResponse.json({
     ok: true,
     rate: updated.active_exchange_rate,
     source: updated.exchange_rate_source,
     timestamp: updated.exchange_rate_updated_at,
-    settings: toClientSettings(updated),
+    settings: toClientSettings(updated, updatedConfig.pagoMovilConfig),
   });
 }

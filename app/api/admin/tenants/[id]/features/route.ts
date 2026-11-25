@@ -99,13 +99,19 @@ export async function POST(
   const byKey = new Map((catalog ?? []).map((f) => [f.key, f]));
   const { data: current, error: readError } = await db
     .from('tenant_features')
-    .select('feature_key,enabled')
+    .select('feature_key,enabled,config')
     .eq('tenant_id', params.id);
   if (readError)
     return NextResponse.json(
       { error: 'No se pudo leer la configuración actual.' },
       { status: 500 },
     );
+  const currentConfigByKey = new Map<string, Record<string, unknown>>(
+    (current ?? []).map((f: any) => [
+      f.feature_key,
+      f.config && typeof f.config === 'object' ? (f.config as Record<string, unknown>) : {},
+    ]),
+  );
   const active = new Set(
     (current ?? []).filter((f) => f.enabled).map((f) => f.feature_key),
   );
@@ -149,18 +155,22 @@ export async function POST(
       );
   }
   if (!entries.length) return NextResponse.json({ ok: true, count: 0 });
-  const rows = entries.map((f) => ({
-    tenant_id: params.id,
-    feature_key: f.feature_key,
-    contracted: f.contracted ?? f.enabled,
-    enabled: f.enabled,
-    config: f.config,
-    config_state: f.enabled ? 'enabled' : 'pending_config',
-    release_status:
-      byKey.get(f.feature_key)?.implementation_status === 'implemented'
-        ? 'released_for_testing'
-        : 'planned',
-  }));
+  const rows = entries.map((f) => {
+    const existingCfg = currentConfigByKey.get(f.feature_key) ?? {};
+    const mergedCfg = { ...existingCfg, ...f.config };
+    return {
+      tenant_id: params.id,
+      feature_key: f.feature_key,
+      contracted: f.contracted ?? f.enabled,
+      enabled: f.enabled,
+      config: mergedCfg,
+      config_state: f.enabled ? 'enabled' : 'pending_config',
+      release_status:
+        byKey.get(f.feature_key)?.implementation_status === 'implemented'
+          ? 'released_for_testing'
+          : 'planned',
+    };
+  });
   const { error: saveError } = await db
     .from('tenant_features')
     .upsert(rows, { onConflict: 'tenant_id,feature_key' });

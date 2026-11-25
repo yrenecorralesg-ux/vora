@@ -691,7 +691,13 @@ export function PosProvider({
       const data = await postJson('/exchange-rate', { action: 'refresh', ...(customUrl ? { url: customUrl } : {}) });
       const newRate = Number(data.rate);
       setExchangeRate(newRate);
-      if (data.settings) setSettings(data.settings);
+      if (data.settings) {
+        setSettings((prev) => ({
+          ...prev,
+          ...data.settings,
+          pago_movil_config: data.settings.pago_movil_config ?? prev.pago_movil_config,
+        }));
+      }
       showNotification(
         'Tasa BCV sincronizada',
         `Tasa oficial actualizada: ${newRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} VES/USD (${data.source || 'API'}).`,

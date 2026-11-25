@@ -23,6 +23,7 @@ function load(relative, mocks = {}) {
 }
 const rejectService = () => { throw new Error('Privileged client reached before authorization'); };
 const anonymous = {
+  'server-only': {},
   '@/lib/auth': { requireSuperAdmin: async () => null, requireSession: async () => null, isSuperAdmin: async () => false },
   '@/lib/supabase-server': { getSupabaseServerClient: () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }), getSupabaseServiceClient: rejectService },
 };
@@ -395,17 +396,65 @@ async function warehouseMvpTests() {
   await test('Pago Movil QR encodes official Suiche 7B format without dashes', async () => {
     const pm = load('lib/pos-pago-movil.ts');
     const { decodeQr } = require('decoder-qr-pago-movil');
-    const val = pm.validatePagoMovilConfig({ bank_code: '0102', phone: '0426-6553049', tax_id: '32130926', holder_name: 'Stunt Riders' });
+    const val = pm.validatePagoMovilConfig({ bank_code: '0102', phone: '0414-1234567', tax_id: '12345678', holder_name: 'Comercio Demo' });
     assert.equal(val.ok, true);
-    assert.equal(val.value.phone, '04266553049');
-    assert.equal(val.value.tax_id, '32130926');
-    const qrPayload = pm.formatPagoMovilQrPayload(val.value, 919.82, 'Stunt Riders');
+    assert.equal(val.value.phone, '04141234567');
+    assert.equal(val.value.tax_id, '12345678');
+    const qrPayload = pm.formatPagoMovilQrPayload(val.value, 919.82, 'Comercio Demo');
     assert.ok(qrPayload.includes('?merchantId=0102&origin=app'));
     const decoded = decodeQr(qrPayload);
-    assert.equal(decoded.dni, 'V32130926');
-    assert.equal(decoded.phone, '584266553049');
+    assert.equal(decoded.dni, 'V12345678');
+    assert.equal(decoded.phone, '584141234567');
     assert.equal(decoded.bank, '0102');
     assert.equal(decoded.amount, '919,82');
+  });
+
+  await test('exchange-rate preserves saved pago_movil_config and modules PATCH merges config', async () => {
+    const pmDb = {
+      tenants: [{ id: 'tP', slug: 'demo-co', commercial_name: 'Demo', commercial_status: 'active' }],
+      tenant_memberships: [{ tenant_id: 'tP', auth_user_id: 'admin-p', role: 'tenant_admin', status: 'active' }],
+      role_permissions: [],
+      features: [{ key: 'commerce.pos', implementation_status: 'implemented' }],
+      tenant_features: [
+        {
+          tenant_id: 'tP',
+          feature_key: 'commerce.pos',
+          enabled: true,
+          contracted: true,
+          config: { catalog_source: 'pos', pago_movil: { bank_code: '0102', bank_name: 'Banco de Venezuela', phone: '04141234567', tax_id: '12345678' } },
+        },
+      ],
+      pos_tenant_settings: [
+        { tenant_id: 'tP', active_exchange_rate: 50, max_cashier_discount_percent: 5, allow_partial_payments: true, active_methods: ['efectivo', 'pago_movil'], internal_doc_prefix: 'COMP-INT-' },
+      ],
+    };
+    const calls = [];
+    const pmService = fakeDb(pmDb, calls);
+    const mocks = {
+      'server-only': {},
+      '@/lib/auth': { requireSession: async () => ({ id: 'admin-p', email: 'a@demo.co' }), isSuperAdmin: async () => false, requireSuperAdmin: async () => null },
+      '@/lib/supabase-server': { getSupabaseServerClient: () => ({}), getSupabaseServiceClient: () => pmService },
+    };
+    const exRoute = load('app/api/t/[slug]/pos/exchange-rate/route.ts', mocks);
+    const getRes = await exRoute.GET(new NextRequest('https://x/api/test'), { params: { slug: 'demo-co' } });
+    assert.equal(getRes.status, 200);
+    const getJson = await getRes.json();
+    assert.equal(getJson.settings.pago_movil_config.phone, '04141234567');
+    assert.equal(getJson.settings.pago_movil_config.tax_id, '12345678');
+
+    const modRoute = load('app/api/t/[slug]/modules/route.ts', mocks);
+    const patchRes = await modRoute.PATCH(
+      new Request('https://x/api/test', {
+        method: 'PATCH',
+        body: JSON.stringify({ feature_key: 'commerce.pos', enabled: true, config: { functions: { pos_sales: true } } }),
+      }),
+      { params: { slug: 'demo-co' } },
+    );
+    assert.equal(patchRes.status, 200);
+    const upsertCall = calls.find(([k, t]) => k === 'upsert' && t === 'tenant_features');
+    assert.ok(upsertCall);
+    assert.equal(upsertCall[2].config.pago_movil.phone, '04141234567');
+    assert.equal(upsertCall[2].config.functions.pos_sales, true);
   });
 
   await test('scheduled reports are due once per day on their configured day', async () => {

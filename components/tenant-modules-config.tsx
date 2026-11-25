@@ -24,7 +24,7 @@ export function TenantModulesConfig({
   initialFeatures,
 }: {
   slug: string;
-  initialFeatures: Array<{ feature_key: string; enabled: boolean; config?: any }>;
+  initialFeatures: Array<{ feature_key: string; enabled: boolean; contracted?: boolean; config?: any }>;
 }) {
   const router = useRouter();
 
@@ -43,6 +43,7 @@ export function TenantModulesConfig({
         category: catalogItem?.category ?? 'crm',
         description: catalogItem?.description ?? '',
         enabled: existing?.enabled ?? false,
+        contracted: existing?.contracted !== false && Boolean(existing),
         config: cfg,
         functions: catalogItem?.functions ?? [],
       };
@@ -53,36 +54,38 @@ export function TenantModulesConfig({
   const [savingKey, setSavingKey] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ ok: boolean; message: string } | null>(null);
 
+  async function patchModule(featureKey: string, enabled: boolean, config: Record<string, unknown>) {
+    const res = await fetch(`/api/t/${slug}/modules`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        feature_key: featureKey,
+        enabled,
+        config,
+      }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok) {
+      throw new Error(data?.error || 'Error al guardar configuración en la base de datos.');
+    }
+    return data;
+  }
+
   async function handleToggleModule(moduleKey: string, newEnabled: boolean) {
     setSavingKey(moduleKey);
     setFeedback(null);
 
-    // Optimistic update
+    const target = featuresList.find((f) => f.key === moduleKey);
     setFeaturesList((prev) =>
       prev.map((f) => (f.key === moduleKey ? { ...f, enabled: newEnabled } : f)),
     );
 
     try {
-      const target = featuresList.find((f) => f.key === moduleKey);
-      const res = await fetch(`/api/t/${slug}/modules`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          feature_key: moduleKey,
-          enabled: newEnabled,
-          config: target?.config ?? { functions: {} },
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Error al actualizar módulo');
-      }
-
+      await patchModule(moduleKey, newEnabled, target?.config ?? { functions: {} });
       setFeedback({ ok: true, message: `Módulo "${target?.name}" ${newEnabled ? 'activado' : 'desactivado'} con éxito.` });
       router.refresh();
     } catch (err: any) {
       setFeedback({ ok: false, message: err.message || 'Error al guardar estado' });
-      // Revert optimistic
       setFeaturesList((prev) =>
         prev.map((f) => (f.key === moduleKey ? { ...f, enabled: !newEnabled } : f)),
       );
@@ -95,87 +98,82 @@ export function TenantModulesConfig({
     const target = featuresList.find((f) => f.key === moduleKey);
     if (!target) return;
 
+    const prevConfig = target.config;
     const newFunctions = {
       ...(target.config?.functions ?? {}),
       [funcKey]: funcEnabled,
     };
     const newConfig = { ...target.config, functions: newFunctions };
 
+    setFeedback(null);
     setFeaturesList((prev) =>
       prev.map((f) => (f.key === moduleKey ? { ...f, config: newConfig } : f)),
     );
 
     try {
-      await fetch(`/api/t/${slug}/modules`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          feature_key: moduleKey,
-          enabled: target.enabled,
-          config: newConfig,
-        }),
-      });
-    } catch {
-      // Background save
+      await patchModule(moduleKey, target.enabled, newConfig);
+      setFeedback({ ok: true, message: `Función actualizada en "${target.name}".` });
+      router.refresh();
+    } catch (err: any) {
+      setFeaturesList((prev) =>
+        prev.map((f) => (f.key === moduleKey ? { ...f, config: prevConfig } : f)),
+      );
+      setFeedback({ ok: false, message: err.message || 'No se pudo guardar la función.' });
     }
   }
 
   async function handleToggleAllModules(newEnabled: boolean) {
+    const contractedList = featuresList.filter((f) => f.contracted);
+    if (!contractedList.length) return;
+    const previous = featuresList;
     setFeedback(null);
-    setFeaturesList((prev) => prev.map((f) => ({ ...f, enabled: newEnabled })));
+    setFeaturesList((prev) =>
+      prev.map((f) => (f.contracted ? { ...f, enabled: newEnabled } : f)),
+    );
     try {
       await Promise.all(
-        featuresList.map((f) =>
-          fetch(`/api/t/${slug}/modules`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              feature_key: f.key,
-              enabled: newEnabled,
-              config: f.config ?? { functions: {} },
-            }),
-          }),
+        contractedList.map((f) =>
+          patchModule(f.key, newEnabled, f.config ?? { functions: {} }),
         ),
       );
       setFeedback({
         ok: true,
-        message: newEnabled ? 'Todos los módulos han sido activados.' : 'Todos los módulos han sido desactivados.',
+        message: newEnabled ? 'Todos los módulos contratados han sido activados.' : 'Todos los módulos contratados han sido desactivados.',
       });
       router.refresh();
-    } catch {
-      setFeedback({ ok: false, message: 'Error al actualizar algunos módulos.' });
+    } catch (err: any) {
+      setFeaturesList(previous);
+      setFeedback({ ok: false, message: err.message || 'Error al actualizar algunos módulos.' });
     }
   }
 
   async function handleToggleAllFunctions(moduleKey: string, newEnabled: boolean) {
     const target = featuresList.find((f) => f.key === moduleKey);
     if (!target) return;
+    const prevConfig = target.config;
     const nextFuncs: Record<string, boolean> = {};
     for (const fn of target.functions) {
       nextFuncs[fn.key] = newEnabled;
     }
     const newConfig = { ...target.config, functions: nextFuncs };
+    setFeedback(null);
     setFeaturesList((prev) =>
       prev.map((f) => (f.key === moduleKey ? { ...f, config: newConfig } : f)),
     );
     try {
-      await fetch(`/api/t/${slug}/modules`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          feature_key: moduleKey,
-          enabled: target.enabled,
-          config: newConfig,
-        }),
-      });
+      await patchModule(moduleKey, target.enabled, newConfig);
       setFeedback({
         ok: true,
         message: newEnabled
           ? `Todas las funciones de "${target.name}" fueron activadas.`
           : `Todas las funciones de "${target.name}" fueron desactivadas.`,
       });
-    } catch {
-      // Background save
+      router.refresh();
+    } catch (err: any) {
+      setFeaturesList((prev) =>
+        prev.map((f) => (f.key === moduleKey ? { ...f, config: prevConfig } : f)),
+      );
+      setFeedback({ ok: false, message: err.message || 'No se pudieron actualizar las funciones.' });
     }
   }
 
@@ -249,6 +247,11 @@ export function TenantModulesConfig({
                     <Badge variant="outline" className="text-[10px] font-mono capitalize">
                       {f.category}
                     </Badge>
+                    {!f.contracted && (
+                      <Badge variant="secondary" className="text-[10px]">
+                        No contratado
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{f.description}</p>
                 </div>
@@ -268,6 +271,7 @@ export function TenantModulesConfig({
                     <Loader2 className="h-4 w-4 animate-spin text-[#5136db]" />
                   ) : (
                     <Switch
+                      disabled={!f.contracted}
                       checked={f.enabled}
                       onCheckedChange={(checked) => handleToggleModule(f.key, checked)}
                     />

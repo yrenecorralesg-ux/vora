@@ -81,20 +81,42 @@ export function PosView17Settings() {
 
   const [requirePinWithdrawals, setRequirePinWithdrawals] = useState<boolean>(settings.require_pin_for_withdrawals !== false);
 
+  const activeMethodsKey = settings.active_methods.join(',');
+  const pmBankSaved = settings.pago_movil_config?.bank_code || '0102';
+  const pmPhoneSaved = settings.pago_movil_config?.phone || '';
+  const pmTaxIdSaved = settings.pago_movil_config?.tax_id || '';
+  const pmHolderSaved = settings.pago_movil_config?.holder_name || '';
+
   useEffect(() => {
     setMaxDiscount(settings.max_cashier_discount_percent);
     setAllowPartial(settings.allow_partial_payments);
-    setExchangeRateInput(settings.active_exchange_rate ? settings.active_exchange_rate.toString() : '');
     setExchangeRateApiUrl(settings.exchange_rate_api_url || 'https://ve.dolarapi.com/v1/dolares/oficial');
     setAutoFetchRate(settings.auto_fetch_exchange_rate ?? true);
     setDocPrefix(settings.internal_doc_prefix);
     setActiveMethods([...settings.active_methods]);
-    setPmBankCode(settings.pago_movil_config?.bank_code || '0102');
-    setPmPhone(settings.pago_movil_config?.phone || '');
-    setPmTaxId(settings.pago_movil_config?.tax_id || '');
-    setPmHolderName(settings.pago_movil_config?.holder_name || '');
     setRequirePinWithdrawals(settings.require_pin_for_withdrawals !== false);
-  }, [settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    settings.tenant_id,
+    settings.max_cashier_discount_percent,
+    settings.allow_partial_payments,
+    settings.exchange_rate_api_url,
+    settings.auto_fetch_exchange_rate,
+    settings.internal_doc_prefix,
+    settings.require_pin_for_withdrawals,
+    activeMethodsKey,
+  ]);
+
+  useEffect(() => {
+    setExchangeRateInput(settings.active_exchange_rate ? settings.active_exchange_rate.toString() : '');
+  }, [settings.active_exchange_rate]);
+
+  useEffect(() => {
+    setPmBankCode(pmBankSaved);
+    setPmPhone(pmPhoneSaved);
+    setPmTaxId(pmTaxIdSaved);
+    setPmHolderName(pmHolderSaved);
+  }, [pmBankSaved, pmPhoneSaved, pmTaxIdSaved, pmHolderSaved]);
 
   // Nueva Sede / Sucursal
   const [showNewBranchForm, setShowNewBranchForm] = useState(false);
@@ -513,7 +535,7 @@ export function PosView17Settings() {
                       type="text"
                       value={pmTaxId}
                       onChange={(e) => setPmTaxId(e.target.value)}
-                      placeholder="Ej. 32130926 o J401928374"
+                      placeholder="Ej. 12345678 o J123456789"
                       className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
                     />
                   </div>
@@ -528,7 +550,7 @@ export function PosView17Settings() {
                       type="tel"
                       value={pmPhone}
                       onChange={(e) => setPmPhone(e.target.value)}
-                      placeholder="Ej. 04266553049"
+                      placeholder="Ej. 04141234567"
                       className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
                     />
                   </div>
