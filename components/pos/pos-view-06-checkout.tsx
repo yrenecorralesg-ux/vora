@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Banknote,
   Smartphone,
@@ -15,6 +15,7 @@ import {
   Percent,
 } from 'lucide-react';
 import { usePos } from './pos-context';
+import { VE_BANKS } from '@/lib/pos-pago-movil';
 import { posStore } from '@/lib/pos-service';
 import type { PosSale } from '@/lib/types';
 import { kickCashDrawer } from '@/lib/pos-hardware';
@@ -66,6 +67,7 @@ export function PosView06Checkout() {
     reloadCustomers,
     products,
     customers,
+    settings,
   } = usePos();
 
   // Billetera Digital & Saldo a Favor (pos_digital_wallet)
@@ -127,7 +129,15 @@ export function PosView06Checkout() {
   const [cashChangeCurrency, setCashChangeCurrency] = useState<'USD' | 'VES'>('USD');
 
   // Inputs Pago Móvil
-  const [pmBank, setPmBank] = useState('0102 - Banco de Venezuela');
+  const savedPm = settings.pago_movil_config;
+  const [pmBank, setPmBank] = useState(
+    savedPm ? `${savedPm.bank_code} - ${savedPm.bank_name}` : '0102 - Banco de Venezuela',
+  );
+  useEffect(() => {
+    if (savedPm) {
+      setPmBank(`${savedPm.bank_code} - ${savedPm.bank_name}`);
+    }
+  }, [savedPm]);
   const [pmAmountVes, setPmAmountVes] = useState<string>(balanceDueVes.toFixed(2));
   const [pmReference, setPmReference] = useState('');
   const [pmPayerPhone, setPmPayerPhone] = useState(selectedCustomer?.phone ?? '0414-1234567');
@@ -899,6 +909,15 @@ export function PosView06Checkout() {
 
                 {pmSubMode === 'p2p' ? (
                   <form onSubmit={handleAddPagoMovil} className="space-y-4">
+                    {savedPm && (
+                      <div className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-4 py-3 text-xs text-[#111827] flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <span className="font-bold text-[#1E6B4E]">Cuenta receptora: </span>
+                          <span>{savedPm.bank_code} · {savedPm.bank_name} · {savedPm.tax_id} · {savedPm.phone}</span>
+                        </div>
+                        <span className="font-bold tabular-nums">Bs. {balanceDueVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-[#111827]">
@@ -909,11 +928,11 @@ export function PosView06Checkout() {
                           onChange={(e) => setPmBank(e.target.value)}
                           className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-3 text-xs font-semibold text-[#111827]"
                         >
-                          <option value="0102 - Banco de Venezuela">0102 - Banco de Venezuela</option>
-                          <option value="0134 - Banesco">0134 - Banesco</option>
-                          <option value="0108 - Banco Provincial">0108 - Banco Provincial</option>
-                          <option value="0105 - Mercantil">0105 - Mercantil</option>
-                          <option value="0172 - Bancamiga">0172 - Bancamiga</option>
+                          {VE_BANKS.map((b) => (
+                            <option key={b.code} value={`${b.code} - ${b.name}`}>
+                              {b.code} - {b.name}
+                            </option>
+                          ))}
                         </select>
                       </div>
 

@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
-import { Monitor, X, ExternalLink, QrCode, ShoppingBag, Sparkles } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import QRCode from 'qrcode';
+import { X, ExternalLink, QrCode, ShoppingBag, Sparkles, Smartphone, AlertCircle } from 'lucide-react';
 import { usePos } from './pos-context';
+import { formatPagoMovilQrPayload } from '@/lib/pos-pago-movil';
 
 export function PosCustomerDisplayModal() {
   const {
@@ -13,16 +15,50 @@ export function PosCustomerDisplayModal() {
     selectedCustomer,
     activeBranch,
     activeRegister,
+    settings,
+    tenantName,
+    tenantBranding,
     isFuncActive,
   } = usePos();
+
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+
+  const totalUsd = cart.reduce((sum, item) => sum + item.lineTotalUsd, 0);
+  const totalVes = Number((totalUsd * exchangeRate).toFixed(2));
+  const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  const isPagoMovilEnabled = settings.active_methods.includes('pago_movil');
+  const pmConfig = settings.pago_movil_config ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!isCustomerDisplayOpen || !isPagoMovilEnabled || !pmConfig) {
+      setQrDataUrl(null);
+      return;
+    }
+    const payload = formatPagoMovilQrPayload(pmConfig, totalVes, tenantName);
+    QRCode.toDataURL(payload, {
+      width: 240,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#111827', light: '#FFFFFF' },
+    })
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setQrDataUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isCustomerDisplayOpen, isPagoMovilEnabled, pmConfig, totalVes, tenantName]);
 
   if (!isCustomerDisplayOpen || !isFuncActive('pos_customer_display')) {
     return null;
   }
 
-  const totalUsd = cart.reduce((sum, item) => sum + item.lineTotalUsd, 0);
-  const totalVes = Number((totalUsd * exchangeRate).toFixed(2));
-  const totalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const displayCompany = tenantName || 'VORA COMMERCE';
 
   const handlePopOut = () => {
     // Abrir ventana emergente dedicada para pantalla secundaria física (Dual Monitor)
@@ -36,12 +72,19 @@ export function PosCustomerDisplayModal() {
         {/* Cabecera de la Pantalla Secundaria */}
         <header className="flex items-center justify-between border-b border-[#DCE3DF] bg-white px-6 py-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#1E6B4E] text-white font-black text-lg">
-              V
-            </div>
+            {tenantBranding?.logoUrl ? (
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#DCE3DF] bg-white p-1">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={tenantBranding.logoUrl} alt={displayCompany} className="h-full w-full object-contain" />
+              </div>
+            ) : (
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#1E6B4E] text-white font-black text-lg uppercase">
+                {displayCompany.slice(0, 2)}
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-base font-black tracking-tight text-[#111827]">VORA COMMERCE</h1>
+                <h1 className="text-base font-black tracking-tight text-[#111827]">{displayCompany}</h1>
                 <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
                   Pantalla de Cara al Cliente
                 </span>
@@ -147,33 +190,70 @@ export function PosCustomerDisplayModal() {
             </div>
 
             {/* QR Dinámico para Pago Rápido */}
-            <div className="mt-4 rounded-3xl border border-[#DCE3DF] bg-white p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <QrCode className="h-4 w-4 text-[#1E6B4E]" />
-                  <span className="text-xs font-bold text-[#111827]">Pago Móvil Banesco / BDV</span>
+            {isPagoMovilEnabled && (
+              <div className="mt-4 rounded-3xl border border-[#DCE3DF] bg-white p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-4 w-4 text-[#1E6B4E]" />
+                    <span className="text-xs font-bold text-[#111827]">
+                      {pmConfig ? `Pago Móvil · ${pmConfig.bank_name}` : 'Pago Móvil'}
+                    </span>
+                  </div>
+                  <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
+                    {pmConfig ? 'QR Dinámico' : 'Pendiente'}
+                  </span>
                 </div>
-                <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
-                  QR Dinámico
-                </span>
-              </div>
 
-              <div className="flex items-center gap-4 bg-[#F6F5F0] p-3 rounded-2xl border border-[#E5E9E7]">
-                <div className="h-20 w-20 bg-[#111827] rounded-xl flex flex-col items-center justify-center text-white text-[10px] text-center p-1 shrink-0">
-                  <QrCode className="h-10 w-10 text-[#FDE047]" />
-                  <span>Escanear</span>
-                </div>
-                <div className="text-[11px] space-y-0.5 text-[#111827]">
-                  <p><strong>RIF:</strong> J-401928374</p>
-                  <p><strong>Banco:</strong> 0102 Banco de Venezuela</p>
-                  <p><strong>Teléfono:</strong> 0414-9998877</p>
-                  <p className="font-bold text-[#1E6B4E]">Monto exacto: Bs. {totalVes.toLocaleString('es-VE')}</p>
-                </div>
+                {pmConfig ? (
+                  <>
+                    <div className="flex items-center gap-4 bg-[#F6F5F0] p-3 rounded-2xl border border-[#E5E9E7]">
+                      <div className="h-28 w-28 rounded-xl border border-[#DCE3DF] bg-white flex items-center justify-center p-1.5 shrink-0 shadow-2xs">
+                        {qrDataUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={qrDataUrl}
+                            alt="Código QR de Pago Móvil"
+                            className="h-full w-full object-contain"
+                          />
+                        ) : (
+                          <QrCode className="h-10 w-10 text-[#1E6B4E] animate-pulse" />
+                        )}
+                      </div>
+                      <div className="text-[11px] space-y-1 text-[#111827] min-w-0">
+                        {(pmConfig.holder_name || tenantName) && (
+                          <p className="truncate">
+                            <strong>Titular:</strong> {pmConfig.holder_name || tenantName}
+                          </p>
+                        )}
+                        <p>
+                          <strong>RIF / CI:</strong> {pmConfig.tax_id}
+                        </p>
+                        <p className="truncate">
+                          <strong>Banco:</strong> {pmConfig.bank_code} · {pmConfig.bank_name}
+                        </p>
+                        <p>
+                          <strong>Teléfono:</strong> {pmConfig.phone}
+                        </p>
+                        <p className="font-bold text-[#1E6B4E]">
+                          Monto exacto: Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-[10px] text-center text-[#52635A]">
+                      Escanee el código QR o utilice los datos mostrados para realizar su Pago Móvil.
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex items-start gap-2.5 rounded-2xl border border-[#E5E9E7] bg-[#F6F5F0] p-3 text-[11px] text-[#52635A]">
+                    <AlertCircle className="h-4 w-4 text-[#1E6B4E] shrink-0 mt-0.5" />
+                    <p>
+                      Pago Móvil habilitado. Configura el banco, RIF y teléfono receptor en{' '}
+                      <strong className="text-[#111827]">Configuración POS</strong> para mostrar los datos y el código QR aquí.
+                    </p>
+                  </div>
+                )}
               </div>
-              <p className="text-[10px] text-center text-[#52635A]">
-                Escanee desde su aplicación bancaria venezolana para transferir de inmediato.
-              </p>
-            </div>
+            )}
 
             {/* Pie de Pantalla */}
             <div className="mt-4 text-center">

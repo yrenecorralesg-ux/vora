@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   PosCashMovement,
   PosCustomer,
+  PosPagoMovilConfig,
   PosPaymentMethod,
   PosProduct,
   PosSale,
@@ -11,6 +12,7 @@ import type {
   PosSettings,
   PosShift,
 } from '@/lib/types';
+import { normalizePagoMovilConfig } from '@/lib/pos-pago-movil';
 
 /**
  * Capa de servidor del POS: Supabase es la fuente de verdad. Las rutas
@@ -71,6 +73,7 @@ export interface PosRuntimeConfig {
   warehouseStockSync: boolean;
   stockPolicy: StockPolicy;
   settings: PosTenantSettingsRow;
+  pagoMovilConfig: PosPagoMovilConfig | null;
 }
 
 export async function getTenantSettings(service: SupabaseClient, tenantId: string): Promise<PosTenantSettingsRow> {
@@ -97,12 +100,16 @@ function normalizeSettings(row: Record<string, any>): PosTenantSettingsRow {
 }
 
 /** Forma que espera la interfaz del POS (PosSettings). */
-export function toClientSettings(s: PosTenantSettingsRow): PosSettings {
+export function toClientSettings(
+  s: PosTenantSettingsRow,
+  pagoMovilConfig?: PosPagoMovilConfig | null,
+): PosSettings {
   return {
     id: s.tenant_id,
     tenant_id: s.tenant_id,
     branch_id: '',
     active_methods: s.active_methods,
+    pago_movil_config: pagoMovilConfig ?? null,
     max_cashier_discount_percent: s.max_cashier_discount_percent,
     allow_partial_payments: s.allow_partial_payments,
     cross_currency_change_enabled: true,
@@ -152,6 +159,7 @@ export async function loadPosConfig(service: SupabaseClient, tenantId: string): 
     // Con Warehouse el stock nunca queda negativo: la sobreventa no es posible.
     stockPolicy: catalogSource === 'warehouse' && warehouseActive ? 'strict_block' : stockPolicy,
     settings,
+    pagoMovilConfig: normalizePagoMovilConfig(posCfg.pago_movil),
   };
 }
 

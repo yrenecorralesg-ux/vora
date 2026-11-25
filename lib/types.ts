@@ -504,11 +504,20 @@ export interface FiscalProviderInterface {
   }>;
 }
 
+export interface PosPagoMovilConfig {
+  bank_code: string;
+  bank_name: string;
+  phone: string;
+  tax_id: string;
+  holder_name?: string;
+}
+
 export interface PosSettings {
   id: string;
   tenant_id: string;
   branch_id: string;
   active_methods: PosPaymentMethod[];
+  pago_movil_config?: PosPagoMovilConfig | null;
   max_cashier_discount_percent: number;
   allow_partial_payments: boolean;
   cross_currency_change_enabled: boolean;

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 import { getTenantSettings, loadPosConfig, toClientSettings } from '@/lib/pos/server';
+import { validatePagoMovilConfig } from '@/lib/pos-pago-movil';
 import type { PosPaymentMethod } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function GET(
     .limit(200);
   return NextResponse.json({
     ok: true,
-    settings: toClientSettings(config.settings),
+    settings: toClientSettings(config.settings, config.pagoMovilConfig),
     catalog_source: config.catalogSource,
     stock_policy: config.stockPolicy,
     track_stock: config.trackStock,
@@ -82,6 +83,15 @@ export async function POST(
         return NextResponse.json({ ok: false, error: 'Prefijo de comprobante inválido.' }, { status: 400 });
       patch.internal_doc_prefix = prefix;
     }
+
+    let validatedPagoMovil: ReturnType<typeof validatePagoMovilConfig> | null = null;
+    if (body.pago_movil_config !== undefined) {
+      validatedPagoMovil = validatePagoMovilConfig(body.pago_movil_config);
+      if (!validatedPagoMovil.ok) {
+        return NextResponse.json({ ok: false, error: validatedPagoMovil.error }, { status: 400 });
+      }
+    }
+
     const { data, error } = await service
       .from('pos_tenant_settings')
       .update(patch)
@@ -89,6 +99,35 @@ export async function POST(
       .select('*')
       .single();
     if (error || !data) return NextResponse.json({ ok: false, error: 'No se pudo guardar la configuración.' }, { status: 500 });
+
+    if (validatedPagoMovil?.ok) {
+      const { data: existingFeature } = await service
+        .from('tenant_features')
+        .select('enabled, contracted, config')
+        .eq('tenant_id', tenantId)
+        .eq('feature_key', 'commerce.pos')
+        .maybeSingle();
+      const baseCfg =
+        existingFeature?.config && typeof existingFeature.config === 'object'
+          ? (existingFeature.config as Record<string, unknown>)
+          : {};
+      const nextCfg = { ...baseCfg, pago_movil: validatedPagoMovil.value };
+      const { error: tfError } = await service.from('tenant_features').upsert(
+        {
+          tenant_id: tenantId,
+          feature_key: 'commerce.pos',
+          enabled: existingFeature?.enabled ?? true,
+          contracted: existingFeature?.contracted ?? true,
+          config: nextCfg,
+        },
+        { onConflict: 'tenant_id,feature_key' },
+      );
+      if (tfError) {
+        return NextResponse.json({ ok: false, error: 'No se pudieron guardar los datos de Pago Móvil.' }, { status: 500 });
+      }
+    }
+
+    const updatedConfig = await loadPosConfig(service, tenantId);
     await service.from('pos_audit_events').insert({
       tenant_id: tenantId,
       actor_id: userId,
@@ -96,9 +135,14 @@ export async function POST(
       entity_type: 'pos_tenant_settings',
       entity_id: tenantId,
       description: 'Actualización de parámetros operativos del POS',
-      metadata: patch,
+      metadata: validatedPagoMovil?.ok
+        ? { ...patch, pago_movil_config: validatedPagoMovil.value }
+        : patch,
     });
-    return NextResponse.json({ ok: true, settings: toClientSettings(await getTenantSettings(service, tenantId)) });
+    return NextResponse.json({
+      ok: true,
+      settings: toClientSettings(updatedConfig.settings, updatedConfig.pagoMovilConfig),
+    });
   }
 
   if (body.action === 'toggle_register') {

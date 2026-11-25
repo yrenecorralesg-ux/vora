@@ -14,8 +14,10 @@ import {
   Users,
   Lock,
   ShieldAlert,
+  Smartphone,
 } from 'lucide-react';
 import { usePos } from './pos-context';
+import { VE_BANKS, findVeBankName, validatePagoMovilConfig } from '@/lib/pos-pago-movil';
 import type { PosPaymentMethod } from '@/lib/types';
 
 export function PosView17Settings() {
@@ -40,6 +42,7 @@ export function PosView17Settings() {
     reloadSettings,
     reloadStaff,
     activeTenantSlug,
+    tenantName,
   } = usePos();
 
   const ROLE_LABELS: Record<string, string> = {
@@ -71,6 +74,10 @@ export function PosView17Settings() {
   );
   const [docPrefix, setDocPrefix] = useState<string>(settings.internal_doc_prefix);
   const [activeMethods, setActiveMethods] = useState<PosPaymentMethod[]>([...settings.active_methods]);
+  const [pmBankCode, setPmBankCode] = useState<string>(settings.pago_movil_config?.bank_code || '0102');
+  const [pmPhone, setPmPhone] = useState<string>(settings.pago_movil_config?.phone || '');
+  const [pmTaxId, setPmTaxId] = useState<string>(settings.pago_movil_config?.tax_id || '');
+  const [pmHolderName, setPmHolderName] = useState<string>(settings.pago_movil_config?.holder_name || '');
 
   const [requirePinWithdrawals, setRequirePinWithdrawals] = useState<boolean>(settings.require_pin_for_withdrawals !== false);
 
@@ -82,6 +89,10 @@ export function PosView17Settings() {
     setAutoFetchRate(settings.auto_fetch_exchange_rate ?? true);
     setDocPrefix(settings.internal_doc_prefix);
     setActiveMethods([...settings.active_methods]);
+    setPmBankCode(settings.pago_movil_config?.bank_code || '0102');
+    setPmPhone(settings.pago_movil_config?.phone || '');
+    setPmTaxId(settings.pago_movil_config?.tax_id || '');
+    setPmHolderName(settings.pago_movil_config?.holder_name || '');
     setRequirePinWithdrawals(settings.require_pin_for_withdrawals !== false);
   }, [settings]);
 
@@ -122,11 +133,29 @@ export function PosView17Settings() {
       showNotification('Tasa inválida', 'La tasa debe ser mayor a cero.', 'critical');
       return;
     }
+
+    let pagoMovilPatch: Record<string, unknown> = {};
+    if (activeMethods.includes('pago_movil')) {
+      const validated = validatePagoMovilConfig({
+        bank_code: pmBankCode,
+        bank_name: findVeBankName(pmBankCode),
+        phone: pmPhone,
+        tax_id: pmTaxId,
+        holder_name: pmHolderName,
+      });
+      if (!validated.ok) {
+        showNotification('Datos de Pago Móvil inválidos', validated.error, 'critical');
+        return;
+      }
+      pagoMovilPatch = { pago_movil_config: validated.value };
+    }
+
     const result = await saveSettings({
       max_cashier_discount_percent: maxDiscount,
       allow_partial_payments: allowPartial,
       active_methods: activeMethods,
       internal_doc_prefix: docPrefix.trim() || 'COMP-INT-',
+      ...pagoMovilPatch,
       ...(rateVal !== settings.active_exchange_rate ? { active_exchange_rate: rateVal } : {}),
     });
     if (!result.ok) {
@@ -422,6 +451,82 @@ export function PosView17Settings() {
                 ))}
               </div>
             </div>
+
+            {activeMethods.includes('pago_movil') && (
+              <div className="rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0]/60 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-4 w-4 text-[#1E6B4E]" />
+                    <span className="text-xs font-bold text-[#111827]">
+                      Datos de Pago Móvil del comercio
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-[#52635A]">
+                    Visible en Pantalla Cliente y QR
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#111827]">
+                      Banco receptor
+                    </label>
+                    <select
+                      value={pmBankCode}
+                      onChange={(e) => setPmBankCode(e.target.value)}
+                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
+                    >
+                      {VE_BANKS.map((b) => (
+                        <option key={b.code} value={b.code}>
+                          {b.code} - {b.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#111827]">
+                      RIF o Cédula receptora
+                    </label>
+                    <input
+                      type="text"
+                      value={pmTaxId}
+                      onChange={(e) => setPmTaxId(e.target.value)}
+                      placeholder="Ej. J-401928374 o V-12345678"
+                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#111827]">
+                      Teléfono Pago Móvil
+                    </label>
+                    <input
+                      type="tel"
+                      value={pmPhone}
+                      onChange={(e) => setPmPhone(e.target.value)}
+                      placeholder="Ej. 0414-1234567"
+                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-bold text-[#111827]">
+                      Titular / Razón social (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={pmHolderName}
+                      onChange={(e) => setPmHolderName(e.target.value)}
+                      placeholder={tenantName || 'Nombre del comercio'}
+                      className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
