@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { X, ExternalLink, QrCode, ShoppingBag, Sparkles, Smartphone, AlertCircle } from 'lucide-react';
+import { X, ExternalLink, QrCode, ShoppingBag, Smartphone, AlertCircle } from 'lucide-react';
 import { usePos } from './pos-context';
 import { formatPagoMovilQrPayload } from '@/lib/pos-pago-movil';
 
@@ -84,12 +84,7 @@ export function PosCustomerDisplayModal() {
               </div>
             )}
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base font-black tracking-tight text-[#111827]">{displayCompany}</h1>
-                <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
-                  Pantalla de Cara al Cliente
-                </span>
-              </div>
+              <h1 className="text-base font-black tracking-tight text-[#111827]">{displayCompany}</h1>
               <p className="text-xs text-[#52635A]">
                 {activeBranch.name} · {activeRegister.name}
               </p>
@@ -119,8 +114,7 @@ export function PosCustomerDisplayModal() {
         {/* Saludo al cliente */}
         <div className="bg-[#1E6B4E] px-6 py-3 text-white">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs font-semibold">
-              <Sparkles className="h-4 w-4 text-[#FDE047]" />
+            <div className="text-xs font-semibold">
               <span>
                 {selectedCustomer && selectedCustomer.customer_tier !== 'consumidor_final'
                   ? `¡Bienvenido(a), ${selectedCustomer.legal_name}!`
@@ -200,9 +194,6 @@ export function PosCustomerDisplayModal() {
                       {pmConfig ? `Pago Móvil · ${pmConfig.bank_name}` : 'Pago Móvil'}
                     </span>
                   </div>
-                  <span className="rounded-full bg-[#DCFCE7] px-2 py-0.5 text-[10px] font-bold text-[#14532D]">
-                    {pmConfig ? 'QR Dinámico' : 'Pendiente'}
-                  </span>
                 </div>
 
                 {pmConfig ? (
