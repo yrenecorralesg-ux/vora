@@ -40,6 +40,7 @@ export function PosSidebar() {
     navigateTo,
     isFuncActive,
     isWarehouseEnabled,
+    can,
   } = usePos();
 
   const [posExpanded, setPosExpanded] = useState(true);
@@ -142,7 +143,7 @@ export function PosSidebar() {
         },
       ]
       : []),
-    ...(isFuncActive('pos_settings')
+    ...(isFuncActive('pos_settings') && can('pos.settings.manage')
       ? [
         {
           id: 'settings',
@@ -170,7 +171,9 @@ export function PosSidebar() {
     { label: 'Importaciones', href: '/imports', icon: FileSpreadsheet },
     { label: 'Proveedores', href: '/suppliers', icon: Truck },
     { label: 'Reportes', href: '/reports', icon: BarChart2 },
-    { label: 'Configuración', href: '/settings', icon: Settings },
+    ...(can('warehouse.configure')
+      ? [{ label: 'Configuración', href: '/settings', icon: Settings }]
+      : []),
   ];
 
   const primaryBg = tenantBranding?.primaryColor || 'var(--crm-primary, #144D37)';
@@ -331,13 +334,21 @@ export function PosSidebar() {
           <div className="flex flex-col min-w-0">
             <span className="truncate font-bold text-white">{activeUser.name}</span>
             <span className="truncate text-[10px] uppercase tracking-wide" style={{ color: accentColor }}>
-              {activeUser.role === 'pos_cashier'
-                ? 'Cajera'
-                : activeUser.role === 'pos_supervisor'
-                  ? 'Supervisor'
-                  : activeUser.role === 'pos_sales_rep'
-                    ? 'Asesor'
-                    : 'Admin Tienda'}
+              {({
+                tenant_admin: 'Admin Empresa',
+                super_admin: 'Super Admin',
+                pos_store_admin: 'Admin Tienda',
+                pos_supervisor: 'Supervisor',
+                pos_cashier: 'Cajero(a)',
+                pos_sales_rep: 'Asesor',
+                pos_auditor: 'Auditor',
+                wh_manager: 'Admin Almacén',
+                wh_supervisor: 'Superv. Almacén',
+                wh_clerk: 'Almacenista',
+                wh_scanner: 'Escaneo',
+                wh_auditor: 'Auditor Almacén',
+                member: 'Miembro',
+              } as Record<string, string>)[activeUser.role] ?? activeUser.role}
             </span>
           </div>
         </div>

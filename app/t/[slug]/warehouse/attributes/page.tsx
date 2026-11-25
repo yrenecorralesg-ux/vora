@@ -9,7 +9,7 @@ const TYPE_LABEL: Record<string, string> = { text: 'Texto', number: 'Número', d
 
 /** WH-16 · Capacidades y atributos: campos dinámicos por categoría. */
 export default async function AttributesPage({ params }: { params: { slug: string } }) {
-  const ctx = await requireWarehousePage(params.slug);
+  const ctx = await requireWarehousePage(params.slug, { permission: 'warehouse.configure', fn: 'wh_attributes' });
   const [{ data: attrs }, { data: categories }] = await Promise.all([
     ctx.service.from('warehouse_attribute_definitions').select('*').eq('tenant_id', ctx.tenantId).order('sort_order').order('label'),
     ctx.service.from('warehouse_categories').select('id, name').eq('tenant_id', ctx.tenantId).order('name'),

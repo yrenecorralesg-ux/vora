@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** WH-15 · Alta de empresa y sector: selección de actividad y plantilla. */
 export default async function SectorPage({ params }: { params: { slug: string } }) {
-  const ctx = await requireWarehousePage(params.slug);
+  const ctx = await requireWarehousePage(params.slug, { permission: 'warehouse.configure', fn: 'wh_sector' });
   const { data: profile } = await ctx.service.from('warehouse_business_profiles').select('*').eq('tenant_id', ctx.tenantId).maybeSingle();
   const template = BUSINESS_TEMPLATES.find((t) => t.key === profile?.template_key);
 

@@ -14,6 +14,8 @@ import {
   X,
 } from 'lucide-react';
 import type { TenantUserDisplay } from '@/lib/tenant-users';
+import { AdminConfigPermissionsCard } from '@/components/admin-config-permissions';
+import { DEFAULT_CONFIG_ALLOWED_ROLES } from '@/lib/config-permissions';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,10 +49,14 @@ export function TenantUsersPanel({
   users: initialUsers,
   error,
   tenantId,
+  tenantName,
+  initialConfigRoles,
 }: {
   users: TenantUserDisplay[];
   error?: string;
   tenantId?: string;
+  tenantName?: string;
+  initialConfigRoles?: string[] | null;
 }) {
   const router = useRouter();
   const [usersList, setUsersList] = useState<TenantUserDisplay[]>(initialUsers);
@@ -141,6 +147,19 @@ export function TenantUsersPanel({
   };
 
   return (
+    <div className="space-y-6">
+      {tenantId && (
+        <AdminConfigPermissionsCard
+          tenants={[
+            {
+              tenantId,
+              tenantName: tenantName || 'Empresa',
+              allowedRoles: initialConfigRoles ?? DEFAULT_CONFIG_ALLOWED_ROLES,
+              isCustom: initialConfigRoles !== null && initialConfigRoles !== undefined,
+            },
+          ]}
+        />
+      )}
     <Card className="relative overflow-hidden">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
         <div>
@@ -349,5 +368,6 @@ export function TenantUsersPanel({
         </div>
       )}
     </Card>
+    </div>
   );
 }

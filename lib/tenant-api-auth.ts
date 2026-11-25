@@ -6,6 +6,7 @@ import {
   getSupabaseServiceClient,
 } from '@/lib/supabase-server';
 import { getTenantSession } from '@/lib/tenant-session';
+import { getTenantConfigRoles } from '@/lib/config-permissions';
 
 export interface TenantApiAccess {
   tenantId: string;
@@ -89,14 +90,22 @@ const FULL_ACCESS_ROLES = new Set(['super_admin', 'tenant_admin']);
 
 /**
  * Comprueba un permiso de acción (p. ej. 'pos.sales.create') para el rol de la
- * membresía ya autorizada, según role_permissions (scope 'tenant').
+ * membresía ya autorizada, según role_permissions (scope 'tenant') y las
+ * políticas de configuración definidas desde Gestor de Gestores.
  */
 export async function hasTenantPermission(
   access: TenantApiAccess,
   permission: string,
 ): Promise<boolean> {
   if (FULL_ACCESS_ROLES.has(access.role)) return true;
-  const { data } = await getSupabaseServiceClient()
+  const service = getSupabaseServiceClient();
+  if (permission === 'pos.settings.manage') {
+    const customRoles = await getTenantConfigRoles(service, access.tenantId);
+    if (customRoles !== null) {
+      return customRoles.includes(access.role);
+    }
+  }
+  const { data } = await service
     .from('role_permissions')
     .select('permission')
     .eq('role_key', access.role)
@@ -104,6 +113,26 @@ export async function hasTenantPermission(
     .eq('scope', 'tenant')
     .maybeSingle();
   return Boolean(data);
+}
+
+/**
+ * Comprueba si el rol tiene acceso a configuración general / de algún módulo en la empresa.
+ */
+export async function hasConfigPermission(access: TenantApiAccess): Promise<boolean> {
+  if (FULL_ACCESS_ROLES.has(access.role)) return true;
+  const service = getSupabaseServiceClient();
+  const customRoles = await getTenantConfigRoles(service, access.tenantId);
+  if (customRoles !== null) {
+    return customRoles.includes(access.role);
+  }
+  const { data } = await service
+    .from('role_permissions')
+    .select('permission')
+    .eq('role_key', access.role)
+    .in('permission', ['pos.settings.manage', 'warehouse.configure'])
+    .eq('scope', 'tenant')
+    .limit(1);
+  return Boolean(data && data.length > 0);
 }
 
 /** Respuesta 403 estándar cuando falta un permiso de acción. */

@@ -1,5 +1,6 @@
 import { headers } from 'next/headers';
 import { requireWarehousePage, type WarehouseContext, type WarehouseFunction, type WarehousePermission } from '@/lib/warehouse/access';
+import { hasTenantPermission } from '@/lib/tenant-api-auth';
 import { WarehouseSidebar } from '@/components/warehouse/wh-sidebar';
 import { WhBackBar } from '@/components/warehouse/back-bar';
 
@@ -53,13 +54,14 @@ export default async function WarehouseLayout({ children, params }: { children: 
 
   // Redirige a /warehouse/inactive con el motivo si el módulo no puede abrirse.
   const ctx = await requireWarehousePage(params.slug);
-  const [hidden, { data: branding }] = await Promise.all([
+  const [hidden, { data: branding }, canConfigurePos] = await Promise.all([
     hiddenLinks(ctx),
     ctx.service
       .from('tenant_branding')
       .select('primary_color, secondary_color, accent_color, logo_url, font_family')
       .eq('tenant_id', ctx.tenantId)
       .maybeSingle(),
+    hasTenantPermission(ctx, 'pos.settings.manage'),
   ]);
 
   const primaryColor = branding?.primary_color || '#144D37';
@@ -82,6 +84,7 @@ export default async function WarehouseLayout({ children, params }: { children: 
         slug={params.slug}
         tenantName={ctx.tenantName}
         hidden={hidden}
+        canConfigurePos={canConfigurePos}
         branding={{
           primaryColor,
           secondaryColor,

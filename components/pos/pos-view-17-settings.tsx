@@ -266,6 +266,27 @@ export function PosView17Settings() {
     }
   };
 
+  if (me && !can('pos.settings.manage')) {
+    return (
+      <div className="mx-auto max-w-lg rounded-3xl border border-[#DCE3DF] bg-white p-8 text-center shadow-sm space-y-4">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+          <Lock className="h-6 w-6" />
+        </div>
+        <h1 className="text-lg font-bold text-[#111827]">Acceso restringido</h1>
+        <p className="text-xs text-[#52635A]">
+          Tu rol actual no tiene permisos para acceder a la configuración de este módulo.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigateTo('POS-01')}
+          className="inline-flex items-center justify-center rounded-2xl bg-[#1E6B4E] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#16523B]"
+        >
+          Volver a Caja y Terminal
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Cabecera con Bordes Redondeados */}

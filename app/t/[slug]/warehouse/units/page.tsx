@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /** WH-18 · Unidades y conversiones: compra, almacén y venta. */
 export default async function UnitsPage({ params }: { params: { slug: string } }) {
-  const ctx = await requireWarehousePage(params.slug);
+  const ctx = await requireWarehousePage(params.slug, { permission: 'warehouse.configure', fn: 'wh_units' });
   const { data: units } = await ctx.service.from('warehouse_units').select('*').eq('tenant_id', ctx.tenantId).order('code');
   const byId = new Map((units ?? []).map((u) => [u.id, u]));
   const bases = (units ?? []).filter((u) => !u.base_unit_id);

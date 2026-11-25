@@ -24,7 +24,7 @@ const ROLE_LABELS: Record<string, string> = {
  * VORA; cada supervisor define su PIN personal en Configuración.
  */
 export function PosView19Users() {
-  const { staffUsers, supervisors, navigateTo, activeUser } = usePos();
+  const { staffUsers, supervisors, navigateTo, activeUser, can } = usePos();
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
@@ -58,14 +58,16 @@ export function PosView19Users() {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => navigateTo('POS-17')}
-          className="flex items-center gap-2 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-4 py-2.5 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition"
-        >
-          <KeyRound className="h-4 w-4" />
-          {activeUser.can_approve ? 'Configurar mi PIN' : 'Configuración'}
-        </button>
+        {can('pos.settings.manage') && (
+          <button
+            type="button"
+            onClick={() => navigateTo('POS-17')}
+            className="flex items-center gap-2 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-4 py-2.5 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition"
+          >
+            <KeyRound className="h-4 w-4" />
+            {activeUser.can_approve ? 'Configurar mi PIN' : 'Configuración'}
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { authorizeTenantApi, hasTenantPermission } from '@/lib/tenant-api-auth';
+import { FULL_ACCESS_ROLES, resolveRolePermissions } from '@/lib/warehouse/access';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -65,6 +66,11 @@ export async function GET(
     ...APPROVER_PERMISSIONS,
   ])
     permissions[p] = await hasTenantPermission(auth.access, p);
+
+  const whPerms = FULL_ACCESS_ROLES.includes(role)
+    ? null
+    : await resolveRolePermissions(service, tenantId, role);
+  permissions['warehouse.configure'] = whPerms === null ? true : whPerms.has('warehouse.configure');
 
   return NextResponse.json({
     ok: true,

@@ -13,6 +13,8 @@ import {
   getSupabaseServerClient,
   getSupabaseServiceClient,
 } from '@/lib/supabase-server';
+import { AdminConfigPermissionsCard } from '@/components/admin-config-permissions';
+import { DEFAULT_CONFIG_ALLOWED_ROLES, normalizeConfigRoles } from '@/lib/config-permissions';
 import {
   Card,
   CardHeader,
@@ -74,6 +76,7 @@ export default async function UsersPage() {
     platformRolesRes,
     membershipsRes,
     tenantsRes,
+    configFeaturesRes,
   ] = await Promise.all([
     supabase
       .from('platform_user_roles')
@@ -88,7 +91,11 @@ export default async function UsersPage() {
         'id, tenant_id, auth_user_id, role, status, created_at, tenants!inner(id, commercial_name, slug)'
       )
       .order('created_at', { ascending: false }),
-    supabase.from('tenants').select('id, commercial_name, slug'),
+    supabase.from('tenants').select('id, commercial_name, slug').order('commercial_name', { ascending: true }),
+    serviceClient
+      .from('tenant_features')
+      .select('tenant_id, config')
+      .eq('feature_key', 'crm.dashboard'),
   ]);
 
   if (rolesRes.error) {
@@ -206,6 +213,22 @@ export default async function UsersPage() {
   const tenantsWithMembers = Array.from(membershipsByTenant.entries()).sort(
     ([, a], [, b]) => a.tenantName.localeCompare(b.tenantName)
   );
+
+  const configRolesMap = new Map<string, string[] | null>();
+  for (const row of configFeaturesRes.data ?? []) {
+    const cfg = row.config as Record<string, unknown> | null | undefined;
+    configRolesMap.set(row.tenant_id as string, normalizeConfigRoles(cfg?.config_allowed_roles));
+  }
+  const configTenantOptions = (tenantsRes.data ?? []).map((t: any) => {
+    const custom = configRolesMap.get(t.id) ?? null;
+    return {
+      tenantId: t.id as string,
+      tenantName: t.commercial_name as string,
+      tenantSlug: t.slug as string,
+      allowedRoles: custom ?? [...DEFAULT_CONFIG_ALLOWED_ROLES],
+      isCustom: custom !== null,
+    };
+  });
 
   return (
     <div className="animate-fade-in-up space-y-8">
@@ -367,6 +390,11 @@ export default async function UsersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Tenant Config Permissions section */}
+      {configTenantOptions.length > 0 && (
+        <AdminConfigPermissionsCard tenants={configTenantOptions} />
+      )}
 
       {/* Tenant Users section */}
       <Card>

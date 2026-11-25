@@ -30,6 +30,7 @@ async function test(name, fn) { await fn(); passed++; console.log(`PASS ${name}`
 async function main() {
   for (const [route, status] of [
     ['app/api/admin/tenants/[id]/features/route.ts',403],
+    ['app/api/admin/tenants/[id]/config-permissions/route.ts',403],
     ['app/api/admin/tenants/[id]/setup/route.ts',403],
     ['app/api/admin/billing/route.ts',403],
     ['app/api/t/[slug]/modules/route.ts',401],
@@ -361,6 +362,34 @@ async function warehouseMvpTests() {
     assert.equal(calls.filter(([k, fn]) => k === 'rpc' && fn === 'warehouse_ship_transfer').length, 0);
     const ok = await route.POST(post({ idempotency_key: key, from_warehouse_id: 'wh-1', to_warehouse_id: 'wh-2', lines: line }), ctx);
     assert.equal(ok.status, 201);
+  });
+
+  await test('anonymous PATCH blocked: app/api/admin/tenants/[id]/config-permissions/route.ts', async () => {
+    const response = await load('app/api/admin/tenants/[id]/config-permissions/route.ts', anonymous).PATCH(
+      new Request('https://vora.venesoftca.com/api/test', { method: 'PATCH', body: '{"allowed_roles":["tenant_admin"]}' }),
+      { params: { id: 'test' } },
+    );
+    assert.equal(response.status, 403);
+  });
+
+  await test('custom config_allowed_roles controls pos.settings.manage and warehouse.configure', async () => {
+    const tAuth = load('lib/tenant-api-auth.ts', asUser('clerk-a'));
+    const access = load('lib/warehouse/access.ts', asUser('clerk-a'));
+    db.tenant_features.push({
+      tenant_id: 'tA',
+      feature_key: 'crm.dashboard',
+      enabled: true,
+      contracted: true,
+      config: { config_allowed_roles: ['tenant_admin', 'pos_supervisor'] },
+    });
+    assert.equal(await tAuth.hasTenantPermission({ tenantId: 'tA', userId: 'u1', role: 'pos_supervisor', email: null }, 'pos.settings.manage'), true);
+    assert.equal(await tAuth.hasTenantPermission({ tenantId: 'tA', userId: 'u2', role: 'wh_manager', email: null }, 'pos.settings.manage'), false);
+    assert.equal(await tAuth.hasTenantPermission({ tenantId: 'tA', userId: 'u3', role: 'tenant_admin', email: null }, 'pos.settings.manage'), true);
+    const supPerms = await access.resolveRolePermissions(service, 'tA', 'pos_supervisor');
+    const whMgrPerms = await access.resolveRolePermissions(service, 'tA', 'wh_manager');
+    assert.equal(supPerms.has('warehouse.configure'), true);
+    assert.equal(whMgrPerms.has('warehouse.configure'), false);
+    db.tenant_features.pop();
   });
 
   await test('scheduled reports are due once per day on their configured day', async () => {

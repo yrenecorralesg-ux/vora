@@ -31,6 +31,7 @@ import {
 } from 'lucide-react';
 
 import { TenantUsersPanel } from '@/components/tenant-users-panel';
+import { normalizeConfigRoles } from '@/lib/config-permissions';
 import type { TenantUserDisplay } from '@/lib/tenant-users';
 import { CoreServicesPanel } from '@/components/core-services-panel';
 import { cn } from '@/lib/utils';
@@ -200,7 +201,16 @@ export function TenantTabs(props: TenantTabsProps) {
         <BaseDeDatosTab database={database} tenantId={tenant.id} />
       </TabsContent>
       <TabsContent value="usuarios" className="mt-6">
-        <TenantUsersPanel users={props.users} error={props.userDirectoryError} tenantId={props.tenant.id} />
+        <TenantUsersPanel
+          users={props.users}
+          error={props.userDirectoryError}
+          tenantId={props.tenant.id}
+          tenantName={props.tenant.commercial_name}
+          initialConfigRoles={normalizeConfigRoles(
+            (features.find((f) => f.feature_key === 'crm.dashboard')?.config as Record<string, unknown> | undefined)
+              ?.config_allowed_roles,
+          )}
+        />
       </TabsContent>
       <TabsContent value="dominios" className="mt-6">
         <DominiosTab domains={domains} />

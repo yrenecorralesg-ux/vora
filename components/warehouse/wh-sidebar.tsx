@@ -112,6 +112,7 @@ function NavContent({
   slug,
   pathname,
   hidden,
+  canConfigurePos,
   branding,
   onNavigate,
 }: {
@@ -119,6 +120,7 @@ function NavContent({
   slug: string;
   pathname: string;
   hidden: string[];
+  canConfigurePos: boolean;
   branding?: WarehouseSidebarBranding;
   onNavigate?: () => void;
 }) {
@@ -129,6 +131,9 @@ function NavContent({
   const accentColor = branding?.accentColor || '#A9BEA5';
 
   const activeWhLinks = WAREHOUSE_LINKS.filter((l) => !hidden.includes(l.href));
+  const activePosLinks = POS_SUBMODULES.filter(
+    (item) => canConfigurePos || item.label !== 'Configuración',
+  );
 
   return (
     <nav aria-label="Módulos y Submódulos" className="flex flex-1 flex-col gap-1.5 overflow-y-auto pr-1">
@@ -212,7 +217,7 @@ function NavContent({
             className="ml-4 mt-1 pl-3 border-l-2 flex flex-col gap-1"
             style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
           >
-            {POS_SUBMODULES.map((item, idx) => {
+            {activePosLinks.map((item, idx) => {
               const Icon = item.icon;
               return (
                 <Link
@@ -240,11 +245,13 @@ export function WarehouseSidebar({
   slug,
   tenantName,
   hidden = [],
+  canConfigurePos = false,
   branding,
 }: {
   slug: string;
   tenantName: string;
   hidden?: string[];
+  canConfigurePos?: boolean;
   branding?: WarehouseSidebarBranding;
 }) {
   const pathname = usePathname();
@@ -280,6 +287,7 @@ export function WarehouseSidebar({
             slug={slug}
             pathname={pathname}
             hidden={hidden}
+            canConfigurePos={canConfigurePos}
             branding={branding}
           />
         </div>
@@ -349,6 +357,7 @@ export function WarehouseSidebar({
                 slug={slug}
                 pathname={pathname}
                 hidden={hidden}
+                canConfigurePos={canConfigurePos}
                 branding={branding}
                 onNavigate={() => setOpen(false)}
               />

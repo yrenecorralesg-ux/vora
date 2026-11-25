@@ -19,6 +19,7 @@ export function PosCustomerDisplayModal() {
     tenantName,
     tenantBranding,
     isFuncActive,
+    can,
   } = usePos();
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -247,8 +248,14 @@ export function PosCustomerDisplayModal() {
                   <div className="flex items-start gap-2.5 rounded-2xl border border-[#E5E9E7] bg-[#F6F5F0] p-3 text-[11px] text-[#52635A]">
                     <AlertCircle className="h-4 w-4 text-[#1E6B4E] shrink-0 mt-0.5" />
                     <p>
-                      Pago Móvil habilitado. Configura el banco, RIF y teléfono receptor en{' '}
-                      <strong className="text-[#111827]">Configuración POS</strong> para mostrar los datos y el código QR aquí.
+                      {can('pos.settings.manage') ? (
+                        <>
+                          Pago Móvil habilitado. Configura el banco, RIF y teléfono receptor en{' '}
+                          <strong className="text-[#111827]">Configuración POS</strong> para mostrar los datos y el código QR aquí.
+                        </>
+                      ) : (
+                        'Pago Móvil habilitado. Solicita a un usuario con permisos de configuración completar los datos de la cuenta receptora.'
+                      )}
                     </p>
                   </div>
                 )}

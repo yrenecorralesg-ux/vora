@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 /** WH-12 · Roles y permisos: acceso por empresa, almacén y operación. */
 export default async function RolesPage({ params }: { params: { slug: string } }) {
-  const ctx = await requireWarehousePage(params.slug);
+  const ctx = await requireWarehousePage(params.slug, { permission: 'warehouse.configure', fn: 'wh_roles' });
   const editable = FULL_ACCESS_ROLES.includes(ctx.role);
 
   const [{ data: members }, { data: overrides }, { data: scopes }, { data: warehouses }] = await Promise.all([

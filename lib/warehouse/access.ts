@@ -8,6 +8,7 @@ import { isSuperAdmin, requireSession } from '@/lib/auth';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
 
 import { getTenantSession } from '@/lib/tenant-session';
+import { getTenantConfigRoles } from '@/lib/config-permissions';
 
 export const WAREHOUSE_FEATURE = 'warehouse.inventory';
 
@@ -70,15 +71,23 @@ export const FULL_ACCESS_ROLES = ['super_admin', 'tenant_admin'];
  * de Warehouse sustituidos por la matriz de la empresa si existe (WH-12).
  */
 export async function resolveRolePermissions(service: SupabaseClient, tenantId: string, role: string): Promise<Set<string>> {
-  const [{ data: defaults }, { data: matrix }] = await Promise.all([
+  const [{ data: defaults }, { data: matrix }, customConfigRoles] = await Promise.all([
     service.from('role_permissions').select('permission').eq('role_key', role).eq('scope', 'tenant'),
     service.from('tenant_role_matrix').select('permissions').eq('tenant_id', tenantId).eq('role_key', role).maybeSingle(),
+    getTenantConfigRoles(service, tenantId),
   ]);
   const base = new Set((defaults ?? []).map((r) => r.permission as string));
-  if (!matrix) return base;
   const wh = new Set<string>(WAREHOUSE_PERMISSIONS);
-  const result = new Set(Array.from(base).filter((p) => !wh.has(p)));
-  for (const p of (matrix.permissions ?? []) as string[]) if (wh.has(p)) result.add(p);
+  const result = matrix
+    ? new Set(Array.from(base).filter((p) => !wh.has(p)))
+    : base;
+  if (matrix) {
+    for (const p of (matrix.permissions ?? []) as string[]) if (wh.has(p)) result.add(p);
+  }
+  if (customConfigRoles !== null && !FULL_ACCESS_ROLES.includes(role)) {
+    if (customConfigRoles.includes(role)) result.add('warehouse.configure');
+    else result.delete('warehouse.configure');
+  }
   return result;
 }
 

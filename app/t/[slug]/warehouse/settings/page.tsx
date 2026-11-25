@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 
 /** WH-13 · Configuración de inventario: reglas por empresa y almacén. */
 export default async function SettingsPage({ params }: { params: { slug: string } }) {
-  const ctx = await requireWarehousePage(params.slug);
+  const ctx = await requireWarehousePage(params.slug, { permission: 'warehouse.configure', fn: 'wh_settings' });
   const [opts, { data: audit }] = await Promise.all([
     loadFormOptions(ctx),
     ctx.service.from('warehouse_audit_events').select('id, action, entity, created_at, details').eq('tenant_id', ctx.tenantId).order('created_at', { ascending: false }).limit(15),
