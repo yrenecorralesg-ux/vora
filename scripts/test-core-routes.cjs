@@ -392,6 +392,22 @@ async function warehouseMvpTests() {
     db.tenant_features.pop();
   });
 
+  await test('Pago Movil QR encodes official Suiche 7B format without dashes', async () => {
+    const pm = load('lib/pos-pago-movil.ts');
+    const { decodeQr } = require('decoder-qr-pago-movil');
+    const val = pm.validatePagoMovilConfig({ bank_code: '0102', phone: '0426-6553049', tax_id: '32130926', holder_name: 'Stunt Riders' });
+    assert.equal(val.ok, true);
+    assert.equal(val.value.phone, '04266553049');
+    assert.equal(val.value.tax_id, '32130926');
+    const qrPayload = pm.formatPagoMovilQrPayload(val.value, 919.82, 'Stunt Riders');
+    assert.ok(qrPayload.includes('?merchantId=0102&origin=app'));
+    const decoded = decodeQr(qrPayload);
+    assert.equal(decoded.dni, 'V32130926');
+    assert.equal(decoded.phone, '584266553049');
+    assert.equal(decoded.bank, '0102');
+    assert.equal(decoded.amount, '919,82');
+  });
+
   await test('scheduled reports are due once per day on their configured day', async () => {
     const rs = load('lib/warehouse/report-schedules.ts', { ...asUser('admin-a'), '@/lib/resend-mail': { sendVoraMail: async () => 'accepted' } });
     // 2026-11-23 es lunes; 12:00 UTC = 08:00 en Caracas.

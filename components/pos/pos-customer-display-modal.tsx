@@ -39,8 +39,8 @@ export function PosCustomerDisplayModal() {
     }
     const payload = formatPagoMovilQrPayload(pmConfig, totalVes, tenantName);
     QRCode.toDataURL(payload, {
-      width: 240,
-      margin: 1,
+      width: 280,
+      margin: 2,
       errorCorrectionLevel: 'M',
       color: { dark: '#111827', light: '#FFFFFF' },
     })
@@ -227,13 +227,13 @@ export function PosCustomerDisplayModal() {
                           </p>
                         )}
                         <p>
-                          <strong>RIF / CI:</strong> {pmConfig.tax_id}
+                          <strong>Cédula / RIF:</strong> {pmConfig.tax_id.replace(/[\s.\-]/g, '')}
                         </p>
                         <p className="truncate">
-                          <strong>Banco:</strong> {pmConfig.bank_code} · {pmConfig.bank_name}
+                          <strong>Banco:</strong> {pmConfig.bank_code} ({pmConfig.bank_name})
                         </p>
                         <p>
-                          <strong>Teléfono:</strong> {pmConfig.phone}
+                          <strong>Teléfono:</strong> {pmConfig.phone.replace(/[\s\-()]/g, '')}
                         </p>
                         <p className="font-bold text-[#1E6B4E]">
                           Monto exacto: Bs. {totalVes.toLocaleString('es-VE', { minimumFractionDigits: 2 })}

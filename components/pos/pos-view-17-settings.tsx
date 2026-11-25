@@ -513,7 +513,7 @@ export function PosView17Settings() {
                       type="text"
                       value={pmTaxId}
                       onChange={(e) => setPmTaxId(e.target.value)}
-                      placeholder="Ej. J-401928374 o V-12345678"
+                      placeholder="Ej. 32130926 o J401928374"
                       className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
                     />
                   </div>
@@ -528,7 +528,7 @@ export function PosView17Settings() {
                       type="tel"
                       value={pmPhone}
                       onChange={(e) => setPmPhone(e.target.value)}
-                      placeholder="Ej. 0414-1234567"
+                      placeholder="Ej. 04266553049"
                       className="mt-1 w-full rounded-2xl border border-[#DCE3DF] bg-white p-2.5 text-xs font-semibold text-[#111827] outline-none"
                     />
                   </div>
