@@ -217,47 +217,37 @@ const memo: <T extends (...args: never[]) => unknown>(fn: T) => T =
 
 const loadPageContext = memo(async (slug: string): Promise<PageLoad> => {
   const tenantSession = await getTenantSession(slug);
-  const service = getSupabaseServiceClient();
-  const { data: tenant } = await service
-    .from('tenants')
-    .select('id, commercial_name, commercial_status')
-    .eq('slug', slug)
-    .maybeSingle();
-  if (!tenant) return { ok: false, to: `/t/${slug}/login` };
-
-  let userId: string;
-  let role: string;
-  let email: string | null = null;
-
-  if (tenantSession && tenantSession.slug.toLowerCase() === slug.toLowerCase()) {
-    userId = tenantSession.userId;
-    role = tenantSession.role;
-    email = tenantSession.email ?? null;
-  } else {
-    const session = getSupabaseServerClient();
-    const user = await requireSession(session);
-    if (!user) return { ok: false, to: `/t/${slug}/login` };
-    const admin = await isSuperAdmin(user.id, session);
-    if (admin) {
-      userId = user.id;
-      role = 'super_admin';
-      email = user.email ?? null;
-    } else {
-      const { data: membership } = await service
-        .from('tenant_memberships')
-        .select('role')
-        .eq('tenant_id', tenant.id)
-        .eq('auth_user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
-      if (!membership) return { ok: false, to: `/t/${slug}/login` };
-      userId = user.id;
-      role = membership.role;
-      email = user.email ?? null;
-    }
+  if (!tenantSession || tenantSession.slug.toLowerCase() !== slug.toLowerCase()) {
+    return { ok: false, to: `/t/${slug}/login` };
   }
 
-  const loaded = await loadContext({ tenantId: tenant.id, userId, role, email }, tenant);
+  const service = getSupabaseServiceClient();
+  const [{ data: tenant }, { data: membership }] = await Promise.all([
+    service
+      .from('tenants')
+      .select('id, commercial_name, commercial_status')
+      .eq('slug', slug)
+      .maybeSingle(),
+    service
+      .from('tenant_memberships')
+      .select('role')
+      .eq('tenant_id', tenantSession.tenantId)
+      .eq('auth_user_id', tenantSession.userId)
+      .eq('status', 'active')
+      .maybeSingle(),
+  ]);
+
+  if (!tenant || !membership) return { ok: false, to: `/t/${slug}/login` };
+
+  const loaded = await loadContext(
+    {
+      tenantId: tenant.id,
+      userId: tenantSession.userId,
+      role: membership.role,
+      email: tenantSession.email ?? null,
+    },
+    tenant,
+  );
   if (!loaded.ok) return { ok: false, to: `/t/${slug}/warehouse/inactive?reason=${loaded.reason}` };
   return { ok: true, ctx: loaded.ctx };
 });

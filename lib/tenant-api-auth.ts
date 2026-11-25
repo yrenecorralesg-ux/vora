@@ -30,25 +30,52 @@ export type TenantApiAuthResult =
 export async function authorizeTenantApi(
   slug: string,
 ): Promise<TenantApiAuthResult> {
-  // 1. Prioridad: Sesión dedicada de empresa mediante cookie vora_session_[slug]
+  // 1. Aislamiento total: en peticiones HTTP reales se exige exclusivamente la cookie vora_session_[slug].
+  let hasRequestCookies = true;
+  let tenantSession = null;
   try {
-    const tenantSession = await getTenantSession(slug);
-    if (tenantSession && tenantSession.slug.toLowerCase() === slug.toLowerCase()) {
-      return {
-        ok: true,
-        access: {
-          tenantId: tenantSession.tenantId,
-          userId: tenantSession.userId,
-          role: tenantSession.role,
-          email: tenantSession.email,
-        },
-      };
-    }
+    tenantSession = await getTenantSession(slug);
   } catch {
-    // Si no se puede leer el cookieStore, continuar con la verificación estándar
+    // Fuera de Next.js App Router (pruebas unitarias) cookies() lanza excepción.
+    hasRequestCookies = false;
   }
 
-  // 2. Sesión estándar de Supabase Auth
+  if (hasRequestCookies) {
+    if (!tenantSession || tenantSession.slug.toLowerCase() !== slug.toLowerCase()) {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: 'No autenticado en esta empresa.' }, { status: 401 }),
+      };
+    }
+
+    const service = getSupabaseServiceClient();
+    const { data: membership } = await service
+      .from('tenant_memberships')
+      .select('role')
+      .eq('tenant_id', tenantSession.tenantId)
+      .eq('auth_user_id', tenantSession.userId)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (!membership) {
+      return {
+        ok: false,
+        response: NextResponse.json({ error: 'Sin acceso activo en esta empresa.' }, { status: 403 }),
+      };
+    }
+
+    return {
+      ok: true,
+      access: {
+        tenantId: tenantSession.tenantId,
+        userId: tenantSession.userId,
+        role: membership.role,
+        email: tenantSession.email,
+      },
+    };
+  }
+
+  // 2. Respaldo exclusivo para entorno de pruebas unitarias sin cookies() de Next.js.
   const session = getSupabaseServerClient();
   const user = await requireSession(session);
   if (!user)
@@ -66,7 +93,6 @@ export async function authorizeTenantApi(
   const { data: tenant } = await service.from('tenants').select('id').eq('slug', slug).maybeSingle();
   if (!tenant) return denied;
 
-  // 3. Exigir membresía activa específica en esta empresa
   const { data: membership } = await service
     .from('tenant_memberships')
     .select('role')

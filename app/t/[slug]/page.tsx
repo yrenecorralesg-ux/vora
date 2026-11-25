@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation';
 import { requireSession, isSuperAdmin } from '@/lib/auth';
 import { canPreviewTenant, parseTenantBanners } from '@/lib/tenant-preview';
-import { hasConfigPermission } from '@/lib/tenant-api-auth';
 import {
   TenantDashboardPreview,
   type PreviewModule,
@@ -30,22 +29,12 @@ export default async function TenantDashboardPage({
     const admin = await isSuperAdmin(viewer.id, core);
     const { data: member } = await core
       .from('tenant_memberships')
-      .select('id,role')
+      .select('id')
       .eq('tenant_id', profile.id)
       .eq('auth_user_id', viewer.id)
       .eq('status', 'active')
       .maybeSingle();
     const preview = canPreviewTenant(admin, searchParams.preview === '1', !!member);
-    const canConfig =
-      admin ||
-      (member
-        ? await hasConfigPermission({
-            tenantId: profile.id,
-            userId: viewer.id,
-            role: member.role,
-            email: viewer.email ?? null,
-          })
-        : false);
     if (preview || profile.technical_status === 'ready') {
       const [{ data: brand }, { data: assignments }] = await Promise.all([
         core
@@ -95,7 +84,7 @@ export default async function TenantDashboardPage({
           secondary={brand?.secondary_color ?? '#A9BEA5'}
           accent={brand?.accent_color ?? '#C97857'}
           modules={modules}
-          canConfigure={canConfig}
+          canConfigure={admin}
           preview={preview}
         />
       );

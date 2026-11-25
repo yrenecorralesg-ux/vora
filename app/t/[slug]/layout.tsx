@@ -2,8 +2,7 @@ import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { Ban, ShieldAlert } from 'lucide-react';
 
-import { requireSession, isSuperAdmin } from '@/lib/auth';
-import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { getTenantSession } from '@/lib/tenant-session';
 import { CrmSidebar } from '@/components/crm-sidebar';
 import { ModuleRail } from '@/components/module-rail';
@@ -80,25 +79,21 @@ export default async function TenantCrmLayout({
     return <NoAccessPage />;
   }
 
-  // 3. Aislamiento total: Si no hay sesión de empresa, exigir inicio de sesión en el portal de la empresa
-  if (!tenantSession) {
-    const supabase = getSupabaseServerClient();
-    const user = await requireSession(supabase);
-    if (!user) {
-      redirect(`/t/${params.slug}/login`);
-    }
+  // 3. Aislamiento total: exigir sesión dedicada de empresa (vora_session_[slug]) y membresía activa.
+  if (!tenantSession || tenantSession.slug.toLowerCase() !== params.slug.toLowerCase()) {
+    redirect(`/t/${params.slug}/login`);
+  }
 
-    const { data: membership } = await service
-      .from('tenant_memberships')
-      .select('id, role')
-      .eq('tenant_id', tenant.id)
-      .eq('auth_user_id', user.id)
-      .eq('status', 'active')
-      .maybeSingle();
+  const { data: membership } = await service
+    .from('tenant_memberships')
+    .select('id, role')
+    .eq('tenant_id', tenant.id)
+    .eq('auth_user_id', tenantSession.userId)
+    .eq('status', 'active')
+    .maybeSingle();
 
-    if (!membership) {
-      redirect(`/t/${params.slug}/login`);
-    }
+  if (!membership) {
+    redirect(`/t/${params.slug}/login`);
   }
 
   /* 4. Branding y Features ------------------------------------------------ */
@@ -158,7 +153,7 @@ export default async function TenantCrmLayout({
     enabledFeatures.push('crm.dashboard');
   }
 
-  const userRole = tenantSession?.role ?? 'member';
+  const userRole = membership.role;
   const admin = false;
   const isPreview = false;
 

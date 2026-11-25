@@ -1,47 +1,34 @@
-import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
-import { isSuperAdmin, requireSession } from '@/lib/auth';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { getTenantSession } from '@/lib/tenant-session';
+import { hasTenantPermission } from '@/lib/tenant-api-auth';
 
 export async function requireTenantFeature(
   slug: string,
   featureKey: string,
 ): Promise<void> {
   const tenantSession = await getTenantSession(slug);
+  if (!tenantSession || tenantSession.slug.toLowerCase() !== slug.toLowerCase()) {
+    redirect(`/t/${slug}/login`);
+  }
 
   const service = getSupabaseServiceClient();
-  const { data: tenant } = await service
-    .from('tenants')
-    .select('id,technical_status,commercial_status')
-    .eq('slug', slug)
-    .maybeSingle();
-
-  if (!tenant) redirect(`/t/${slug}/login`);
-
-  let userId: string;
-  let userRole: string;
-
-  if (tenantSession && tenantSession.slug.toLowerCase() === slug.toLowerCase()) {
-    userId = tenantSession.userId;
-    userRole = tenantSession.role;
-  } else {
-    // Si no hay cookie de empresa, verificar si hay sesión con membresía activa
-    const user = await requireSession();
-    if (!user) redirect(`/t/${slug}/login`);
-
-    const { data: membership } = await service
+  const [{ data: tenant }, { data: membership }] = await Promise.all([
+    service
+      .from('tenants')
+      .select('id,technical_status,commercial_status')
+      .eq('slug', slug)
+      .maybeSingle(),
+    service
       .from('tenant_memberships')
       .select('role')
-      .eq('tenant_id', tenant.id)
-      .eq('auth_user_id', user.id)
+      .eq('tenant_id', tenantSession.tenantId)
+      .eq('auth_user_id', tenantSession.userId)
       .eq('status', 'active')
-      .maybeSingle();
+      .maybeSingle(),
+  ]);
 
-    if (!membership) redirect(`/t/${slug}/login`);
-    userId = user.id;
-    userRole = membership.role;
-  }
+  if (!tenant || !membership) redirect(`/t/${slug}/login`);
 
   const { data: feature } = await service
     .from('tenant_features')
@@ -67,50 +54,38 @@ export async function requirePosPermission(
   permission: string,
 ): Promise<{ tenantId: string; userId: string; role: string }> {
   const tenantSession = await getTenantSession(slug);
+  if (!tenantSession || tenantSession.slug.toLowerCase() !== slug.toLowerCase()) {
+    redirect(`/t/${slug}/login`);
+  }
 
   const service = getSupabaseServiceClient();
-  const { data: tenant } = await service
-    .from('tenants')
-    .select('id, technical_status, commercial_status')
-    .eq('slug', slug)
-    .maybeSingle();
-
-  if (!tenant) redirect(`/t/${slug}/login`);
-
-  let userId: string;
-  let userRole: string;
-
-  if (tenantSession && tenantSession.slug.toLowerCase() === slug.toLowerCase()) {
-    userId = tenantSession.userId;
-    userRole = tenantSession.role;
-  } else {
-    const user = await requireSession();
-    if (!user) redirect(`/t/${slug}/login`);
-
-    const { data: membership } = await service
+  const [{ data: tenant }, { data: membership }] = await Promise.all([
+    service
+      .from('tenants')
+      .select('id, technical_status, commercial_status')
+      .eq('slug', slug)
+      .maybeSingle(),
+    service
       .from('tenant_memberships')
       .select('role')
-      .eq('tenant_id', tenant.id)
-      .eq('auth_user_id', user.id)
+      .eq('tenant_id', tenantSession.tenantId)
+      .eq('auth_user_id', tenantSession.userId)
       .eq('status', 'active')
-      .maybeSingle();
+      .maybeSingle(),
+  ]);
 
-    if (!membership) redirect(`/t/${slug}/login`);
-    userId = user.id;
-    userRole = membership.role;
-  }
+  if (!tenant || !membership) redirect(`/t/${slug}/login`);
 
-  if (userRole !== 'tenant_admin' && userRole !== 'pos_store_admin') {
-    const { data: perm } = await service
-      .from('role_permissions')
-      .select('id')
-      .eq('role_key', userRole)
-      .eq('permission', permission)
-      .eq('scope', 'tenant')
-      .maybeSingle();
+  const allowed = await hasTenantPermission(
+    {
+      tenantId: tenant.id,
+      userId: tenantSession.userId,
+      role: membership.role,
+      email: tenantSession.email,
+    },
+    permission,
+  );
+  if (!allowed) redirect(`/t/${slug}`);
 
-    if (!perm) redirect(`/t/${slug}`);
-  }
-
-  return { tenantId: tenant.id, userId, role: userRole };
+  return { tenantId: tenant.id, userId: tenantSession.userId, role: membership.role };
 }

@@ -1,8 +1,7 @@
 import { redirect } from 'next/navigation';
 import { Settings, Palette, Layers, CreditCard, Building2 } from 'lucide-react';
 
-import { requireSession, isSuperAdmin } from '@/lib/auth';
-import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
+import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { hasConfigPermission } from '@/lib/tenant-api-auth';
 import { getTenantSession } from '@/lib/tenant-session';
 import {
@@ -56,9 +55,9 @@ export default async function SettingsPage({
   params: { slug: string };
 }) {
   const tenantSession = await getTenantSession(params.slug);
-  const supabase = getSupabaseServerClient();
-  const user = tenantSession ? null : await requireSession(supabase);
-  if (!tenantSession && !user) return null;
+  if (!tenantSession || tenantSession.slug.toLowerCase() !== params.slug.toLowerCase()) {
+    redirect(`/t/${params.slug}/login`);
+  }
 
   // Datos reales del tenant para la pagina de ajustes.
   const service = getSupabaseServiceClient();
@@ -68,38 +67,27 @@ export default async function SettingsPage({
     .eq('slug', params.slug)
     .maybeSingle();
 
-  if (!tenant) redirect(`/t/${params.slug}`);
+  if (!tenant) redirect(`/t/${params.slug}/login`);
 
-  let allowed = false;
-  if (tenantSession && tenantSession.slug.toLowerCase() === params.slug.toLowerCase()) {
-    allowed = await hasConfigPermission({
-      tenantId: tenant.id,
-      userId: tenantSession.userId,
-      role: tenantSession.role,
-      email: tenantSession.email,
-    });
-  } else if (user) {
-    if (await isSuperAdmin(user.id, supabase)) {
-      allowed = true;
-    } else {
-      const { data: membership } = await service
-        .from('tenant_memberships')
-        .select('role')
-        .eq('tenant_id', tenant.id)
-        .eq('auth_user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
-      if (membership) {
-        allowed = await hasConfigPermission({
-          tenantId: tenant.id,
-          userId: user.id,
-          role: membership.role,
-          email: user.email ?? null,
-        });
-      }
-    }
-  }
+  const { data: membership } = await service
+    .from('tenant_memberships')
+    .select('role')
+    .eq('tenant_id', tenant.id)
+    .eq('auth_user_id', tenantSession.userId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (!membership) redirect(`/t/${params.slug}/login`);
+
+  const allowed = await hasConfigPermission({
+    tenantId: tenant.id,
+    userId: tenantSession.userId,
+    role: membership.role,
+    email: tenantSession.email,
+  });
   if (!allowed) redirect(`/t/${params.slug}`);
+
+  const supabase = service;
 
   const { data: branding } = await supabase
     .from('tenant_branding')

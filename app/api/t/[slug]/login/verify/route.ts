@@ -32,15 +32,17 @@ export async function POST(
       return NextResponse.json({ ok: false, error: 'Empresa no encontrada.' }, { status: 404 });
     }
 
-    // 2. Verificar rol Super Admin de Venesoft
+    // 2. Rechazar cuentas globales de VORA Core (sistemas independientes)
     const isPlatformAdmin = await isSuperAdmin(user.id, supabaseSession);
     if (isPlatformAdmin) {
-      return NextResponse.json({
-        ok: true,
-        role: 'super_admin',
-        tenant_name: tenant.commercial_name,
-        redirect_url: `/t/${params.slug}`,
-      });
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'Acceso restringido: Las cuentas de VORA Core son independientes y no inician sesión en empresas.',
+        },
+        { status: 403 },
+      );
     }
 
     // 3. Verificar membresía activa en la empresa

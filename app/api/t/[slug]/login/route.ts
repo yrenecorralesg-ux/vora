@@ -68,6 +68,26 @@ export async function POST(
 
     const authUser = authData.user;
 
+    // 2.5 Rechazar cuentas globales de plataforma (VORA Core) en portales de empresa.
+    const { data: platformRoles } = await service
+      .from('platform_user_roles')
+      .select('platform_roles!inner(key)')
+      .eq('user_id', authUser.id);
+    const isPlatformAdmin = (platformRoles ?? []).some((r: any) => {
+      const pr = Array.isArray(r.platform_roles) ? r.platform_roles : [r.platform_roles];
+      return pr.some((x: any) => x?.key === 'super_admin');
+    });
+    if (isPlatformAdmin) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            'Acceso restringido: Las cuentas administrativas de VORA Core son independientes. Usa un usuario creado en Usuarios de esta empresa.',
+        },
+        { status: 403 },
+      );
+    }
+
     // 3. Verificar membresía activa exclusiva de esta empresa (los tokens de superadmin no tienen validez aquí)
     const { data: membership, error: memErr } = await service
       .from('tenant_memberships')
