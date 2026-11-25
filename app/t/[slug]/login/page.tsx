@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   KeyRound,
@@ -12,7 +11,6 @@ import {
 } from 'lucide-react';
 
 export default function TenantIsolatedLoginPage({ params }: { params: { slug: string } }) {
-  const router = useRouter();
   const [emailOrUser, setEmailOrUser] = useState('');
   const [passwordOrPin, setPasswordOrPin] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -80,7 +78,7 @@ export default function TenantIsolatedLoginPage({ params }: { params: { slug: st
       }
 
       const destUrl = data.redirect_url || `/t/${params.slug}`;
-      router.replace(destUrl);
+      window.location.href = destUrl;
     } catch (err: any) {
       setError(err.message || 'Error de red al conectar con el servidor.');
       setLoading(false);

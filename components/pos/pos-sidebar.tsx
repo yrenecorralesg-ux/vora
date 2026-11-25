@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import {
   Store,
   Receipt,
@@ -30,7 +29,6 @@ import { usePos } from './pos-context';
 import { cn } from '@/lib/utils';
 
 export function PosSidebar() {
-  const router = useRouter();
   const {
     activeTenantSlug,
     tenantName,
@@ -52,7 +50,7 @@ export function PosSidebar() {
     } catch {
       // Ignorar error de red en logout local
     }
-    router.replace(`/t/${activeTenantSlug}/login`);
+    window.location.href = `/t/${activeTenantSlug}/login`;
   };
 
   const isPosModuleActive = [

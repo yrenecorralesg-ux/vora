@@ -2,11 +2,11 @@
 
 import { usePathname } from 'next/navigation';
 
-/** Devuelve true si la ruta pertenece a un módulo con barra lateral propia (POS o Warehouse). */
+/** Devuelve true si la ruta pertenece a un módulo con barra lateral propia (POS o Warehouse) o al login aislado. */
 export function isOwnShellPath(pathname: string, slug: string): boolean {
   // En subdominio la URL visible no lleva el prefijo /t/<slug>.
   const path = pathname.startsWith(`/t/${slug}`) ? pathname.slice(`/t/${slug}`.length) || '/' : pathname;
-  return ['/pos', '/warehouse'].some((p) => path === p || path.startsWith(`${p}/`));
+  return ['/pos', '/warehouse', '/login'].some((p) => path === p || path.startsWith(`${p}/`));
 }
 
 /**
