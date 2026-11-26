@@ -679,6 +679,30 @@ async function offlinePosTests() {
     const r = await mw(new NextRequest('https://pepito.vora.venesoftca.com/sw.js'));
     assert.equal(r.headers.get('x-middleware-next'), '1');
   });
+
+  await test('signed vora_session cookie allows tenant route without Supabase auth and blocks cross-tenant/forged', async () => {
+    const mw = load('middleware.ts', { '@supabase/ssr': { createServerClient: () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }) } }).middleware;
+    const tsMod = load('lib/tenant-session.ts', { 'next/headers': { cookies: () => ({ get: () => undefined }) } });
+    const pepitoToken = tsMod.createTenantSessionToken({
+      userId: 'u1', email: 'cajero@pepito.test', name: 'Cajero', role: 'pos_cashier', tenantId: 't1', slug: 'pepito',
+    });
+    const okRes = await mw(new NextRequest('https://vora.venesoftca.com/t/pepito/pos', {
+      headers: { cookie: `${tsMod.getTenantCookieName('pepito')}=${pepitoToken}` },
+    }));
+    assert.equal(okRes.headers.get('x-middleware-next'), '1');
+
+    const crossRes = await mw(new NextRequest('https://vora.venesoftca.com/t/otra/pos', {
+      headers: { cookie: `${tsMod.getTenantCookieName('pepito')}=${pepitoToken}` },
+    }));
+    assert.equal(crossRes.status, 307);
+    assert.equal(new URL(crossRes.headers.get('location')).pathname, '/t/otra/login');
+
+    const forgedRes = await mw(new NextRequest('https://vora.venesoftca.com/t/pepito/pos', {
+      headers: { cookie: `${tsMod.getTenantCookieName('pepito')}=fake.payload` },
+    }));
+    assert.equal(forgedRes.status, 307);
+    assert.equal(new URL(forgedRes.headers.get('location')).pathname, '/t/pepito/login');
+  });
 }
 
 function rpcCallsFrom(calls, fn) {

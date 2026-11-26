@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { VORA_DOMAIN, validTenantSlug } from '@/lib/core-config';
+import { getTenantCookieName, verifyTenantSessionTokenEdge } from '@/lib/tenant-session-edge';
 export async function middleware(request: NextRequest) {
   const hostname = request.nextUrl.hostname.toLowerCase(),
     suffix = `.${VORA_DOMAIN}`;
@@ -84,12 +85,20 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/t/') ||
     pathname === '/login'
   ) {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
     const tenantMatch = pathname.match(/^\/t\/([^/]+)/);
     const targetSlug = tenantMatch?.[1] ?? slug;
+
+    let hasTenantSession = false;
+    if (pathname.startsWith('/t/') && !pathname.endsWith('/login') && targetSlug) {
+      const tenantToken = request.cookies.get(getTenantCookieName(targetSlug))?.value;
+      if (tenantToken) {
+        hasTenantSession = Boolean(await verifyTenantSessionTokenEdge(tenantToken, targetSlug));
+      }
+    }
+
+    const user = hasTenantSession
+      ? null
+      : (await supabase.auth.getUser()).data.user;
 
     if (!user && pathname.startsWith('/admin')) {
       const login = request.nextUrl.clone();
@@ -98,7 +107,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(login);
     }
 
-    if (!user && pathname.startsWith('/t/') && !pathname.endsWith('/login')) {
+    if (!user && !hasTenantSession && pathname.startsWith('/t/') && !pathname.endsWith('/login')) {
       const login = request.nextUrl.clone();
       login.pathname = targetSlug ? `/t/${targetSlug}/login` : '/login';
       login.search = '';

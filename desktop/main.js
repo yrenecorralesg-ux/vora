@@ -2,7 +2,43 @@ const { app, BrowserWindow, ipcMain, Menu, screen, shell } = require('electron')
 const fs = require('node:fs');
 const path = require('node:path');
 
-const APP_URL = (process.env.VORA_DESKTOP_URL || 'https://vora-weld-mu.vercel.app').replace(/\/+$/, '');
+function readTenantConfig() {
+  try {
+    const cfgPath = path.join(__dirname, 'tenant.config.json');
+    if (fs.existsSync(cfgPath)) {
+      return JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+    }
+  } catch {
+    // Ignorar errores de lectura de configuración embebida
+  }
+  return {};
+}
+
+const tenantCfg = readTenantConfig();
+const BASE_URL = (
+  process.env.VORA_DESKTOP_BASE_URL ||
+  tenantCfg.baseUrl ||
+  'https://vora-weld-mu.vercel.app'
+).replace(/\/+$/, '');
+const TENANT_SLUG = String(process.env.VORA_TENANT_SLUG || tenantCfg.slug || '')
+  .trim()
+  .toLowerCase();
+const TENANT_NAME = String(process.env.VORA_TENANT_NAME || tenantCfg.name || '').trim();
+const APP_URL = (
+  process.env.VORA_DESKTOP_URL ||
+  tenantCfg.appUrl ||
+  (TENANT_SLUG ? `${BASE_URL}/t/${TENANT_SLUG}/login` : BASE_URL)
+).replace(/\/+$/, '');
+const APP_TITLE = TENANT_NAME ? `VORA · ${TENANT_NAME}` : 'VORA · Sistema Comercial y POS';
+
+if (TENANT_SLUG) {
+  app.setName(`vora-${TENANT_SLUG}`);
+  app.setPath('userData', path.join(app.getPath('appData'), 'VORA', TENANT_SLUG));
+  if (process.platform === 'win32') {
+    app.setAppUserModelId(`com.venesoftca.vora.desktop.${TENANT_SLUG}`);
+  }
+}
+
 const ICON_PATH = path.join(__dirname, 'build', 'icon.png');
 const OFFLINE_PAGE = path.join(__dirname, 'offline.html');
 
@@ -46,7 +82,23 @@ function isPosShellUrl(rawUrl) {
     if (!isTrustedAppUrl(rawUrl)) return false;
     const parsed = new URL(rawUrl);
     if (parsed.protocol === 'file:') return false;
-    return /^\/t\/[^/]+\/pos\/?$/i.test(parsed.pathname);
+    const match = parsed.pathname.match(/^\/t\/([^/]+)\/pos\/?$/i);
+    if (!match) return false;
+    if (TENANT_SLUG && match[1].toLowerCase() !== TENANT_SLUG) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isWrongTenantUrl(rawUrl) {
+  if (!TENANT_SLUG) return false;
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol === 'file:') return false;
+    const match = parsed.pathname.match(/^\/t\/([^/]+)(?:\/|$)/i);
+    if (match && match[1].toLowerCase() !== TENANT_SLUG) return true;
+    return false;
   } catch {
     return false;
   }
@@ -63,7 +115,7 @@ function createMainWindow() {
     height: 860,
     minWidth: 1024,
     minHeight: 680,
-    title: 'VORA · Sistema Comercial y POS',
+    title: APP_TITLE,
     icon: ICON_PATH,
     backgroundColor: '#F6F2E9',
     show: false,
@@ -91,6 +143,12 @@ function createMainWindow() {
   };
   mainWindow.webContents.on('did-navigate', (_e, url) => recordPosUrl(url));
   mainWindow.webContents.on('did-navigate-in-page', (_e, url) => recordPosUrl(url));
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (isWrongTenantUrl(url)) {
+      event.preventDefault();
+      void mainWindow.loadURL(APP_URL);
+    }
+  });
 
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, _errDesc, validatedUrl, isMainFrame) => {
     if (!isMainFrame || errorCode === -3) return; // Ignorar abortos de navegación normal
@@ -291,9 +349,14 @@ ipcMain.handle('vora:open-last-pos', () => {
 
 ipcMain.handle('vora:get-desktop-info', () => {
   const state = readDesktopState();
+  const safeLastPosUrl =
+    state.lastPosUrl && isPosShellUrl(state.lastPosUrl) ? state.lastPosUrl : null;
   return {
     version: app.getVersion(),
-    lastPosUrl: state.lastPosUrl || null,
+    lastPosUrl: safeLastPosUrl,
+    tenantSlug: TENANT_SLUG || null,
+    tenantName: TENANT_NAME || null,
+    appUrl: APP_URL,
   };
 });
 

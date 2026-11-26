@@ -19,3 +19,5 @@ credenciales*.txt
 # Electron desktop build artifacts
 desktop/node_modules/
 desktop/dist/
+desktop/tenant.config.json
+desktop/.builder-*.json

@@ -6,8 +6,9 @@ import {
   type PreviewModule,
 } from '@/components/tenant-dashboard-preview';
 
+import { getTenantSession } from '@/lib/tenant-session';
 import { requireTenantFeature } from '@/lib/tenant-access';
-import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -18,33 +19,39 @@ export default async function TenantDashboardPage({
   params: { slug: string };
   searchParams: { preview?: string };
 }) {
+  const tenantSession = await getTenantSession(params.slug);
+  const service = getSupabaseServiceClient();
   const core = getSupabaseServerClient();
-  const { data: profile } = await core
+  const db = tenantSession ? service : core;
+
+  const { data: profile } = await db
     .from('tenants')
     .select('id,commercial_name,technical_status')
     .eq('slug', params.slug)
     .maybeSingle();
-  const viewer = await requireSession(core);
-  if (profile && viewer) {
-    const admin = await isSuperAdmin(viewer.id, core);
-    const { data: member } = await core
+
+  const viewer = tenantSession ? null : await requireSession(core);
+  if (profile && (viewer || tenantSession)) {
+    const admin = viewer ? await isSuperAdmin(viewer.id, core) : false;
+    const actorUserId = tenantSession?.userId ?? viewer?.id ?? '';
+    const { data: member } = await db
       .from('tenant_memberships')
       .select('id')
       .eq('tenant_id', profile.id)
-      .eq('auth_user_id', viewer.id)
+      .eq('auth_user_id', actorUserId)
       .eq('status', 'active')
       .maybeSingle();
-    const preview = canPreviewTenant(admin, searchParams.preview === '1', !!member);
-    if (preview || profile.technical_status === 'ready') {
+    const preview = viewer ? canPreviewTenant(admin, searchParams.preview === '1', !!member) : false;
+    if (preview || (profile.technical_status === 'ready' && (admin || !!member))) {
       const [{ data: brand }, { data: assignments }] = await Promise.all([
-        core
+        db
           .from('tenant_branding')
           .select(
             'primary_color,secondary_color,accent_color,logo_url,banner_url',
           )
           .eq('tenant_id', profile.id)
           .maybeSingle(),
-        core
+        db
           .from('tenant_features')
           .select('feature_key,enabled,contracted,features(name,description)')
           .eq('tenant_id', profile.id),

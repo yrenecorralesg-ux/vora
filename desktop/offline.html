@@ -70,7 +70,7 @@
   </head>
   <body>
     <div class="card">
-      <h1>No se pudo conectar con VORA</h1>
+      <h1 id="offlineTitle">No se pudo conectar con VORA</h1>
       <p>
         Verifica tu conexión a internet para iniciar sesión por primera vez o sincronizar datos con el servidor.
       </p>
@@ -87,11 +87,16 @@
     <script>
       if (window.voraDesktop && window.voraDesktop.getDesktopInfo) {
         window.voraDesktop.getDesktopInfo().then(function (info) {
+          if (info && info.tenantName) {
+            document.getElementById('offlineTitle').textContent = 'No se pudo conectar con VORA · ' + info.tenantName;
+          }
           if (info && info.lastPosUrl) {
             document.getElementById('lastPosBtn').style.display = 'block';
           }
           if (info && info.version) {
-            document.getElementById('verMeta').textContent = 'VORA Desktop v' + info.version;
+            var label = 'VORA Desktop v' + info.version;
+            if (info.tenantName) label += ' · ' + info.tenantName;
+            document.getElementById('verMeta').textContent = label;
           }
         }).catch(function () {});
       }

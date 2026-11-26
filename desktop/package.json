@@ -6,7 +6,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "build:portable": "electron-builder --win portable"
+    "build:portable": "electron-builder --win portable",
+    "build:tenants": "node build-tenants.cjs"
   },
   "devDependencies": {
     "electron": "^35.2.0",
