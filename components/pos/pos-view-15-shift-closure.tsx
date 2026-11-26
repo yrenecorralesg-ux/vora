@@ -16,6 +16,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { usePos } from './pos-context';
+import { voraPrint } from '@/lib/desktop-bridge';
 import type { PosShift } from '@/lib/types';
 
 export function PosView15ShiftClosure() {
@@ -726,7 +727,7 @@ export function PosView15ShiftClosure() {
               <button
                 type="button"
                 onClick={() => {
-                  window.print();
+                  void voraPrint({ silent: true, thermal80mm: true });
                   showNotification(`Reporte ${reportType} Impreso`, `Ticket enviado a cola de impresión térmica ESC/POS.`, 'success');
                 }}
                 className="flex-1 rounded-2xl bg-[#1E6B4E] py-2.5 text-xs font-bold text-white hover:bg-[#16523B]"

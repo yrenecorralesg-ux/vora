@@ -7,7 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "desktop:install": "npm --prefix desktop install",
+    "desktop:dev": "npm --prefix desktop start",
+    "desktop:build": "npm --prefix desktop run build:portable"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

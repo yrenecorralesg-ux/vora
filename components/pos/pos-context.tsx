@@ -17,6 +17,8 @@ import type {
   PosDispatchStatus,
 } from '@/lib/types';
 import { getOfflineQueue, syncOfflineSales } from '@/lib/pos-offline';
+import { publishCustomerDisplayState } from '@/lib/desktop-bridge';
+import { formatPagoMovilQrPayload } from '@/lib/pos-pago-movil';
 import {
   apiError,
   buildSalesBookCsv,
@@ -650,6 +652,51 @@ export function PosProvider({
 
   const activeBranch = branches.find((b) => b.id === activeBranchId) ?? branches[0] ?? EMPTY_BRANCH;
   const activeRegister = registers.find((r) => r.id === activeRegisterId) ?? registers[0] ?? EMPTY_REGISTER;
+
+  // Sincronización en vivo hacia Monitor 2 / Pantalla Cliente (Desktop IPC + BroadcastChannel)
+  useEffect(() => {
+    if (!activeTenantSlug) return;
+    const totalUsd = cart.reduce((sum, item) => sum + item.lineTotalUsd, 0);
+    const totalVes = Number((totalUsd * exchangeRate).toFixed(2));
+    const isPmEnabled = settings.active_methods.includes('pago_movil');
+    const pmCfg = settings.pago_movil_config ?? null;
+    publishCustomerDisplayState({
+      tenantSlug: activeTenantSlug,
+      tenantName: tenantName || 'VORA COMMERCE',
+      logoUrl: tenantBranding.logoUrl,
+      primaryColor: tenantBranding.primaryColor || '#1E6B4E',
+      branchName: activeBranch.name,
+      registerName: activeRegister.name,
+      exchangeRate,
+      customerName: selectedCustomer?.legal_name ?? null,
+      customerTier: selectedCustomer?.customer_tier ?? null,
+      items: cart.map((l) => ({
+        name: l.name,
+        quantity: l.quantity,
+        unitPriceUsd: l.unitPriceUsd,
+        discountPercent: l.discountPercent,
+        lineTotalUsd: l.lineTotalUsd,
+      })),
+      totalUsd,
+      totalVes,
+      isPagoMovilEnabled: isPmEnabled,
+      pagoMovilConfig: pmCfg,
+      qrPayload: isPmEnabled && pmCfg ? formatPagoMovilQrPayload(pmCfg, totalVes, tenantName) : null,
+      updatedAt: Date.now(),
+    });
+  }, [
+    activeTenantSlug,
+    tenantName,
+    tenantBranding.logoUrl,
+    tenantBranding.primaryColor,
+    activeBranch.name,
+    activeRegister.name,
+    exchangeRate,
+    selectedCustomer,
+    cart,
+    settings.active_methods,
+    settings.pago_movil_config,
+  ]);
   const activeUser: PosMe = me ?? {
     id: '',
     name: 'Cargando…',

@@ -5,6 +5,7 @@ import QRCode from 'qrcode';
 import { X, ExternalLink, QrCode, ShoppingBag, Smartphone, AlertCircle } from 'lucide-react';
 import { usePos } from './pos-context';
 import { formatPagoMovilQrPayload } from '@/lib/pos-pago-movil';
+import { openExternalCustomerDisplay } from '@/lib/desktop-bridge';
 
 export function PosCustomerDisplayModal() {
   const {
@@ -16,6 +17,7 @@ export function PosCustomerDisplayModal() {
     activeBranch,
     activeRegister,
     settings,
+    activeTenantSlug,
     tenantName,
     tenantBranding,
     isFuncActive,
@@ -62,9 +64,11 @@ export function PosCustomerDisplayModal() {
   const displayCompany = tenantName || 'VORA COMMERCE';
 
   const handlePopOut = () => {
-    // Abrir ventana emergente dedicada para pantalla secundaria física (Dual Monitor)
-    const popUrl = `/pos/customer-display?branch=${activeBranch.id}&register=${activeRegister.id}`;
-    window.open(popUrl, 'VoraCustomerDisplay', 'width=1024,height=768,menubar=no,toolbar=no,location=no');
+    // Abrir ventana dedicada (en Desktop Electron detecta y extiende al Monitor 2 automáticamente)
+    const base =
+      typeof window !== 'undefined' ? window.location.origin : '';
+    const popUrl = `${base}/t/${encodeURIComponent(activeTenantSlug)}/pos/customer-display`;
+    void openExternalCustomerDisplay(popUrl);
   };
 
   return (

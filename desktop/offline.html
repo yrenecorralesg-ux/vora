@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VORA · Sin conexión</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: #f6f2e9;
+        color: #111827;
+      }
+      .card {
+        max-width: 420px;
+        background: #ffffff;
+        border: 1px solid #dce3df;
+        border-radius: 24px;
+        padding: 32px;
+        text-align: center;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.06);
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+        font-weight: 800;
+      }
+      p {
+        margin: 0 0 24px;
+        font-size: 13px;
+        color: #52635a;
+        line-height: 1.5;
+      }
+      button {
+        border: none;
+        border-radius: 14px;
+        background: #285c49;
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+        padding: 12px 24px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #1f4a3a;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>No se pudo conectar con VORA</h1>
+      <p>
+        Verifica tu conexión a internet para iniciar sesión y sincronizar los datos con el servidor.
+      </p>
+      <button type="button" onclick="window.voraDesktop && window.voraDesktop.retryLoad()">
+        Reintentar conexión
+      </button>
+    </div>
+  </body>
+</html>

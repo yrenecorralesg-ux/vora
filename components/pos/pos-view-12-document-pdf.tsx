@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Printer, RefreshCw, AlertTriangle, ArrowLeft, Send } from 'lucide-react';
 import { usePos } from './pos-context';
+import { voraPrint } from '@/lib/desktop-bridge';
 import type { PosFiscalIntegration } from '@/lib/types';
 
 export function PosView12DocumentPdf() {
@@ -220,7 +221,7 @@ export function PosView12DocumentPdf() {
             )}
             <button
               type="button"
-              onClick={() => window.print()}
+              onClick={() => void voraPrint({ silent: true, thermal80mm: thermalFormat })}
               className="flex items-center gap-1.5 rounded-2xl border border-[#DCE3DF] bg-white px-4 py-2 text-xs font-bold text-[#111827] shadow-xs hover:bg-[#F6F5F0]"
             >
               <Printer className="h-4 w-4 text-[#52635A]" />
