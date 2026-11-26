@@ -11,10 +11,9 @@ export function PosView02OpenShift() {
     setActiveRegisterId,
     registers,
     activeShift,
-    refreshActiveShift,
+    openShift,
     navigateTo,
     showNotification,
-    activeTenantSlug,
   } = usePos();
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,39 +42,27 @@ export function PosView02OpenShift() {
     }
 
     setSubmitting(true);
-    let result: { ok?: boolean; error?: string } | null = null;
-    try {
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/shifts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'open',
-          branch_id: activeBranch.id,
-          register_id: activeRegisterId,
-          cashier_name: activeUser.name,
-          opening_usd: usdVal,
-          opening_ves: vesVal,
-          notes,
-        }),
-      });
-      result = await res.json().catch(() => null);
-    } catch {
-      result = { ok: false, error: 'Sin conexión con el servidor. El turno no se abrió.' };
-    } finally {
-      setSubmitting(false);
-    }
+    const result = await openShift({
+      branchId: activeBranch.id,
+      registerId: activeRegisterId,
+      openingUsd: usdVal,
+      openingVes: vesVal,
+      notes,
+    });
+    setSubmitting(false);
 
-    if (!result?.ok) {
-      setErrorMessage(result?.error ?? 'Error en apertura de turno.');
-      showNotification('No se abrió el turno', result?.error ?? 'Caja ocupada', 'critical');
+    if (!result.ok) {
+      setErrorMessage(result.error ?? 'Error en apertura de turno.');
+      showNotification('No se abrió el turno', result.error ?? 'Caja ocupada', 'critical');
       return;
     }
 
-    await refreshActiveShift();
     showNotification(
-      'Turno aperturado exitosamente',
-      `Turno abierto en ${registers.find((r) => r.id === activeRegisterId)?.name} con fondo de $${usdVal} USD y ${vesVal} VES.`,
-      'success',
+      result.offline ? 'Turno aperturado sin conexión' : 'Turno aperturado exitosamente',
+      result.offline
+        ? `Turno abierto localmente en ${registers.find((r) => r.id === activeRegisterId)?.name}; se sincronizará al volver la red.`
+        : `Turno abierto en ${registers.find((r) => r.id === activeRegisterId)?.name} con fondo de $${usdVal} USD y ${vesVal} VES.`,
+      result.offline ? 'alert' : 'success',
     );
     navigateTo('POS-03-04');
   };

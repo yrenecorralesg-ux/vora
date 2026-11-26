@@ -45,6 +45,9 @@ export interface VoraDesktopBridge {
   closeCustomerDisplay: () => Promise<void>;
   syncCustomerDisplay: (payload: CustomerDisplaySyncPayload) => void;
   onCustomerDisplayState: (callback: (payload: CustomerDisplaySyncPayload) => void) => () => void;
+  retryLoad?: () => Promise<void>;
+  openLastPos?: () => Promise<void>;
+  getDesktopInfo?: () => Promise<{ version: string; lastPosUrl: string | null }>;
 }
 
 declare global {

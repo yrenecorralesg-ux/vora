@@ -16,10 +16,8 @@ import {
 } from 'lucide-react';
 import { usePos } from './pos-context';
 import { VE_BANKS } from '@/lib/pos-pago-movil';
-import { posStore } from '@/lib/pos-service';
 import type { PosSale } from '@/lib/types';
 import { kickCashDrawer } from '@/lib/pos-hardware';
-import { enqueueOfflineSale } from '@/lib/pos-offline';
 
 function CasheaIcon({ className = 'h-4 w-4' }: { className?: string }) {
   return (
@@ -46,6 +44,10 @@ export function PosView06Checkout() {
     cartNotes,
     selectedCustomer,
     discountAuthorizedBy,
+    offlineDiscountAuth,
+    ensureDraftSaleKey,
+    recordOfflineSale,
+    stockPolicy,
     activeBranch,
     activeUser,
     activeRegister,
@@ -66,7 +68,6 @@ export function PosView06Checkout() {
     refreshActiveShift,
     reloadCustomers,
     products,
-    customers,
     settings,
   } = usePos();
 
@@ -168,6 +169,10 @@ export function PosView06Checkout() {
   const [creditNotes, setCreditNotes] = useState('');
 
   const handleGenerateCasheaIntent = async () => {
+    if (!isOnline) {
+      showNotification('Requiere conexión', 'Cashea requiere conexión a internet en tiempo real. Usa otro método de pago.', 'alert');
+      return;
+    }
     const amount = parseFloat(casheaAmountUsd);
     if (isNaN(amount) || amount < 25) {
       showNotification('Monto inválido', 'Cashea exige un monto mínimo de $25.00 USD.', 'critical');
@@ -270,6 +275,10 @@ export function PosView06Checkout() {
   // Cobro C2P (Comercio a Personas - Débito Inmediato)
   const handleChargeC2P = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isOnline) {
+      showNotification('Requiere conexión', 'El débito inmediato C2P requiere internet. Usa Pago Móvil P2P manual (con referencia) o Efectivo.', 'alert');
+      return;
+    }
     const amount = parseFloat(pmAmountVes);
     if (isNaN(amount) || amount <= 0) return;
     if (!c2pToken.trim() || c2pToken.trim().length < 6) {
@@ -383,7 +392,7 @@ export function PosView06Checkout() {
       }
     }
 
-    const idempotencyKey = `sale-${activeRegister.id}-${Date.now()}`;
+    const idempotencyKey = ensureDraftSaleKey();
     const correlationId = `corr-${Date.now()}`;
 
     const creditNoteSegment = allowCreditSale && balanceDueUsd > 0.05
@@ -427,14 +436,20 @@ export function PosView06Checkout() {
         changeAmount: p.changeAmount,
         changeCurrency: p.changeCurrency,
         referenceNumber: p.referenceNumber,
+        bankCode: p.bankCode,
         bankName: p.bankName,
+        payerPhone: p.payerPhone,
+        payerDocument: p.payerDocument,
+        terminalId: p.terminalId,
         cardLast4: p.cardLast4,
         approvalCode: p.approvalCode,
         casheaOperationId: p.casheaOperationId,
+        casheaMerchantAmount: p.casheaMerchantAmount,
         providerStatus: p.providerStatus,
       })),
       notes: finalNotes || undefined,
       discount_authorization_id: discountAuthorizedBy ?? undefined,
+      offline_discount_auth: offlineDiscountAuth ?? undefined,
       sales_rep_id: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.id : undefined,
       sales_rep_name: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.name : undefined,
       wallet_change_deposited_usd: isFuncActive('pos_digital_wallet') && depositChangeToWallet ? totalChangeUsd : undefined,
@@ -444,7 +459,7 @@ export function PosView06Checkout() {
     let confirmedSale: PosSale | null = null;
 
     // Intento híbrido backend API / RPC
-    if (isOnline) {
+    if (isOnline && !activeShift.id.startsWith('off-') && !(selectedCustomer?.id || '').startsWith('off-')) {
       try {
         const response = await fetch(`/api/t/${activeTenantSlug}/pos/sales`, {
           method: 'POST',
@@ -471,45 +486,134 @@ export function PosView06Checkout() {
 
     let isProvisional = false;
     if (!confirmedSale) {
-      // Sin conexión: se encola con la misma clave de idempotencia y se emite un
-      // comprobante provisional local. El servidor la registra (o la rechaza) al reconectar.
-      enqueueOfflineSale(activeTenantSlug, salePayload);
-      isProvisional = true;
-      posStore.shifts = [{ ...activeShift, expected_totals: { ...activeShift.expected_totals } }];
-      posStore.products = products.map((p) => ({ ...p }));
-      posStore.customers = customers.map((c) => ({ ...c }));
-      posStore.sales = [];
-      posStore.settings.active_exchange_rate = exchangeRate;
-
-      const saleResult = posStore.confirmSale({
-        branchId: activeBranch.id,
-        shiftId: activeShift.id,
-        registerId: activeRegister.id,
-        cashierUserId: activeUser.id,
-        customerId: selectedCustomer?.id,
-        idempotencyKey,
-        correlationId,
-        lines: salePayload.lines,
-        payments: salePayload.payments,
-        notes: finalNotes || undefined,
-        discountAuthorizationId: discountAuthorizedBy ?? undefined,
-        salesRepId: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.id : undefined,
-        salesRepName: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.name : undefined,
-        walletChangeDepositedUsd: isFuncActive('pos_digital_wallet') && depositChangeToWallet ? totalChangeUsd : undefined,
-        walletUsedUsd: isFuncActive('pos_digital_wallet') && useCustomerWallet ? walletUsedUsd : undefined,
-      });
-
-      if (!saleResult.ok || !saleResult.sale) {
-        showNotification('Error en confirmación', saleResult.error ?? 'Fallo al confirmar la venta.', 'critical');
-        return;
+      if (stockPolicy === 'strict_block') {
+        for (const c of cart) {
+          if (!c.isService && c.productId) {
+            const prod = products.find((p) => p.id === c.productId || p.sku === c.sku);
+            if (prod && prod.stock_quantity < c.quantity) {
+              showNotification(
+                'Stock insuficiente',
+                `Sin conexión en modo estricto: ${c.name} solo tiene ${prod.stock_quantity} u. disponibles.`,
+                'critical',
+              );
+              return;
+            }
+          }
+        }
       }
-      confirmedSale = {
-        ...saleResult.sale,
-        sale_number: `PEND-${idempotencyKey.slice(-6).toUpperCase()}`,
-        notes: [saleResult.sale.notes, 'Venta registrada sin conexión: pendiente de sincronizar con el servidor.']
+
+      isProvisional = true;
+      const nowIso = new Date().toISOString();
+      const tempSaleId = `off-sale-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+      const saleNum = `PEND-${idempotencyKey.slice(-6).toUpperCase()}`;
+      const subtotalUsd = Number(
+        cart.reduce((sum, c) => sum + c.unitPriceUsd * c.quantity, 0).toFixed(2),
+      );
+      const discountTotalUsd = Number(
+        cart.reduce((sum, c) => sum + c.unitPriceUsd * c.quantity * (c.discountPercent / 100), 0).toFixed(2),
+      );
+      const taxTotalUsd = Number(
+        cart
+          .reduce((sum, c) => sum + c.unitPriceUsd * (1 - c.discountPercent / 100) * (c.taxRatePercent / 100) * c.quantity, 0)
+          .toFixed(2),
+      );
+      const paymentStatus = balanceDueUsd <= 0.05 ? 'pagada' : totalPaidUsd + walletUsedUsd > 0 ? 'parcial' : 'pendiente';
+      const provisionalSale: PosSale = {
+        id: tempSaleId,
+        tenant_id: activeBranch.tenant_id,
+        branch_id: activeBranch.id,
+        shift_id: activeShift.id,
+        register_id: activeRegister.id,
+        cashier_user_id: activeUser.id,
+        customer_id: selectedCustomer?.id ?? null,
+        sale_number: saleNum,
+        commercial_status: 'confirmada',
+        payment_status: paymentStatus,
+        currency: 'USD',
+        exchange_rate_snapshot: exchangeRate,
+        subtotal_usd: subtotalUsd,
+        discount_total_usd: discountTotalUsd,
+        tax_total_usd: taxTotalUsd,
+        total_usd: Number(totalUsd.toFixed(2)),
+        total_ves: totalVes,
+        paid_total_usd: Number(totalPaidUsd.toFixed(2)),
+        paid_total_ves: totalPaidVes,
+        balance_due_usd: balanceDueUsd,
+        balance_due_ves: balanceDueVes,
+        notes: [finalNotes, 'Venta registrada sin conexión: pendiente de sincronizar con el servidor.']
           .filter(Boolean)
           .join(' | '),
+        discount_authorization_id: discountAuthorizedBy ?? null,
+        idempotency_key: idempotencyKey,
+        correlation_id: correlationId,
+        confirmed_at: nowIso,
+        created_at: nowIso,
+        customer: selectedCustomer ?? null,
+        sales_rep_id: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.id ?? null : null,
+        sales_rep_name: isFuncActive('pos_sales_commissions') ? selectedSalesRep?.name ?? null : null,
+        wallet_used_usd: isFuncActive('pos_digital_wallet') && useCustomerWallet ? walletUsedUsd : 0,
+        wallet_change_deposited_usd:
+          isFuncActive('pos_digital_wallet') && depositChangeToWallet ? totalChangeUsd : 0,
+        lines: salePayload.lines.map((l, idx) => ({
+          id: `off-line-${tempSaleId}-${idx}`,
+          tenant_id: activeBranch.tenant_id,
+          sale_id: tempSaleId,
+          product_id: l.productId ?? null,
+          sku_snapshot: l.sku,
+          name_snapshot: l.name,
+          is_service: l.isService,
+          quantity: l.quantity,
+          returned_quantity: 0,
+          unit_price_usd: l.unitPriceUsd,
+          discount_percent: l.discountPercent,
+          discount_amount_usd: Number(l.discountAmountUsd.toFixed(2)),
+          tax_rate_percent: l.taxRatePercent,
+          tax_amount_usd: Number(l.taxAmountUsd.toFixed(2)),
+          line_subtotal_usd: Number(l.lineSubtotalUsd.toFixed(2)),
+          line_total_usd: Number(l.lineTotalUsd.toFixed(2)),
+          created_at: nowIso,
+        })),
+        payments: salePayload.payments.map((p, idx) => ({
+          id: `off-pay-${tempSaleId}-${idx}`,
+          tenant_id: activeBranch.tenant_id,
+          branch_id: activeBranch.id,
+          sale_id: tempSaleId,
+          shift_id: activeShift.id,
+          method: p.method,
+          currency: p.currency,
+          amount_received: p.amountReceived,
+          amount_applied: p.amountApplied,
+          change_amount: p.changeAmount,
+          change_currency: p.changeCurrency ?? null,
+          exchange_rate_snapshot: exchangeRate,
+          reference_number: p.referenceNumber ?? null,
+          bank_code: null,
+          bank_name: p.bankName ?? null,
+          payer_phone: null,
+          payer_document: null,
+          terminal_id: null,
+          card_last4: p.cardLast4 ?? null,
+          approval_code: p.approvalCode ?? null,
+          cashea_operation_id: p.casheaOperationId ?? null,
+          cashea_merchant_amount: null,
+          provider_status: p.providerStatus,
+          verified_by: p.providerStatus === 'verificado' ? activeUser.id : null,
+          verified_at: p.providerStatus === 'verificado' ? nowIso : null,
+          created_at: nowIso,
+        })),
+        document: {
+          id: `off-doc-${tempSaleId}`,
+          tenant_id: activeBranch.tenant_id,
+          sale_id: tempSaleId,
+          document_kind: 'comprobante_interno',
+          internal_number: `PEND-${idempotencyKey.slice(-6).toUpperCase()}`,
+          pdf_path: '',
+          status: 'generado',
+          created_at: nowIso,
+        },
       };
+      const saved = await recordOfflineSale({ salePayload, provisionalSale });
+      confirmedSale = saved.sale;
     }
 
     // Apertura automática de gaveta RJ11 si hubo cobro en efectivo
@@ -534,7 +638,7 @@ export function PosView06Checkout() {
       confirmedSale.balance_due_usd > 0
         ? `Operación ${confirmedSale.sale_number} registrada con saldo pendiente de $${confirmedSale.balance_due_usd.toFixed(2)} USD en CxC.`
         : `Operación ${confirmedSale.sale_number} procesada con éxito.`,
-      'success',
+      isProvisional ? 'alert' : 'success',
     );
     navigateTo('POS-11');
   };
@@ -547,7 +651,8 @@ export function PosView06Checkout() {
           <div>
             <h1 className="text-xl font-bold text-[#111827]">Cobro y pagos mixtos</h1>
             <p className="mt-0.5 text-xs text-[#52635A]">
-              Cliente: <strong className="text-[#111827]">{selectedCustomer?.legal_name ?? 'Consumidor Final'}</strong> · Tasa: 36,50 VES/USD
+              Cliente: <strong className="text-[#111827]">{selectedCustomer?.legal_name ?? 'Consumidor Final'}</strong> · Tasa:{' '}
+              {exchangeRate.toLocaleString('es-VE', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} VES/USD
             </p>
           </div>
           <button

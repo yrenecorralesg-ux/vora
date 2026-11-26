@@ -7,8 +7,10 @@ import {
   getTenantSettings,
   listCashMovements,
   listShifts,
+  resolveActorFromOfflineProof,
   sqlErrorMessage,
   userDisplayNames,
+  verifyOfflinePinProof,
   verifySupervisorPin,
 } from '@/lib/pos/server';
 
@@ -56,8 +58,9 @@ export async function POST(
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
+  const baseAccess = auth.access;
   const service = getSupabaseServiceClient();
-  const { tenantId, userId } = auth.access;
+  const { tenantId, userId } = baseAccess;
 
   let body: Record<string, any>;
   try {
@@ -66,12 +69,55 @@ export async function POST(
     return NextResponse.json({ ok: false, error: 'Solicitud inválida.' }, { status: 400 });
   }
 
+  const offlineOpKey = String(body.offline_op_key ?? body.idempotency_key ?? '').trim();
+
+  async function resolveEffectiveAccess(requiredPermission: string, scopePrefix: string) {
+    const check = await resolveActorFromOfflineProof({
+      service,
+      tenantId,
+      authUserId: userId,
+      offlineOperatorAuth: body.offline_operator_auth,
+      requiredPermission,
+      actionScope: `${scopePrefix}:${offlineOpKey}`,
+    });
+    if (!check.ok) return { ok: false as const, response: NextResponse.json({ ok: false, error: check.error }, { status: check.status }) };
+    if (check.actorId === userId) return { ok: true as const, access: baseAccess };
+    const { data: mem } = await service
+      .from('tenant_memberships')
+      .select('role')
+      .eq('tenant_id', tenantId)
+      .eq('auth_user_id', check.actorId)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (!mem) return { ok: false as const, response: permissionDenied('El operador no está activo en la empresa.') };
+    return { ok: true as const, access: { ...baseAccess, userId: check.actorId, role: mem.role } };
+  }
+
   if (body.action === 'open') {
-    if (!(await hasTenantPermission(auth.access, 'pos.cash.open')))
+    const actorRes = await resolveEffectiveAccess('pos.cash.open', 'shift_open');
+    if (!actorRes.ok) return actorRes.response;
+    const effective = actorRes.access;
+    if (!(await hasTenantPermission(effective, 'pos.cash.open')))
       return permissionDenied('Tu rol no permite abrir turnos de caja.');
+
+    if (offlineOpKey) {
+      const { data: prevEvent } = await service
+        .from('pos_audit_events')
+        .select('entity_id')
+        .eq('tenant_id', tenantId)
+        .eq('correlation_id', `shift-open:${offlineOpKey}`)
+        .maybeSingle();
+      if (prevEvent?.entity_id) {
+        const existingShift = await getShift(service, tenantId, prevEvent.entity_id);
+        if (existingShift) {
+          return NextResponse.json({ ok: true, shift: existingShift, idempotent_replay: true });
+        }
+      }
+    }
+
     const { data: id, error } = await service.rpc('pos_open_shift', {
       p_tenant: tenantId,
-      p_actor: userId,
+      p_actor: effective.userId,
       p_branch: body.branch_id,
       p_register: body.register_id,
       p_cashier_name: String(body.cashier_name ?? '').slice(0, 150),
@@ -80,52 +126,108 @@ export async function POST(
       p_notes: body.notes ? String(body.notes).slice(0, 1000) : null,
     });
     if (error) return NextResponse.json({ ok: false, error: sqlErrorMessage(error, 'No se pudo abrir el turno.') }, { status: 409 });
+
+    if (offlineOpKey && id) {
+      await service.from('pos_audit_events').insert({
+        tenant_id: tenantId,
+        branch_id: body.branch_id ?? null,
+        shift_id: id as string,
+        actor_id: effective.userId,
+        event_type: 'apertura_turno_offline_sync',
+        entity_type: 'pos_shifts',
+        entity_id: id as string,
+        description: 'Sincronización idempotente de apertura de turno',
+        correlation_id: `shift-open:${offlineOpKey}`,
+      });
+    }
     return NextResponse.json({ ok: true, shift: await getShift(service, tenantId, id as string) });
   }
 
   if (body.action === 'movement') {
-    if (!(await hasTenantPermission(auth.access, 'pos.cash.open')))
+    const actorRes = await resolveEffectiveAccess('pos.cash.open', 'movement');
+    if (!actorRes.ok) return actorRes.response;
+    const effective = actorRes.access;
+    if (!(await hasTenantPermission(effective, 'pos.cash.open')))
       return permissionDenied('Tu rol no permite registrar movimientos de caja.');
+
+    if (offlineOpKey) {
+      const { data: prevEvent } = await service
+        .from('pos_audit_events')
+        .select('entity_id')
+        .eq('tenant_id', tenantId)
+        .eq('correlation_id', `movement:${offlineOpKey}`)
+        .maybeSingle();
+      if (prevEvent?.entity_id) {
+        const shift = await getShift(service, tenantId, String(body.shift_id));
+        return NextResponse.json({ ok: true, movement_id: prevEvent.entity_id, shift, idempotent_replay: true });
+      }
+    }
+
     let authorizationId: string | null = null;
     if (body.movement_type === 'retiro_efectivo') {
       const settings = await getTenantSettings(service, tenantId);
-      const isSupervisor = await hasTenantPermission(auth.access, 'pos.refunds.approve');
+      const isSupervisor = await hasTenantPermission(effective, 'pos.refunds.approve');
       if (settings.require_pin_for_withdrawals && !isSupervisor) {
-        if (!body.supervisor_id || !body.supervisor_pin)
-          return permissionDenied('Los retiros de efectivo requieren el PIN de un supervisor.');
-        const check = await verifySupervisorPin({
-          service,
-          tenantId,
-          supervisorId: String(body.supervisor_id),
-          pin: String(body.supervisor_pin),
-          permission: 'pos.refunds.approve',
-        });
-        if (!check.ok) return NextResponse.json({ ok: false, error: check.error }, { status: check.status });
+        let approvedBy = '';
+        let offlineAuthorizedAt: string | null = null;
+        if (body.offline_supervisor_auth && typeof body.offline_supervisor_auth === 'object') {
+          const offAuth = body.offline_supervisor_auth as Record<string, any>;
+          approvedBy = String(offAuth.supervisor_id ?? '').trim();
+          const check = await verifyOfflinePinProof({
+            service,
+            tenantId,
+            userId: approvedBy,
+            permission: 'pos.refunds.approve',
+            proof: String(offAuth.proof ?? ''),
+            message: `supervisor:${tenantId}:${approvedBy}:cash_movement:${offlineOpKey}`,
+          });
+          if (!check.ok) return NextResponse.json({ ok: false, error: check.error }, { status: check.status });
+          offlineAuthorizedAt = offAuth.authorized_at ? String(offAuth.authorized_at) : null;
+        } else {
+          if (!body.supervisor_id || !body.supervisor_pin)
+            return permissionDenied('Los retiros de efectivo requieren el PIN de un supervisor.');
+          approvedBy = String(body.supervisor_id);
+          const check = await verifySupervisorPin({
+            service,
+            tenantId,
+            supervisorId: approvedBy,
+            pin: String(body.supervisor_pin),
+            permission: 'pos.refunds.approve',
+          });
+          if (!check.ok) return NextResponse.json({ ok: false, error: check.error }, { status: check.status });
+        }
         const shift = await getShift(service, tenantId, String(body.shift_id));
         if (!shift) return NextResponse.json({ ok: false, error: 'Turno no encontrado.' }, { status: 404 });
-        const { data: authRow, error: authErr } = await service
+        const authInsert = {
+          tenant_id: tenantId,
+          branch_id: shift.branch_id,
+          shift_id: shift.id,
+          operation_type: 'cash_movement',
+          requested_by: effective.userId,
+          approved_by: approvedBy,
+          approver_name_snapshot: (await userDisplayNames(service, [approvedBy])).get(approvedBy) ?? null,
+          reason: String(body.reason ?? 'Retiro de efectivo').slice(0, 500) || 'Retiro de efectivo',
+          limit_snapshot: { amount: Number(body.amount), currency: body.currency },
+          consumed_at: new Date().toISOString(),
+          ...(offlineAuthorizedAt ? { offline_authorized_at: offlineAuthorizedAt } : {}),
+        };
+        let authRes = await service
           .from('pos_authorizations')
-          .insert({
-            tenant_id: tenantId,
-            branch_id: shift.branch_id,
-            shift_id: shift.id,
-            operation_type: 'cash_movement',
-            requested_by: userId,
-            approved_by: body.supervisor_id,
-            approver_name_snapshot: (await userDisplayNames(service, [String(body.supervisor_id)])).get(String(body.supervisor_id)) ?? null,
-            reason: String(body.reason ?? 'Retiro de efectivo').slice(0, 500) || 'Retiro de efectivo',
-            limit_snapshot: { amount: Number(body.amount), currency: body.currency },
-            consumed_at: new Date().toISOString(),
-          })
+          .insert(authInsert)
           .select('id')
           .single();
-        if (authErr || !authRow) return NextResponse.json({ ok: false, error: 'No se pudo registrar la autorización.' }, { status: 500 });
-        authorizationId = authRow.id;
+        if (authRes.error && offlineAuthorizedAt) {
+          const { offline_authorized_at: _omit, ...compatInsert } = authInsert;
+          authRes = await service.from('pos_authorizations').insert(compatInsert).select('id').single();
+        }
+        if (authRes.error || !authRes.data)
+          return NextResponse.json({ ok: false, error: 'No se pudo registrar la autorización.' }, { status: 500 });
+        authorizationId = authRes.data.id;
       }
     }
     const { data: id, error } = await service.rpc('pos_add_cash_movement', {
       p_tenant: tenantId,
-      p_actor: userId,
+      p_actor: effective.userId,
       p_shift: body.shift_id,
       p_type: body.movement_type,
       p_currency: body.currency,
@@ -134,24 +236,46 @@ export async function POST(
       p_authorization: authorizationId,
     });
     if (error) return NextResponse.json({ ok: false, error: sqlErrorMessage(error, 'No se pudo registrar el movimiento.') }, { status: 400 });
+
+    if (offlineOpKey && id) {
+      const shift = await getShift(service, tenantId, String(body.shift_id));
+      await service.from('pos_audit_events').insert({
+        tenant_id: tenantId,
+        branch_id: shift?.branch_id ?? null,
+        shift_id: String(body.shift_id),
+        actor_id: effective.userId,
+        event_type: 'movimiento_caja_offline_sync',
+        entity_type: 'pos_cash_movements',
+        entity_id: id as string,
+        description: 'Sincronización idempotente de movimiento de caja',
+        correlation_id: `movement:${offlineOpKey}`,
+      });
+    }
     const shift = await getShift(service, tenantId, String(body.shift_id));
     return NextResponse.json({ ok: true, movement_id: id, shift });
   }
 
   if (body.action === 'close') {
-    if (!(await hasTenantPermission(auth.access, 'pos.cash.close')))
+    const actorRes = await resolveEffectiveAccess('pos.cash.close', 'shift_close');
+    if (!actorRes.ok) return actorRes.response;
+    const effective = actorRes.access;
+    if (!(await hasTenantPermission(effective, 'pos.cash.close')))
       return permissionDenied('Tu rol no permite cerrar turnos de caja.');
     const shift = await getShift(service, tenantId, String(body.shift_id ?? ''));
     if (!shift) return NextResponse.json({ ok: false, error: 'Turno no encontrado.' }, { status: 404 });
+    // Idempotencia si ya fue cerrado previamente en un reintento offline.
+    if (shift.status === 'cerrado' && offlineOpKey) {
+      return NextResponse.json({ ok: true, shift, idempotent_replay: true });
+    }
     // Solo el cajero del turno o un supervisor puede cerrarlo.
-    if (shift.cashier_user_id !== userId && !(await hasTenantPermission(auth.access, 'pos.refunds.approve')))
+    if (shift.cashier_user_id !== effective.userId && !(await hasTenantPermission(effective, 'pos.refunds.approve')))
       return permissionDenied('Solo el cajero del turno o un supervisor puede cerrarlo.');
     const declared = Object.fromEntries(
       Object.entries((body.declared ?? {}) as Record<string, unknown>).map(([k, v]) => [k, Number(v) || 0]),
     );
     const { error } = await service.rpc('pos_close_shift', {
       p_tenant: tenantId,
-      p_actor: userId,
+      p_actor: effective.userId,
       p_shift: shift.id,
       p_declared: declared,
       p_justification: body.justification ? String(body.justification).slice(0, 2000) : null,

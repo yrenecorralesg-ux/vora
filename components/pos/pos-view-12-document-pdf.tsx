@@ -7,17 +7,36 @@ import { voraPrint } from '@/lib/desktop-bridge';
 import type { PosFiscalIntegration } from '@/lib/types';
 
 export function PosView12DocumentPdf() {
-  const { lastConfirmedSale, sales, activeBranch, showNotification, navigateTo, isFuncActive, activeTenantSlug, tenantName, activeUser } = usePos();
+  const {
+    lastConfirmedSale,
+    sales,
+    activeBranch,
+    showNotification,
+    navigateTo,
+    isFuncActive,
+    activeTenantSlug,
+    tenantName,
+    activeUser,
+    fiscalIntegration,
+    isOnline,
+  } = usePos();
   const [fiscalSale, setFiscalSale] = useState(lastConfirmedSale ?? sales[0]);
-  const [integration, setIntegration] = useState<PosFiscalIntegration | null>(null);
+  const [integration, setIntegration] = useState<PosFiscalIntegration | null>(fiscalIntegration);
 
-  // Configuración fiscal real de la empresa (pos_fiscal_integrations).
+  // Configuración fiscal real de la empresa (con respaldo cacheado offline).
   useEffect(() => {
+    if (fiscalIntegration) setIntegration(fiscalIntegration);
+  }, [fiscalIntegration]);
+
+  useEffect(() => {
+    if (!isOnline) return;
     fetch(`/api/t/${activeTenantSlug}/pos/fiscal`, { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d) => setIntegration(d.integration ?? null))
-      .catch(() => setIntegration(null));
-  }, [activeTenantSlug]);
+      .then((d) => {
+        if (d?.integration) setIntegration(d.integration);
+      })
+      .catch(() => {});
+  }, [activeTenantSlug, isOnline]);
 
   useEffect(() => {
     if (!fiscalSale && sales[0]) setFiscalSale(sales[0]);

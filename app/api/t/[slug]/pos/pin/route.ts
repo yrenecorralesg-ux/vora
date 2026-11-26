@@ -1,7 +1,14 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
-import { PosError, hashPin, validatePinFormat, verifyPinHash } from '@/lib/pos/server';
+import {
+  PosError,
+  createOfflinePinBundle,
+  hashPin,
+  saveOfflinePinBundle,
+  validatePinFormat,
+  verifyPinHash,
+} from '@/lib/pos/server';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -13,31 +20,45 @@ async function canApprove(access: Parameters<typeof hasTenantPermission>[0]) {
   return false;
 }
 
-/** ¿El usuario de la sesión tiene PIN de supervisor configurado? */
+/** ¿El usuario de la sesión tiene PIN configurado (y listo para modo offline)? */
 export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
-  const { data } = await getSupabaseServiceClient()
+  const service = getSupabaseServiceClient();
+  let row: { updated_at?: string; locked_until?: string | null; offline_bundle?: unknown } | null = null;
+  const primary = await service
     .from('pos_staff_pins')
-    .select('updated_at, locked_until')
+    .select('updated_at, locked_until, offline_bundle')
     .eq('tenant_id', auth.access.tenantId)
     .eq('auth_user_id', auth.access.userId)
     .maybeSingle();
+  if (primary.error) {
+    const fallback = await service
+      .from('pos_staff_pins')
+      .select('updated_at, locked_until')
+      .eq('tenant_id', auth.access.tenantId)
+      .eq('auth_user_id', auth.access.userId)
+      .maybeSingle();
+    row = fallback.data;
+  } else {
+    row = primary.data;
+  }
   return NextResponse.json({
     ok: true,
-    has_pin: Boolean(data),
-    updated_at: data?.updated_at ?? null,
-    locked_until: data?.locked_until ?? null,
+    has_pin: Boolean(row),
+    offline_pin_ready: Boolean(row?.offline_bundle),
+    updated_at: row?.updated_at ?? null,
+    locked_until: row?.locked_until ?? null,
     can_approve: await canApprove(auth.access),
   });
 }
 
 /**
- * Define o cambia el PIN personal del supervisor de la sesión. Para cambiarlo
- * exige el PIN actual. Se guarda solo el hash (scrypt con sal).
+ * Define o cambia el PIN personal del operador/supervisor de la sesión.
+ * Permite también activar la verificación offline del PIN actual sin cambiarlo.
  */
 export async function POST(
   request: NextRequest,
@@ -46,9 +67,7 @@ export async function POST(
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
   if (auth.access.role === 'super_admin')
-    return permissionDenied('El PIN de supervisor es personal de los usuarios de la empresa.');
-  if (!(await canApprove(auth.access)))
-    return permissionDenied('Tu rol no autoriza operaciones de supervisor; no necesita PIN.');
+    return permissionDenied('El PIN del POS es personal de los usuarios de la empresa.');
 
   let body: Record<string, any>;
   try {
@@ -58,7 +77,6 @@ export async function POST(
   }
 
   try {
-    const pin = validatePinFormat(body.pin);
     const service = getSupabaseServiceClient();
     const { tenantId, userId } = auth.access;
     const { data: current } = await service
@@ -67,30 +85,59 @@ export async function POST(
       .eq('tenant_id', tenantId)
       .eq('auth_user_id', userId)
       .maybeSingle();
+
+    if (body.action === 'activate_offline') {
+      if (!current) {
+        return NextResponse.json({ ok: false, error: 'Primero configura tu PIN del POS.' }, { status: 400 });
+      }
+      const currentPin = String(body.current_pin ?? '').trim();
+      if (!verifyPinHash(currentPin, current.pin_hash)) {
+        return NextResponse.json({ ok: false, error: 'El PIN actual no es correcto.' }, { status: 403 });
+      }
+      const bundle = createOfflinePinBundle({
+        pin: currentPin,
+        tenantId,
+        userId,
+        pinHash: current.pin_hash,
+      });
+      const saved = await saveOfflinePinBundle(service, tenantId, userId, bundle);
+      return NextResponse.json({ ok: true, offline_pin_ready: saved });
+    }
+
+    const pin = validatePinFormat(body.pin);
     if (current && !verifyPinHash(String(body.current_pin ?? '').trim(), current.pin_hash))
       return NextResponse.json({ ok: false, error: 'El PIN actual no es correcto.' }, { status: 403 });
 
-    const { error } = await service.from('pos_staff_pins').upsert(
-      {
-        tenant_id: tenantId,
-        auth_user_id: userId,
-        pin_hash: hashPin(pin),
-        failed_attempts: 0,
-        locked_until: null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tenant_id,auth_user_id' },
-    );
-    if (error) return NextResponse.json({ ok: false, error: 'No se pudo guardar el PIN.' }, { status: 500 });
+    const pinHash = hashPin(pin);
+    const offlineBundle = createOfflinePinBundle({ pin, tenantId, userId, pinHash });
+    const baseRow = {
+      tenant_id: tenantId,
+      auth_user_id: userId,
+      pin_hash: pinHash,
+      failed_attempts: 0,
+      locked_until: null,
+      updated_at: new Date().toISOString(),
+    };
+
+    let offlineSaved = true;
+    const first = await service
+      .from('pos_staff_pins')
+      .upsert({ ...baseRow, offline_bundle: offlineBundle }, { onConflict: 'tenant_id,auth_user_id' });
+    if (first.error) {
+      offlineSaved = false;
+      const fallback = await service.from('pos_staff_pins').upsert(baseRow, { onConflict: 'tenant_id,auth_user_id' });
+      if (fallback.error) return NextResponse.json({ ok: false, error: 'No se pudo guardar el PIN.' }, { status: 500 });
+    }
+
     await service.from('pos_audit_events').insert({
       tenant_id: tenantId,
       actor_id: userId,
       event_type: current ? 'pin_supervisor_cambiado' : 'pin_supervisor_creado',
       entity_type: 'pos_staff_pins',
       entity_id: userId,
-      description: current ? 'PIN de supervisor actualizado' : 'PIN de supervisor configurado',
+      description: current ? 'PIN personal del POS actualizado' : 'PIN personal del POS configurado',
     });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, offline_pin_ready: offlineSaved });
   } catch (err) {
     const e = err as PosError;
     return NextResponse.json({ ok: false, error: e.message }, { status: e.status ?? 500 });

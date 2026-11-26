@@ -18,9 +18,7 @@ export function PosView13History() {
     showNotification,
     isFuncActive,
     generateAccountingSalesBookCsv,
-    activeTenantSlug,
-    reloadSales,
-    refreshActiveShift,
+    recordDebtPayment,
   } = usePos();
 
   const [selectedRegister, setSelectedRegister] = useState<string>('all');
@@ -262,7 +260,14 @@ export function PosView13History() {
               filteredSales.map((sale) => (
                 <tr key={sale.id} className="hover:bg-[#F6F5F0]/60 transition">
                   <td className="py-3 px-4 font-bold text-[#111827]">
-                    {sale.sale_number}
+                    <div className="flex items-center gap-1.5">
+                      <span>{sale.sale_number}</span>
+                      {sale.id.startsWith('off-') && (
+                        <span className="rounded-full bg-[#FEF3C7] px-2 py-0.5 text-[9px] font-bold text-[#92400E]">
+                          Pendiente sync
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 px-4 text-[#52635A]">
                     {new Date(sale.confirmed_at ?? sale.created_at).toLocaleString('es-VE')}
@@ -405,36 +410,24 @@ export function PosView13History() {
                   showNotification('Turno cerrado', 'Abra un turno de caja para registrar abonos.', 'alert');
                   return;
                 }
-                let res: { ok?: boolean; error?: string; sale?: { balance_due_usd: number } } | null = null;
-                try {
-                  const response = await fetch(`/api/t/${activeTenantSlug}/pos/sales/${debtSale.id}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      action: 'debt_payment',
-                      shift_id: activeShift.id,
-                      method: debtPayMethod,
-                      currency: 'USD',
-                      amount,
-                      reference_number: debtRef || undefined,
-                      idempotency_key: `abono-${debtSale.id}-${Date.now()}`,
-                    }),
-                  });
-                  res = await response.json().catch(() => null);
-                } catch {
-                  res = { ok: false, error: 'Sin conexión con el servidor.' };
-                }
-                if (res?.ok) {
+                const result = await recordDebtPayment({
+                  saleId: debtSale.id,
+                  shiftId: activeShift.id,
+                  method: debtPayMethod,
+                  currency: 'USD',
+                  amount,
+                  referenceNumber: debtRef || undefined,
+                });
+                if (result.ok) {
                   showNotification(
-                    'Abono Registrado',
-                    `Abono de ${amount.toFixed(2)} USD registrado. Saldo restante: ${Number(res.sale?.balance_due_usd ?? 0).toFixed(2)} USD.`,
-                    'success',
+                    result.offline ? 'Abono guardado sin conexión' : 'Abono Registrado',
+                    `Abono de ${amount.toFixed(2)} USD registrado. Saldo restante: ${Number(result.balanceDueUsd ?? 0).toFixed(2)} USD.`,
+                    result.offline ? 'alert' : 'success',
                   );
                   setDebtSale(null);
                   setPaymentAmountUsd('');
-                  await Promise.all([reloadSales(), refreshActiveShift()]);
                 } else {
-                  showNotification('Error', res?.error || 'Error al procesar abono.', 'critical');
+                  showNotification('Error', result.error || 'Error al procesar abono.', 'critical');
                 }
               }}
               className="mt-4 space-y-3 text-xs"

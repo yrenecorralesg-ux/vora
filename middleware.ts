@@ -12,8 +12,8 @@ export async function middleware(request: NextRequest) {
     return new NextResponse('Empresa no encontrada.', { status: 404 });
   if (slug && pathname.startsWith('/admin'))
     return NextResponse.redirect(new URL(pathname, `https://${VORA_DOMAIN}`));
-  // Challenge is deliberately reachable while domain verification is pending.
-  if (pathname === '/api/tenant-domain-check') return NextResponse.next();
+  // Challenge & Service Worker are reachable without tenant rewrite.
+  if (pathname === '/api/tenant-domain-check' || pathname === '/sw.js') return NextResponse.next();
   if (
     slug &&
     pathname.startsWith('/api/t/') &&
@@ -116,6 +116,6 @@ export async function middleware(request: NextRequest) {
 }
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2?)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|woff2?)$).*)',
   ],
 };

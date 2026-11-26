@@ -24,7 +24,7 @@ const ROLE_LABELS: Record<string, string> = {
  * VORA; cada supervisor define su PIN personal en Configuración.
  */
 export function PosView19Users() {
-  const { staffUsers, supervisors, navigateTo, activeUser, can } = usePos();
+  const { staffUsers, supervisors, activeUser, setIsOperatorModalOpen } = usePos();
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
@@ -58,16 +58,14 @@ export function PosView19Users() {
             </p>
           </div>
         </div>
-        {can('pos.settings.manage') && (
-          <button
-            type="button"
-            onClick={() => navigateTo('POS-17')}
-            className="flex items-center gap-2 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-4 py-2.5 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition"
-          >
-            <KeyRound className="h-4 w-4" />
-            {activeUser.can_approve ? 'Configurar mi PIN' : 'Configuración'}
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setIsOperatorModalOpen(true)}
+          className="flex items-center gap-2 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] px-4 py-2.5 text-xs font-bold text-[#111827] hover:bg-[#DCE3DF] transition"
+        >
+          <KeyRound className="h-4 w-4" />
+          Configurar mi PIN / Cambiar operador
+        </button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -125,6 +123,11 @@ export function PosView19Users() {
                   {supervisorIds.has(u.id) && (
                     <span className="flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2.5 py-1 text-[10px] font-bold text-[#92400E]">
                       <ShieldCheck className="h-3 w-3" /> Autoriza con PIN
+                    </span>
+                  )}
+                  {u.offline_pin_ready && (
+                    <span className="rounded-full bg-[#E0F2FE] px-2.5 py-1 text-[10px] font-bold text-[#0369A1]">
+                      PIN Offline
                     </span>
                   )}
                   <span

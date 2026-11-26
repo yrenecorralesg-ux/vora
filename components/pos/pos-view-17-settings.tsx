@@ -38,6 +38,7 @@ export function PosView17Settings() {
     staffUsers,
     me,
     can,
+    isOnline,
     saveSettings,
     reloadSettings,
     reloadStaff,
@@ -202,9 +203,11 @@ export function PosView17Settings() {
     }
 
     showNotification(
-      'Configuración guardada',
-      'Parámetros operativos de sede, API de tasa BCV y límites de descuento actualizados en el sistema.',
-      'success',
+      isOnline ? 'Configuración guardada' : 'Configuración guardada sin conexión',
+      isOnline
+        ? 'Parámetros operativos de sede, API de tasa BCV y límites de descuento actualizados en el sistema.'
+        : 'Parámetros aplicados localmente; se sincronizarán con el servidor al volver la conexión.',
+      isOnline ? 'success' : 'alert',
     );
   };
 
@@ -765,64 +768,66 @@ export function PosView17Settings() {
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Columna 1: Mi PIN y políticas */}
             <div className="space-y-4 rounded-2xl border border-[#DCE3DF] bg-[#F6F5F0] p-5">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">Mi PIN de supervisor</h3>
-              {me?.can_approve ? (
-                <form onSubmit={handleSavePin} className="space-y-3">
-                  <p className="text-[11px] text-[#52635A]">
-                    {me.has_pin
-                      ? 'Ya tienes un PIN configurado. Para cambiarlo, ingresa el actual.'
-                      : 'Aún no tienes PIN: configúralo para poder autorizar descuentos, devoluciones y retiros en la caja de un cajero.'}
-                  </p>
-                  {me.has_pin && (
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#111827]">Mi PIN de POS y supervisión</h3>
+              {me ? (
+                <div className="space-y-3">
+                  <form onSubmit={handleSavePin} className="space-y-3">
+                    <p className="text-[11px] text-[#52635A]">
+                      {me.has_pin
+                        ? me.offline_pin_ready
+                          ? 'PIN configurado y habilitado para cambio rápido y operación sin conexión.'
+                          : 'Ya tienes PIN configurado. Ingresa el actual para cambiarlo o activar modo offline.'
+                        : 'Configura tu PIN personal para cambio rápido de operador y autorizaciones (si tu rol aprueba).'}
+                    </p>
+                    {me.has_pin && (
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        maxLength={8}
+                        required
+                        placeholder="PIN actual"
+                        value={currentPin}
+                        onChange={(e) => setCurrentPin(e.target.value)}
+                        className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 text-xs font-mono font-bold tracking-widest"
+                      />
+                    )}
+                    <div className="relative">
+                      <input
+                        type="password"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        maxLength={8}
+                        required
+                        placeholder="Nuevo PIN (4 a 8 dígitos)"
+                        value={newPin}
+                        onChange={(e) => setNewPin(e.target.value)}
+                        className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 pr-10 text-xs font-mono font-bold tracking-widest"
+                      />
+                      <KeyRound className="absolute right-3 top-3 h-4 w-4 text-[#52635A]" />
+                    </div>
                     <input
                       type="password"
                       inputMode="numeric"
                       autoComplete="off"
                       maxLength={8}
                       required
-                      placeholder="PIN actual"
-                      value={currentPin}
-                      onChange={(e) => setCurrentPin(e.target.value)}
+                      placeholder="Repite el nuevo PIN"
+                      value={confirmPin}
+                      onChange={(e) => setConfirmPin(e.target.value)}
                       className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 text-xs font-mono font-bold tracking-widest"
                     />
-                  )}
-                  <div className="relative">
-                    <input
-                      type="password"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      maxLength={8}
-                      required
-                      placeholder="Nuevo PIN (4 a 8 dígitos)"
-                      value={newPin}
-                      onChange={(e) => setNewPin(e.target.value)}
-                      className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 pr-10 text-xs font-mono font-bold tracking-widest"
-                    />
-                    <KeyRound className="absolute right-3 top-3 h-4 w-4 text-[#52635A]" />
-                  </div>
-                  <input
-                    type="password"
-                    inputMode="numeric"
-                    autoComplete="off"
-                    maxLength={8}
-                    required
-                    placeholder="Repite el nuevo PIN"
-                    value={confirmPin}
-                    onChange={(e) => setConfirmPin(e.target.value)}
-                    className="w-full rounded-xl border border-[#DCE3DF] bg-white p-3 text-xs font-mono font-bold tracking-widest"
-                  />
-                  <button
-                    type="submit"
-                    disabled={savingPin}
-                    className="w-full rounded-xl bg-[#1E6B4E] py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-[#16523B] disabled:opacity-60"
-                  >
-                    {me.has_pin ? 'Cambiar mi PIN' : 'Guardar mi PIN'}
-                  </button>
-                </form>
+                    <button
+                      type="submit"
+                      disabled={savingPin || !isOnline}
+                      className="w-full rounded-xl bg-[#1E6B4E] py-2.5 text-xs font-bold uppercase tracking-wider text-white shadow-xs hover:bg-[#16523B] disabled:opacity-60"
+                    >
+                      {me.has_pin ? 'Cambiar mi PIN' : 'Guardar mi PIN'}
+                    </button>
+                  </form>
+                </div>
               ) : (
-                <p className="text-[11px] text-[#52635A]">
-                  Tu rol no autoriza operaciones de supervisor, por lo que no necesita PIN.
-                </p>
+                <p className="text-[11px] text-[#52635A]">Cargando perfil de operador…</p>
               )}
 
               <div className="space-y-2.5 pt-3 border-t border-[#DCE3DF]">

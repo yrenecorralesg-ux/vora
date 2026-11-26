@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
-import { getTenantSettings, loadPosConfig, toClientSettings } from '@/lib/pos/server';
+import { getTenantSettings, loadPosConfig, resolveActorFromOfflineProof, toClientSettings } from '@/lib/pos/server';
 import { validatePagoMovilConfig } from '@/lib/pos-pago-movil';
 import type { PosPaymentMethod } from '@/lib/types';
 
@@ -41,10 +41,8 @@ export async function POST(
 ) {
   const auth = await authorizeTenantApi(params.slug);
   if (!auth.ok) return auth.response;
-  if (!(await hasTenantPermission(auth.access, 'pos.settings.manage')))
-    return permissionDenied('Tu rol no permite cambiar la configuración del POS.');
   const service = getSupabaseServiceClient();
-  const { tenantId, userId } = auth.access;
+  const { tenantId } = auth.access;
 
   let body: Record<string, any>;
   try {
@@ -52,6 +50,34 @@ export async function POST(
   } catch {
     return NextResponse.json({ ok: false, error: 'Solicitud inválida.' }, { status: 400 });
   }
+
+  const offlineOpKey = String(body.offline_op_key ?? '').trim();
+  const actorCheck = await resolveActorFromOfflineProof({
+    service,
+    tenantId,
+    authUserId: auth.access.userId,
+    offlineOperatorAuth: body.offline_operator_auth,
+    requiredPermission: 'pos.settings.manage',
+    actionScope: `settings:${offlineOpKey}`,
+  });
+  if (!actorCheck.ok) {
+    return NextResponse.json({ ok: false, error: actorCheck.error }, { status: actorCheck.status });
+  }
+  const userId = actorCheck.actorId;
+  let effectiveAccess = auth.access;
+  if (userId !== auth.access.userId) {
+    const { data: mem } = await service
+      .from('tenant_memberships')
+      .select('role')
+      .eq('tenant_id', tenantId)
+      .eq('auth_user_id', userId)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (!mem) return permissionDenied('El operador no está activo en la empresa.');
+    effectiveAccess = { ...auth.access, userId, role: mem.role };
+  }
+  if (!(await hasTenantPermission(effectiveAccess, 'pos.settings.manage')))
+    return permissionDenied('Tu rol no permite cambiar la configuración del POS.');
 
   if (body.action === 'update_settings') {
     await getTenantSettings(service, tenantId);

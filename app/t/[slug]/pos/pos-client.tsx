@@ -6,6 +6,9 @@ import { PosSidebar } from '@/components/pos/pos-sidebar';
 import { PosHeader } from '@/components/pos/pos-header';
 import { PosToaster } from '@/components/pos/pos-toaster';
 import { PosCustomerDisplayModal } from '@/components/pos/pos-customer-display-modal';
+import { PosOfflineQueueModal } from '@/components/pos/pos-offline-queue-modal';
+import { PosOperatorModal } from '@/components/pos/pos-operator-modal';
+import { SwRegister } from '@/components/sw-register';
 import { PosView01Dashboard } from '@/components/pos/pos-view-01-dashboard';
 import { PosView02OpenShift } from '@/components/pos/pos-view-02-open-shift';
 import { PosView0304SaleCart } from '@/components/pos/pos-view-03-04-sale-cart';
@@ -71,8 +74,15 @@ export function PosModuleContent() {
       {/* Notificaciones flotantes */}
       <PosToaster />
 
+      {/* Registro Service Worker para arranque offline */}
+      <SwRegister />
+
       {/* Modal Pantalla de Cara al Cliente (pos_customer_display) */}
       <PosCustomerDisplayModal />
+
+      {/* Modales Offline y Cambio de Operador */}
+      <PosOfflineQueueModal />
+      <PosOperatorModal />
 
       {/* Barra Lateral estilo PDF */}
       <PosSidebar />

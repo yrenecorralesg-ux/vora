@@ -1,6 +1,6 @@
 {
   "name": "vora-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "VORA ERP & POS Desktop Shell (Windows Portable)",
   "private": true,
   "main": "main.js",

@@ -16,7 +16,7 @@
         color: #111827;
       }
       .card {
-        max-width: 420px;
+        max-width: 440px;
         background: #ffffff;
         border: 1px solid #dce3df;
         border-radius: 24px;
@@ -35,6 +35,11 @@
         color: #52635a;
         line-height: 1.5;
       }
+      .actions {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
       button {
         border: none;
         border-radius: 14px;
@@ -48,17 +53,48 @@
       button:hover {
         background: #1f4a3a;
       }
+      button.secondary {
+        background: #f6f5f0;
+        color: #111827;
+        border: 1px solid #dce3df;
+      }
+      button.secondary:hover {
+        background: #e5e9e7;
+      }
+      .meta {
+        margin-top: 16px;
+        font-size: 11px;
+        color: #8a968f;
+      }
     </style>
   </head>
   <body>
     <div class="card">
       <h1>No se pudo conectar con VORA</h1>
       <p>
-        Verifica tu conexión a internet para iniciar sesión y sincronizar los datos con el servidor.
+        Verifica tu conexión a internet para iniciar sesión por primera vez o sincronizar datos con el servidor.
       </p>
-      <button type="button" onclick="window.voraDesktop && window.voraDesktop.retryLoad()">
-        Reintentar conexión
-      </button>
+      <div class="actions">
+        <button type="button" id="lastPosBtn" style="display: none" onclick="window.voraDesktop && window.voraDesktop.openLastPos()">
+          Abrir último POS en caché (Offline)
+        </button>
+        <button type="button" class="secondary" onclick="window.voraDesktop && window.voraDesktop.retryLoad()">
+          Reintentar conexión
+        </button>
+      </div>
+      <div class="meta" id="verMeta"></div>
     </div>
+    <script>
+      if (window.voraDesktop && window.voraDesktop.getDesktopInfo) {
+        window.voraDesktop.getDesktopInfo().then(function (info) {
+          if (info && info.lastPosUrl) {
+            document.getElementById('lastPosBtn').style.display = 'block';
+          }
+          if (info && info.version) {
+            document.getElementById('verMeta').textContent = 'VORA Desktop v' + info.version;
+          }
+        }).catch(function () {});
+      }
+    </script>
   </body>
 </html>

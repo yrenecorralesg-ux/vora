@@ -16,4 +16,6 @@ contextBridge.exposeInMainWorld('voraDesktop', {
     return () => ipcRenderer.removeListener('vora:customer-display-state', handler);
   },
   retryLoad: () => ipcRenderer.invoke('vora:retry-load'),
+  openLastPos: () => ipcRenderer.invoke('vora:open-last-pos'),
+  getDesktopInfo: () => ipcRenderer.invoke('vora:get-desktop-info'),
 });

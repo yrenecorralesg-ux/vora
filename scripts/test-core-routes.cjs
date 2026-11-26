@@ -481,6 +481,208 @@ async function warehouseMvpTests() {
     if (prev === undefined) delete process.env.CRON_SECRET;
     else process.env.CRON_SECRET = prev;
   });
+
+  await offlinePosTests();
+}
+
+async function offlinePosTests() {
+  const { pbkdf2Sync, createHash, createDecipheriv, createHmac } = require('node:crypto');
+  const posServer = load('lib/pos/server.ts', { 'server-only': {} });
+  const pinHash = posServer.hashPin('4826');
+  const cashierPinHash = posServer.hashPin('7391');
+
+  const supBundle = posServer.createOfflinePinBundle({
+    pin: '4826',
+    tenantId: 'tA',
+    userId: 'super-a',
+    pinHash,
+  });
+  const cashierBundle = posServer.createOfflinePinBundle({
+    pin: '7391',
+    tenantId: 'tA',
+    userId: 'cajero-a',
+    pinHash: cashierPinHash,
+  });
+
+  await test('offline PIN bundle decrypts signing key only with the real PIN', async () => {
+    const derived = pbkdf2Sync('4826', Buffer.from(supBundle.salt, 'base64'), supBundle.iterations, 32, 'sha256');
+    assert.equal(createHash('sha256').update(derived).digest('hex'), supBundle.verifier_hash);
+    const rawEnc = Buffer.from(supBundle.encrypted_key, 'base64');
+    const ciphertext = rawEnc.subarray(0, rawEnc.length - 16);
+    const tag = rawEnc.subarray(rawEnc.length - 16);
+    const decipher = createDecipheriv('aes-256-gcm', derived, Buffer.from(supBundle.iv, 'base64'));
+    decipher.setAuthTag(tag);
+    const signingKey = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+    assert.equal(signingKey.length, 32);
+
+    const wrongDerived = pbkdf2Sync('9999', Buffer.from(supBundle.salt, 'base64'), supBundle.iterations, 32, 'sha256');
+    assert.notEqual(createHash('sha256').update(wrongDerived).digest('hex'), supBundle.verifier_hash);
+  });
+
+  const db = {
+    tenants: [{ id: 'tA', slug: 'empresa-a', commercial_name: 'Empresa A', commercial_status: 'active' }],
+    tenant_memberships: [
+      { tenant_id: 'tA', auth_user_id: 'cajero-a', role: 'pos_cashier', status: 'active' },
+      { tenant_id: 'tA', auth_user_id: 'super-a', role: 'pos_supervisor', status: 'active' },
+    ],
+    role_permissions: [
+      { role_key: 'pos_cashier', permission: 'pos.sales.create', scope: 'tenant' },
+      { role_key: 'pos_cashier', permission: 'pos.cash.open', scope: 'tenant' },
+      { role_key: 'pos_supervisor', permission: 'pos.sales.create', scope: 'tenant' },
+      { role_key: 'pos_supervisor', permission: 'pos.refunds.approve', scope: 'tenant' },
+      { role_key: 'pos_supervisor', permission: 'pos.sales.discount.override', scope: 'tenant' },
+    ],
+    tenant_features: [
+      { tenant_id: 'tA', feature_key: 'commerce.pos', enabled: true, contracted: true, config: { catalog_source: 'pos' } },
+    ],
+    pos_tenant_settings: [
+      { tenant_id: 'tA', active_exchange_rate: 40, max_cashier_discount_percent: 5, allow_partial_payments: true,
+        active_methods: ['efectivo', 'pago_movil', 'tarjeta', 'cashea'], internal_doc_prefix: 'COMP-INT-' },
+    ],
+    pos_products: [
+      { id: 'prod-a', tenant_id: 'tA', sku: 'CAF-1', name: 'Café', price_usd: 10, tax_rate_percent: 16, is_service: false, status: 'disponible' },
+    ],
+    pos_shifts: [
+      { id: 'turno-1', tenant_id: 'tA', branch_id: 'br-1', register_id: 'reg-1', cashier_user_id: 'cajero-a', status: 'abierto' },
+    ],
+    pos_staff_pins: [
+      { tenant_id: 'tA', auth_user_id: 'super-a', pin_hash: pinHash, offline_bundle: supBundle, failed_attempts: 0, locked_until: null },
+      { tenant_id: 'tA', auth_user_id: 'cajero-a', pin_hash: cashierPinHash, offline_bundle: cashierBundle, failed_attempts: 0, locked_until: null },
+    ],
+    pos_sales: [
+      { id: 'venta-a', tenant_id: 'tA', branch_id: 'br-1', sale_number: 'VTA-0000001', created_at: '2026-11-21', metadata: {} },
+    ],
+  };
+
+  const calls = [];
+  const service = fakeDb(db, calls, {
+    pos_record_sale: { data: { sale_id: 'venta-a', replay: false }, error: null },
+    pos_record_return: { data: { return_id: 'dev-1' }, error: null },
+  });
+  const asUser = (id) => ({
+    'server-only': {},
+    'next/navigation': { redirect: () => { throw new Error('redirect'); } },
+    '@/lib/auth': { requireSession: async () => ({ id, email: `${id}@test.local` }), isSuperAdmin: async () => false, requireSuperAdmin: async () => null },
+    '@/lib/supabase-server': { getSupabaseServerClient: () => ({}), getSupabaseServiceClient: () => service },
+  });
+  const ctx = { params: { slug: 'empresa-a' } };
+  const post = (body) => new NextRequest('https://vora.venesoftca.com/api/test', { method: 'POST', body: JSON.stringify(body) });
+
+  const decryptSigningKey = (bundle, pin) => {
+    const derived = pbkdf2Sync(pin, Buffer.from(bundle.salt, 'base64'), bundle.iterations, 32, 'sha256');
+    const rawEnc = Buffer.from(bundle.encrypted_key, 'base64');
+    const decipher = createDecipheriv('aes-256-gcm', derived, Buffer.from(bundle.iv, 'base64'));
+    decipher.setAuthTag(rawEnc.subarray(rawEnc.length - 16));
+    return Buffer.concat([decipher.update(rawEnc.subarray(0, rawEnc.length - 16)), decipher.final()]);
+  };
+
+  await test('offline supervisor proof authorizes discount override on sync, while forged proof is rejected', async () => {
+    const salesRoute = load('app/api/t/[slug]/pos/sales/route.ts', asUser('cajero-a'));
+    const supKey = decryptSigningKey(supBundle, '4826');
+    const idemp = 'sale-off-1';
+    const validProof = createHmac('sha256', supKey).update(`supervisor:tA:super-a:discount_override:${idemp}`).digest('hex');
+
+    calls.length = 0;
+    const badRes = await salesRoute.POST(
+      post({
+        idempotency_key: idemp,
+        shift_id: 'turno-1',
+        lines: [{ productId: 'prod-a', quantity: 1, discountPercent: 50 }],
+        payments: [],
+        offline_discount_auth: { supervisor_id: 'super-a', proof: '0'.repeat(64), reason: 'forged' },
+      }),
+      ctx,
+    );
+    assert.equal(badRes.status, 403);
+    assert.equal(rpcCallsFrom(calls, 'pos_record_sale').length, 0);
+
+    calls.length = 0;
+    const okRes = await salesRoute.POST(
+      post({
+        idempotency_key: idemp,
+        shift_id: 'turno-1',
+        lines: [{ productId: 'prod-a', quantity: 1, discountPercent: 50 }],
+        payments: [],
+        offline_discount_auth: { supervisor_id: 'super-a', proof: validProof, reason: 'promo offline', authorized_at: '2026-11-26T12:00:00Z' },
+      }),
+      ctx,
+    );
+    assert.equal(okRes.status, 200);
+    assert.equal(rpcCallsFrom(calls, 'pos_record_sale').length, 1);
+  });
+
+  await test('cashier offline PIN proof cannot authorize supervisor return, while supervisor offline proof succeeds', async () => {
+    const returnsRoute = load('app/api/t/[slug]/pos/returns/route.ts', asUser('cajero-a'));
+    const cashierKey = decryptSigningKey(cashierBundle, '7391');
+    const supKey = decryptSigningKey(supBundle, '4826');
+    const retKey = 'ret-off-1';
+
+    const cashierProof = createHmac('sha256', cashierKey).update(`supervisor:tA:cajero-a:sale_return:${retKey}`).digest('hex');
+    const rBad = await returnsRoute.POST(
+      post({
+        idempotency_key: retKey,
+        original_sale_id: 'VTA-0000001',
+        shift_id: 'turno-1',
+        return_type: 'devolucion_parcial',
+        reason: 'cliente',
+        refund_method: 'efectivo_usd',
+        lines: [],
+        offline_supervisor_auth: { supervisor_id: 'cajero-a', proof: cashierProof },
+      }),
+      ctx,
+    );
+    assert.equal(rBad.status, 403);
+
+    const supProof = createHmac('sha256', supKey).update(`supervisor:tA:super-a:sale_return:${retKey}`).digest('hex');
+    calls.length = 0;
+    const rOk = await returnsRoute.POST(
+      post({
+        idempotency_key: retKey,
+        original_sale_id: 'VTA-0000001',
+        shift_id: 'turno-1',
+        return_type: 'devolucion_parcial',
+        reason: 'cliente',
+        refund_method: 'efectivo_usd',
+        lines: [],
+        offline_supervisor_auth: { supervisor_id: 'super-a', proof: supProof, authorized_at: '2026-11-26T12:05:00Z' },
+      }),
+      ctx,
+    );
+    assert.equal(rOk.status, 200);
+    assert.equal(rpcCallsFrom(calls, 'pos_record_return')[0][2].p_return.approved_by, 'super-a');
+  });
+
+  await test('offline operator proof attributes p_actor to the switched cashier on sync', async () => {
+    // Sesión HTTP pertenece a super-a, pero la venta offline la firmó cajero-a con su PIN
+    const salesRoute = load('app/api/t/[slug]/pos/sales/route.ts', asUser('super-a'));
+    const cashierKey = decryptSigningKey(cashierBundle, '7391');
+    const idemp = 'sale-op-switch-1';
+    const opProof = createHmac('sha256', cashierKey).update(`operator:tA:cajero-a:sale:${idemp}`).digest('hex');
+
+    calls.length = 0;
+    const r = await salesRoute.POST(
+      post({
+        idempotency_key: idemp,
+        shift_id: 'turno-1',
+        lines: [{ productId: 'prod-a', quantity: 1 }],
+        payments: [],
+        offline_operator_auth: { operator_id: 'cajero-a', proof: opProof },
+      }),
+      ctx,
+    );
+    assert.equal(r.status, 200);
+    assert.equal(rpcCallsFrom(calls, 'pos_record_sale')[0][2].p_actor, 'cajero-a');
+  });
+
+  await test('service worker /sw.js bypasses tenant subdomain rewriting', async () => {
+    const mw = load('middleware.ts', { '@supabase/ssr': { createServerClient: () => ({ auth: { getUser: async () => ({ data: { user: null } }) } }) } }).middleware;
+    const r = await mw(new NextRequest('https://pepito.vora.venesoftca.com/sw.js'));
+    assert.equal(r.headers.get('x-middleware-next'), '1');
+  });
+}
+
+function rpcCallsFrom(calls, fn) {
+  return calls.filter(([k, name]) => k === 'rpc' && name === fn);
 }
 
 main().catch(e=>{console.error(e);process.exitCode=1;});

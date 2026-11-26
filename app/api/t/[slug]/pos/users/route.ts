@@ -21,15 +21,22 @@ export async function GET(
   const service = getSupabaseServiceClient();
   const { tenantId, userId, role } = auth.access;
 
-  const [{ data: members }, { data: pins }] = await Promise.all([
+  const [{ data: members }, pinsRes] = await Promise.all([
     service
       .from('tenant_memberships')
       .select('auth_user_id, role, status, created_at')
       .eq('tenant_id', tenantId)
       .order('created_at'),
-    service.from('pos_staff_pins').select('auth_user_id').eq('tenant_id', tenantId),
+    service.from('pos_staff_pins').select('auth_user_id, offline_bundle').eq('tenant_id', tenantId),
   ]);
-  const withPin = new Set((pins ?? []).map((p) => p.auth_user_id as string));
+  const pins = pinsRes.error
+    ? (await service.from('pos_staff_pins').select('auth_user_id').eq('tenant_id', tenantId)).data
+    : pinsRes.data;
+
+  const withPin = new Set((pins ?? []).map((p: any) => p.auth_user_id as string));
+  const withOfflinePin = new Set(
+    (pins ?? []).filter((p: any) => Boolean(p.offline_bundle)).map((p: any) => p.auth_user_id as string),
+  );
   const ids = Array.from(new Set([...(members ?? []).map((m) => m.auth_user_id as string), userId]));
   const profiles = new Map<string, { name: string; email: string | null }>();
   await Promise.all(
@@ -51,6 +58,7 @@ export async function GET(
     role: m.role as string,
     is_active: m.status === 'active',
     has_pin: withPin.has(m.auth_user_id),
+    offline_pin_ready: withOfflinePin.has(m.auth_user_id),
     created_at: m.created_at as string,
   }));
 
@@ -80,6 +88,7 @@ export async function GET(
       email: profiles.get(userId)?.email ?? auth.access.email,
       role,
       has_pin: withPin.has(userId),
+      offline_pin_ready: withOfflinePin.has(userId),
       can_approve: APPROVER_PERMISSIONS.some((p) => permissions[p]),
       permissions,
     },
@@ -92,7 +101,7 @@ const managedInGestor = () =>
     {
       ok: false,
       error:
-        'Los usuarios y roles se administran desde el gestor de VORA (empresa → Usuarios). Cada supervisor define su PIN en Configuración → Mi PIN.',
+        'Los usuarios y roles se administran desde el gestor de VORA (empresa → Usuarios). Cada operador define su PIN en el POS.',
     },
     { status: 410 },
   );

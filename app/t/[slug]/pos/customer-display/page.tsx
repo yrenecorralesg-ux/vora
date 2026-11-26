@@ -9,6 +9,7 @@ import {
   customerDisplayStorageKey,
   type CustomerDisplaySyncPayload,
 } from '@/lib/desktop-bridge';
+import { SwRegister } from '@/components/sw-register';
 
 export default function PosCustomerDisplayPage() {
   const params = useParams<{ slug: string }>();
@@ -94,6 +95,7 @@ export default function PosCustomerDisplayPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#F6F5F0]">
+      <SwRegister />
       <header className="flex items-center justify-between border-b border-[#DCE3DF] bg-white px-8 py-4">
         <div className="flex items-center gap-4">
           {state?.logoUrl ? (

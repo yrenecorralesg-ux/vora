@@ -10,6 +10,10 @@ import {
   Smartphone,
   CreditCard,
   Wallet,
+  WifiOff,
+  CloudUpload,
+  AlertTriangle,
+  UserCheck,
 } from 'lucide-react';
 import { usePos } from './pos-context';
 
@@ -24,6 +28,11 @@ export function PosView01Dashboard() {
     showNotification,
     tenantBranding,
     me,
+    isOnline,
+    offlineQueueCount,
+    offlineRejectedCount,
+    setIsQueueModalOpen,
+    setIsOperatorModalOpen,
   } = usePos();
 
   const primaryColor = tenantBranding?.primaryColor || 'var(--crm-primary, #1E6B4E)';
@@ -84,13 +93,52 @@ export function PosView01Dashboard() {
   return (
     <div className="space-y-8">
       {/* Saludo y Estado Principal */}
-      <div>
-        <h1 className="text-3xl font-extrabold text-[#111827]">
-          {firstName ? `¡Hola, ${firstName}!` : '¡Hola!'}
-        </h1>
-        <p className="mt-1 text-sm font-medium text-[#52635A]">
-          {isShiftOpen ? 'Todo listo para vender' : 'Abre la caja para empezar a vender'}
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-extrabold text-[#111827]">
+            {firstName ? `¡Hola, ${firstName}!` : '¡Hola!'}
+          </h1>
+          <p className="mt-1 text-sm font-medium text-[#52635A]">
+            {isShiftOpen ? 'Todo listo para vender' : 'Abre la caja para empezar a vender'}
+          </p>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {!isOnline && (
+            <span className="flex items-center gap-1.5 rounded-xl border border-[#F87171] bg-[#FEF2F2] px-3 py-1.5 text-xs font-bold text-[#B91C1C]">
+              <WifiOff className="h-3.5 w-3.5" />
+              <span>Sin conexión (Modo offline)</span>
+            </span>
+          )}
+          {offlineQueueCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsQueueModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-[#F59E0B] bg-[#FFFBEB] px-3 py-1.5 text-xs font-bold text-[#B45309] hover:bg-[#FEF3C7] transition"
+            >
+              <CloudUpload className="h-3.5 w-3.5" />
+              <span>Pendientes ({offlineQueueCount})</span>
+            </button>
+          )}
+          {offlineRejectedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setIsQueueModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-xl border border-[#EF4444] bg-[#FEF2F2] px-3 py-1.5 text-xs font-bold text-[#B91C1C] hover:bg-[#FEE2E2] transition"
+            >
+              <AlertTriangle className="h-3.5 w-3.5" />
+              <span>Rechazadas ({offlineRejectedCount})</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsOperatorModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-[#DCE3DF] bg-white px-3 py-1.5 text-xs font-bold text-[#111827] shadow-2xs hover:bg-[#F6F5F0] transition"
+          >
+            <UserCheck className="h-3.5 w-3.5 text-[#1E6B4E]" />
+            <span>Operador / PIN</span>
+          </button>
+        </div>
       </div>
 
       {/* 4 Tarjetas de Acciones Rápidas con Bordes Curvos Suaves */}

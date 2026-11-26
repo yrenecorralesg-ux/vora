@@ -12,6 +12,7 @@ import {
   BarChart2,
   Settings,
   LogOut,
+  Lock,
   ChevronDown,
   Warehouse,
   LayoutDashboard,
@@ -39,12 +40,34 @@ export function PosSidebar() {
     isFuncActive,
     isWarehouseEnabled,
     can,
+    offlineQueueCount,
+    setIsOperatorModalOpen,
+    setIsTerminalLocked,
+    clearOfflineSigningSession,
   } = usePos();
 
   const [posExpanded, setPosExpanded] = useState(true);
   const [whExpanded, setWhExpanded] = useState(false);
 
   const handleLogout = async () => {
+    if (
+      offlineQueueCount > 0 &&
+      typeof window !== 'undefined' &&
+      !window.confirm(
+        `Hay ${offlineQueueCount} operación(es) pendientes de sincronizar en este equipo. Se conservarán en el navegador, pero no podrás volver a entrar sin internet si borras la sesión. ¿Cerrar sesión de todos modos?`,
+      )
+    ) {
+      return;
+    }
+    clearOfflineSigningSession();
+    try {
+      navigator.serviceWorker?.controller?.postMessage({
+        type: 'CLEAR_TENANT_CACHE',
+        slug: activeTenantSlug,
+      });
+    } catch {
+      // Ignorar
+    }
     try {
       await fetch(`/api/t/${activeTenantSlug}/logout`, { method: 'POST' });
     } catch {
@@ -321,15 +344,20 @@ export function PosSidebar() {
 
       {/* Pie de Barra Lateral: Operador y Salida */}
       <div className="flex flex-col gap-2 pt-4 border-t border-white/10">
-        {/* Resumen del Operador en Sesión */}
-        <div className="flex items-center gap-3 rounded-2xl p-2.5 bg-black/20 text-xs">
+        {/* Resumen del Operador en Sesión (clic para cambiar operador o configurar PIN) */}
+        <button
+          type="button"
+          onClick={() => setIsOperatorModalOpen(true)}
+          title="Cambiar operador o configurar mi PIN"
+          className="flex w-full items-center gap-3 rounded-2xl p-2.5 bg-black/20 text-left text-xs hover:bg-black/30 transition"
+        >
           <div
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold text-white text-[11px]"
             style={{ backgroundColor: secondaryColor }}
           >
             {activeUser.name.slice(0, 2).toUpperCase()}
           </div>
-          <div className="flex flex-col min-w-0">
+          <div className="flex flex-col min-w-0 flex-1">
             <span className="truncate font-bold text-white">{activeUser.name}</span>
             <span className="truncate text-[10px] uppercase tracking-wide" style={{ color: accentColor }}>
               {({
@@ -349,7 +377,17 @@ export function PosSidebar() {
               } as Record<string, string>)[activeUser.role] ?? activeUser.role}
             </span>
           </div>
-        </div>
+        </button>
+
+        {/* Bloquear terminal sin cerrar sesión */}
+        <button
+          type="button"
+          onClick={() => setIsTerminalLocked(true)}
+          className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-white/85 transition hover:bg-white/10 hover:text-white"
+        >
+          <Lock className="h-4 w-4 shrink-0" />
+          <span>Bloquear / Cambiar usuario</span>
+        </button>
 
         {/* Botón Cerrar Sesión */}
         <button

@@ -39,6 +39,8 @@ export function PosView0304SaleCart() {
     selectedCustomer,
     discountAuthorizedBy,
     setDiscountAuthorizedBy,
+    setOfflineDiscountAuth,
+    ensureDraftSaleKey,
     settings,
     exchangeRate,
     navigateTo,
@@ -248,17 +250,19 @@ export function PosView0304SaleCart() {
       setSupervisorError('Indica la justificación del descuento.');
       return;
     }
-    // El PIN lo valida el servidor y devuelve una autorización de un solo uso.
+    // El PIN lo valida el servidor (o paquete cifrado offline) y devuelve autorización de un solo uso.
     setApproving(true);
+    const saleKey = ensureDraftSaleKey();
     const result = await requestSupervisorAuthorization({
       supervisorId,
       pin: supervisorPin,
       operationType: 'discount_override',
       reason: supervisorReason.trim(),
       limitSnapshot: { discount_percent: requestedDiscountPercent, max_cashier: settings.max_cashier_discount_percent },
+      saleIdempotencyKey: saleKey,
     });
     setApproving(false);
-    if (!result.ok || !result.authorizationId) {
+    if (!result.ok || (!result.authorizationId && !result.offlineDiscountAuth)) {
       setSupervisorError(result.error ?? 'El PIN del supervisor no es válido. Operación denegada.');
       return;
     }
@@ -266,9 +270,10 @@ export function PosView0304SaleCart() {
     if (supervisorIndex !== null) {
       updateCartDiscount(supervisorIndex, requestedDiscountPercent);
       const authName = result.approverName || 'Supervisor';
-      setDiscountAuthorizedBy(result.authorizationId);
+      setDiscountAuthorizedBy(result.offline ? null : result.authorizationId ?? null);
+      setOfflineDiscountAuth(result.offlineDiscountAuth ?? null);
       showNotification(
-        'Descuento Aprobado',
+        result.offline ? 'Descuento aprobado sin conexión' : 'Descuento Aprobado',
         `Descuento del ${requestedDiscountPercent}% autorizado por ${authName}.`,
         'success',
       );
@@ -351,9 +356,15 @@ export function PosView0304SaleCart() {
             <div className="flex items-center border-l border-[#DCE3DF] pl-2">
               <button
                 type="button"
-                onClick={() => setShowNewProductModal(true)}
+                onClick={() => {
+                  if (!isOnline) {
+                    showNotification('Sin conexión', 'El alta rápida de productos requiere conexión con el inventario del servidor.', 'alert');
+                    return;
+                  }
+                  setShowNewProductModal(true);
+                }}
                 title="Crear nuevo producto en inventario y almacén"
-                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-white shadow-xs transition hover:opacity-90"
+                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-white shadow-xs transition hover:opacity-90 disabled:opacity-50"
                 style={{ backgroundColor: tenantBranding?.primaryColor || '#144D37' }}
               >
                 <Plus className="h-4 w-4" />

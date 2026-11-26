@@ -25,8 +25,8 @@ export function PosView15ShiftClosure() {
     tenantBranding,
     activeShift,
     activeBranch,
-    activeUser,
-    refreshActiveShift,
+    addCashMovement,
+    closeShift,
     showNotification,
     navigateTo,
     isFuncActive,
@@ -35,7 +35,6 @@ export function PosView15ShiftClosure() {
     can,
     settings,
     sales,
-    activeTenantSlug,
   } = usePos();
   const [closedShift, setClosedShift] = useState<PosShift | null>(null);
   const [busy, setBusy] = useState(false);
@@ -112,38 +111,29 @@ export function PosView15ShiftClosure() {
     }
 
     setBusy(true);
-    let data: { ok?: boolean; error?: string } | null = null;
-    try {
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/shifts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'movement',
-          shift_id: shift.id,
-          movement_type: movType,
-          currency: movCurrency,
-          amount: amt,
-          reason: movReason.trim(),
-          supervisor_id: withPin ? authSupervisorId : undefined,
-          supervisor_pin: withPin ? authSupervisorPin.trim() : undefined,
-        }),
-      });
-      data = await res.json().catch(() => null);
-    } catch {
-      data = { ok: false, error: 'Sin conexión con el servidor.' };
-    } finally {
-      setBusy(false);
-      setAuthSupervisorPin('');
-    }
+    const res = await addCashMovement({
+      shiftId: shift.id,
+      movementType: movType,
+      currency: movCurrency,
+      amount: amt,
+      reason: movReason.trim(),
+      supervisorId: withPin ? authSupervisorId : undefined,
+      supervisorPin: withPin ? authSupervisorPin.trim() : undefined,
+    });
+    setBusy(false);
+    setAuthSupervisorPin('');
 
-    if (!data?.ok) {
-      setMovementError(data?.error ?? 'No se pudo registrar el movimiento.');
+    if (!res.ok) {
+      setMovementError(res.error ?? 'No se pudo registrar el movimiento.');
       return;
     }
-    await refreshActiveShift();
     setMovAmount('');
     setMovReason('');
-    showNotification('Movimiento registrado', `${movType}: ${amt} ${movCurrency}${withPin ? ' (autorizado por supervisor)' : ''}.`, 'success');
+    showNotification(
+      res.offline ? 'Movimiento guardado sin conexión' : 'Movimiento registrado',
+      `${movType}: ${amt} ${movCurrency}${withPin ? ' (autorizado por supervisor)' : ''}.`,
+      res.offline ? 'alert' : 'success',
+    );
   };
 
   // Cierre Definitivo de Turno (Regla #5: Bloqueo si hay ventas en espera)
@@ -165,39 +155,32 @@ export function PosView15ShiftClosure() {
     }
 
     setBusy(true);
-    let data: { ok?: boolean; error?: string; shift?: PosShift } | null = null;
-    try {
-      const res = await fetch(`/api/t/${activeTenantSlug}/pos/shifts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'close',
-          shift_id: shift.id,
-          justification: justification.trim() || undefined,
-          declared: {
-            efectivo_usd: parseFloat(declaredUsd) || 0,
-            efectivo_ves: parseFloat(declaredVes) || 0,
-            pago_movil_ves: parseFloat(declaredPm) || 0,
-            tarjeta_ves: parseFloat(declaredCard) || 0,
-            cashea_usd: parseFloat(declaredCashea) || 0,
-          },
-        }),
-      });
-      data = await res.json().catch(() => null);
-    } catch {
-      data = { ok: false, error: 'Sin conexión con el servidor. El turno sigue abierto.' };
-    } finally {
-      setBusy(false);
-    }
+    const res = await closeShift({
+      shiftId: shift.id,
+      justification: justification.trim() || undefined,
+      declared: {
+        efectivo_usd: parseFloat(declaredUsd) || 0,
+        efectivo_ves: parseFloat(declaredVes) || 0,
+        pago_movil_ves: parseFloat(declaredPm) || 0,
+        tarjeta_ves: parseFloat(declaredCard) || 0,
+        cashea_usd: parseFloat(declaredCashea) || 0,
+      },
+    });
+    setBusy(false);
 
-    if (!data?.ok) {
-      setClosureError(data?.error ?? 'Error en cierre de turno.');
+    if (!res.ok) {
+      setClosureError(res.error ?? 'Error en cierre de turno.');
       return;
     }
 
-    setClosedShift(data.shift ?? null);
-    await refreshActiveShift();
-    showNotification('Turno cerrado', 'Cierre inmutable de turno ejecutado con éxito.', 'success');
+    setClosedShift(res.shift ?? null);
+    showNotification(
+      res.offline ? 'Turno cerrado sin conexión' : 'Turno cerrado',
+      res.offline
+        ? 'Cierre local ejecutado; se enviará al servidor cuando vuelva internet.'
+        : 'Cierre inmutable de turno ejecutado con éxito.',
+      res.offline ? 'alert' : 'success',
+    );
   };
 
   return (
@@ -373,9 +356,11 @@ export function PosView15ShiftClosure() {
                     <label className="block text-[10px] font-bold text-[#52635A]">PIN del supervisor</label>
                     <input
                       type="password"
-                      maxLength={6}
+                      inputMode="numeric"
+                      autoComplete="off"
+                      maxLength={8}
                       required
-                      placeholder="PIN (ej: 9999)"
+                      placeholder="PIN personal del supervisor"
                       value={authSupervisorPin}
                       onChange={(e) => setAuthSupervisorPin(e.target.value)}
                       className="mt-1 w-full rounded-xl border border-[#DCE3DF] bg-white p-2 text-xs font-bold"

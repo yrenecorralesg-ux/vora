@@ -1,4 +1,5 @@
 const { app, BrowserWindow, ipcMain, Menu, screen, shell } = require('electron');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const APP_URL = (process.env.VORA_DESKTOP_URL || 'https://vora-weld-mu.vercel.app').replace(/\/+$/, '');
@@ -6,6 +7,28 @@ const ICON_PATH = path.join(__dirname, 'build', 'icon.png');
 const OFFLINE_PAGE = path.join(__dirname, 'offline.html');
 
 const TRUSTED_HOST_SUFFIXES = ['vercel.app', 'vora.venesoftca.com', 'localhost', '127.0.0.1'];
+
+function getStateFile() {
+  return path.join(app.getPath('userData'), 'vora-desktop-state.json');
+}
+
+function readDesktopState() {
+  try {
+    const raw = fs.readFileSync(getStateFile(), 'utf8');
+    return JSON.parse(raw);
+  } catch {
+    return {};
+  }
+}
+
+function writeDesktopState(patch) {
+  try {
+    const next = { ...readDesktopState(), ...patch };
+    fs.writeFileSync(getStateFile(), JSON.stringify(next), 'utf8');
+  } catch {
+    // Ignorar error de escritura en disco
+  }
+}
 
 function isTrustedAppUrl(rawUrl) {
   try {
@@ -18,9 +41,21 @@ function isTrustedAppUrl(rawUrl) {
   }
 }
 
+function isPosShellUrl(rawUrl) {
+  try {
+    if (!isTrustedAppUrl(rawUrl)) return false;
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol === 'file:') return false;
+    return /^\/t\/[^/]+\/pos\/?$/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+}
+
 let mainWindow = null;
 let customerWindow = null;
 let lastCustomerPayload = null;
+let triedOfflinePosFallback = false;
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -48,9 +83,33 @@ function createMainWindow() {
     mainWindow.show();
   });
 
+  const recordPosUrl = (url) => {
+    if (isPosShellUrl(url)) {
+      triedOfflinePosFallback = false;
+      writeDesktopState({ lastPosUrl: url });
+    }
+  };
+  mainWindow.webContents.on('did-navigate', (_e, url) => recordPosUrl(url));
+  mainWindow.webContents.on('did-navigate-in-page', (_e, url) => recordPosUrl(url));
+
   mainWindow.webContents.on('did-fail-load', (_event, errorCode, _errDesc, validatedUrl, isMainFrame) => {
     if (!isMainFrame || errorCode === -3) return; // Ignorar abortos de navegación normal
     if (validatedUrl && validatedUrl.startsWith('file://')) return;
+
+    const state = readDesktopState();
+    const lastPosUrl = state.lastPosUrl;
+    if (
+      lastPosUrl &&
+      isPosShellUrl(lastPosUrl) &&
+      !triedOfflinePosFallback &&
+      validatedUrl !== lastPosUrl
+    ) {
+      // Si el inicio hacia APP_URL falla sin internet, intentamos abrir el último POS cacheado por el Service Worker.
+      triedOfflinePosFallback = true;
+      void mainWindow.loadURL(lastPosUrl);
+      return;
+    }
+
     mainWindow.loadFile(OFFLINE_PAGE, { query: { url: APP_URL } });
   });
 
@@ -79,6 +138,7 @@ function createMainWindow() {
     if (input.key === 'F11') {
       mainWindow.setFullScreen(!mainWindow.isFullScreen());
     } else if (input.control && input.key.toLowerCase() === 'r') {
+      triedOfflinePosFallback = false;
       mainWindow.reload();
     }
   });
@@ -214,8 +274,27 @@ ipcMain.handle('vora:print-silent', (event, options = {}) => {
 
 ipcMain.handle('vora:retry-load', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
+    triedOfflinePosFallback = false;
     void mainWindow.loadURL(APP_URL);
   }
+});
+
+ipcMain.handle('vora:open-last-pos', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const state = readDesktopState();
+    if (state.lastPosUrl && isPosShellUrl(state.lastPosUrl)) {
+      triedOfflinePosFallback = true;
+      void mainWindow.loadURL(state.lastPosUrl);
+    }
+  }
+});
+
+ipcMain.handle('vora:get-desktop-info', () => {
+  const state = readDesktopState();
+  return {
+    version: app.getVersion(),
+    lastPosUrl: state.lastPosUrl || null,
+  };
 });
 
 const gotLock = app.requestSingleInstanceLock();

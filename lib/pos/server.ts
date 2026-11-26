@@ -1,5 +1,5 @@
 import 'server-only';
-import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createCipheriv, createHash, createHmac, pbkdf2Sync, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
   PosCashMovement,
@@ -652,11 +652,86 @@ export async function listReturns(service: SupabaseClient, tenantId: string): Pr
 }
 
 // --------------------------------------------------------------------------
-// PIN de supervisor (hash scrypt, bloqueo tras intentos fallidos)
+// PIN de supervisor y operador (hash scrypt, bloqueo + firma offline)
 // --------------------------------------------------------------------------
 
 const PIN_MAX_ATTEMPTS = 5;
 const PIN_LOCK_MINUTES = 15;
+const OFFLINE_PIN_ITERATIONS = 100_000;
+
+export interface OfflinePinBundle {
+  version: 1;
+  salt: string;
+  iterations: number;
+  verifier_hash: string;
+  iv: string;
+  encrypted_key: string;
+}
+
+export interface OfflineProofPayload {
+  operator_id?: string;
+  supervisor_id?: string;
+  proof: string;
+  authorized_at?: string;
+  reason?: string;
+  limit_snapshot?: Record<string, unknown>;
+}
+
+function getOfflinePinSecret(): string {
+  return (
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.CRON_SECRET ||
+    'vora-tenant-session-secret-salt-2026'
+  );
+}
+
+export function deriveOfflineSigningKey(tenantId: string, userId: string, pinHash: string): Buffer {
+  return createHmac('sha256', getOfflinePinSecret())
+    .update(`vora-offline-pin:${tenantId}:${userId}:${pinHash}`)
+    .digest();
+}
+
+export function createOfflinePinBundle(params: {
+  pin: string;
+  tenantId: string;
+  userId: string;
+  pinHash: string;
+}): OfflinePinBundle {
+  const saltBuf = randomBytes(16);
+  const derivedKey = pbkdf2Sync(params.pin, saltBuf, OFFLINE_PIN_ITERATIONS, 32, 'sha256');
+  const verifierHash = createHash('sha256').update(derivedKey).digest('hex');
+  const iv = randomBytes(12);
+  const signingKey = deriveOfflineSigningKey(params.tenantId, params.userId, params.pinHash);
+  const cipher = createCipheriv('aes-256-gcm', derivedKey, iv);
+  const ciphertext = Buffer.concat([cipher.update(signingKey), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return {
+    version: 1,
+    salt: saltBuf.toString('base64'),
+    iterations: OFFLINE_PIN_ITERATIONS,
+    verifier_hash: verifierHash,
+    iv: iv.toString('base64'),
+    encrypted_key: Buffer.concat([ciphertext, authTag]).toString('base64'),
+  };
+}
+
+export async function saveOfflinePinBundle(
+  service: SupabaseClient,
+  tenantId: string,
+  userId: string,
+  bundle: OfflinePinBundle,
+): Promise<boolean> {
+  try {
+    const { error } = await service
+      .from('pos_staff_pins')
+      .update({ offline_bundle: bundle })
+      .eq('tenant_id', tenantId)
+      .eq('auth_user_id', userId);
+    return !error;
+  } catch {
+    return false;
+  }
+}
 
 export function validatePinFormat(pin: unknown): string {
   const p = String(pin ?? '').trim();
@@ -681,28 +756,29 @@ export function verifyPinHash(pin: string, stored: string): boolean {
 }
 
 /**
- * Valida el PIN de un supervisor concreto y que su rol tenga el permiso pedido.
- * Bloquea el PIN 15 minutos tras 5 intentos fallidos.
+ * Valida el PIN de un usuario concreto (y opcionalmente un permiso de su rol).
+ * Bloquea el PIN 15 minutos tras 5 intentos fallidos y aprovisiona el paquete
+ * cifrado offline si todavía no existía.
  */
-export async function verifySupervisorPin(params: {
+export async function verifyUserPin(params: {
   service: SupabaseClient;
   tenantId: string;
-  supervisorId: string;
+  userId: string;
   pin: string;
-  permission: string;
+  permission?: string;
 }): Promise<{ ok: true; role: string } | { ok: false; error: string; status: number }> {
-  const { service, tenantId, supervisorId, pin, permission } = params;
+  const { service, tenantId, userId, pin, permission } = params;
   const { data: membership } = await service
     .from('tenant_memberships')
     .select('role')
     .eq('tenant_id', tenantId)
-    .eq('auth_user_id', supervisorId)
+    .eq('auth_user_id', userId)
     .eq('status', 'active')
     .maybeSingle();
-  if (!membership) return { ok: false, error: 'El supervisor no pertenece a la empresa.', status: 403 };
+  if (!membership) return { ok: false, error: 'El usuario no pertenece a la empresa o está inactivo.', status: 403 };
 
   const role = membership.role as string;
-  if (role !== 'tenant_admin') {
+  if (permission && role !== 'tenant_admin') {
     const { data: perm } = await service
       .from('role_permissions')
       .select('permission')
@@ -717,13 +793,14 @@ export async function verifySupervisorPin(params: {
     .from('pos_staff_pins')
     .select('pin_hash, failed_attempts, locked_until')
     .eq('tenant_id', tenantId)
-    .eq('auth_user_id', supervisorId)
+    .eq('auth_user_id', userId)
     .maybeSingle();
-  if (!row) return { ok: false, error: 'El supervisor no tiene un PIN configurado.', status: 403 };
+  if (!row) return { ok: false, error: 'El usuario no tiene un PIN configurado.', status: 403 };
   if (row.locked_until && new Date(row.locked_until) > new Date())
     return { ok: false, error: 'PIN bloqueado temporalmente por intentos fallidos. Intenta más tarde.', status: 429 };
 
-  if (!verifyPinHash(String(pin ?? '').trim(), row.pin_hash)) {
+  const cleanPin = String(pin ?? '').trim();
+  if (!verifyPinHash(cleanPin, row.pin_hash)) {
     const attempts = (row.failed_attempts ?? 0) + 1;
     await service
       .from('pos_staff_pins')
@@ -733,17 +810,138 @@ export async function verifySupervisorPin(params: {
           attempts >= PIN_MAX_ATTEMPTS ? new Date(Date.now() + PIN_LOCK_MINUTES * 60_000).toISOString() : null,
       })
       .eq('tenant_id', tenantId)
-      .eq('auth_user_id', supervisorId);
-    return { ok: false, error: 'PIN de supervisor inválido.', status: 403 };
+      .eq('auth_user_id', userId);
+    return { ok: false, error: permission ? 'PIN de supervisor inválido.' : 'PIN de usuario inválido.', status: 403 };
   }
   if (row.failed_attempts) {
     await service
       .from('pos_staff_pins')
       .update({ failed_attempts: 0, locked_until: null })
       .eq('tenant_id', tenantId)
-      .eq('auth_user_id', supervisorId);
+      .eq('auth_user_id', userId);
+  }
+  const bundle = createOfflinePinBundle({ pin: cleanPin, tenantId, userId, pinHash: row.pin_hash });
+  await saveOfflinePinBundle(service, tenantId, userId, bundle);
+  return { ok: true, role };
+}
+
+/**
+ * Valida el PIN de un supervisor concreto y que su rol tenga el permiso pedido.
+ * Bloquea el PIN 15 minutos tras 5 intentos fallidos.
+ */
+export async function verifySupervisorPin(params: {
+  service: SupabaseClient;
+  tenantId: string;
+  supervisorId: string;
+  pin: string;
+  permission: string;
+}): Promise<{ ok: true; role: string } | { ok: false; error: string; status: number }> {
+  const res = await verifyUserPin({
+    service: params.service,
+    tenantId: params.tenantId,
+    userId: params.supervisorId,
+    pin: params.pin,
+    permission: params.permission,
+  });
+  if (!res.ok && res.error === 'El usuario no pertenece a la empresa o está inactivo.') {
+    return { ok: false, error: 'El supervisor no pertenece a la empresa.', status: 403 };
+  }
+  if (!res.ok && res.error === 'El usuario no tiene un PIN configurado.') {
+    return { ok: false, error: 'El supervisor no tiene un PIN configurado.', status: 403 };
+  }
+  return res;
+}
+
+/**
+ * Verifica una firma criptográfica generada sin conexión a partir de la clave
+ * descifrada con el PIN real del supervisor u operador.
+ */
+export async function verifyOfflinePinProof(params: {
+  service: SupabaseClient;
+  tenantId: string;
+  userId: string;
+  permission?: string;
+  proof: string;
+  message: string;
+}): Promise<{ ok: true; role: string } | { ok: false; error: string; status: number }> {
+  const { service, tenantId, userId, permission, proof, message } = params;
+  const cleanProof = String(proof ?? '').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(cleanProof)) {
+    return { ok: false, error: 'Firma de autorización offline inválida.', status: 403 };
+  }
+
+  const { data: membership } = await service
+    .from('tenant_memberships')
+    .select('role')
+    .eq('tenant_id', tenantId)
+    .eq('auth_user_id', userId)
+    .eq('status', 'active')
+    .maybeSingle();
+  if (!membership) return { ok: false, error: 'El usuario no pertenece a la empresa o está inactivo.', status: 403 };
+
+  const role = membership.role as string;
+  if (permission && role !== 'tenant_admin') {
+    const { data: perm } = await service
+      .from('role_permissions')
+      .select('permission')
+      .eq('role_key', role)
+      .eq('permission', permission)
+      .eq('scope', 'tenant')
+      .maybeSingle();
+    if (!perm) return { ok: false, error: 'Ese usuario no tiene facultad para autorizar esta operación.', status: 403 };
+  }
+
+  const { data: row } = await service
+    .from('pos_staff_pins')
+    .select('pin_hash, locked_until')
+    .eq('tenant_id', tenantId)
+    .eq('auth_user_id', userId)
+    .maybeSingle();
+  if (!row) return { ok: false, error: 'El usuario no tiene un PIN configurado.', status: 403 };
+  if (row.locked_until && new Date(row.locked_until) > new Date())
+    return { ok: false, error: 'PIN bloqueado temporalmente por intentos fallidos.', status: 429 };
+
+  const signingKey = deriveOfflineSigningKey(tenantId, userId, row.pin_hash);
+  const expectedProof = createHmac('sha256', signingKey).update(message).digest('hex');
+  const valid = timingSafeEqual(Buffer.from(cleanProof, 'hex'), Buffer.from(expectedProof, 'hex'));
+  if (!valid) {
+    return { ok: false, error: 'La autorización offline no corresponde al PIN vigente.', status: 403 };
   }
   return { ok: true, role };
+}
+
+/**
+ * Si una operación offline fue realizada por otro operador que desbloqueó la caja
+ * localmente con su PIN, valida su prueba criptográfica y permiso antes de
+ * atribuirle p_actor en el servidor.
+ */
+export async function resolveActorFromOfflineProof(params: {
+  service: SupabaseClient;
+  tenantId: string;
+  authUserId: string;
+  offlineOperatorAuth: unknown;
+  requiredPermission: string;
+  actionScope: string;
+}): Promise<{ ok: true; actorId: string } | { ok: false; error: string; status: number }> {
+  const { service, tenantId, authUserId, offlineOperatorAuth, requiredPermission, actionScope } = params;
+  if (!offlineOperatorAuth || typeof offlineOperatorAuth !== 'object') {
+    return { ok: true, actorId: authUserId };
+  }
+  const authObj = offlineOperatorAuth as Record<string, unknown>;
+  const operatorId = String(authObj.operator_id ?? '').trim();
+  if (!operatorId || operatorId === authUserId) {
+    return { ok: true, actorId: authUserId };
+  }
+  const check = await verifyOfflinePinProof({
+    service,
+    tenantId,
+    userId: operatorId,
+    permission: requiredPermission,
+    proof: String(authObj.proof ?? ''),
+    message: `operator:${tenantId}:${operatorId}:${actionScope}`,
+  });
+  if (!check.ok) return check;
+  return { ok: true, actorId: operatorId };
 }
 
 /** Nombre visible de un usuario de Auth (metadatos o correo). */

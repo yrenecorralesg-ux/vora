@@ -8,18 +8,12 @@ export function PosView14Returns() {
   const {
     sales,
     lastConfirmedSale,
-    activeBranch,
     activeShift,
-    activeUser,
     showNotification,
     navigateTo,
     supervisors: allSupervisors,
     can,
-    activeTenantSlug,
-    reloadProducts,
-    reloadSales,
-    reloadReturns,
-    refreshActiveShift,
+    recordSaleReturn,
   } = usePos();
   const isSupervisorSession = can('pos.refunds.approve');
   const [submitting, setSubmitting] = useState(false);
@@ -72,15 +66,32 @@ export function PosView14Returns() {
       return;
     }
 
-    const itemsToReturn: Array<{ lineId: string; quantity: number }> = [];
+    const itemsToReturn: Array<{ saleLineId: string; lineIndex: number; sku: string; quantity: number; condition: 'sellable' | 'damaged' }> = [];
     if (returnType === 'anulacion_total') {
-      (selectedSale.lines ?? []).forEach((l) => {
+      (selectedSale.lines ?? []).forEach((l, idx) => {
         const remaining = l.quantity - l.returned_quantity;
-        if (remaining > 0) itemsToReturn.push({ lineId: l.id, quantity: remaining });
+        if (remaining > 0) {
+          itemsToReturn.push({
+            saleLineId: l.id,
+            lineIndex: idx,
+            sku: l.sku_snapshot,
+            quantity: remaining,
+            condition: damagedLines[l.id] ? 'damaged' : 'sellable',
+          });
+        }
       });
     } else {
-      Object.entries(quantitiesToReturn).forEach(([lineId, qty]) => {
-        if (qty > 0) itemsToReturn.push({ lineId, quantity: qty });
+      (selectedSale.lines ?? []).forEach((l, idx) => {
+        const qty = quantitiesToReturn[l.id] ?? 0;
+        if (qty > 0) {
+          itemsToReturn.push({
+            saleLineId: l.id,
+            lineIndex: idx,
+            sku: l.sku_snapshot,
+            quantity: qty,
+            condition: damagedLines[l.id] ? 'damaged' : 'sellable',
+          });
+        }
       });
     }
     if (itemsToReturn.length === 0) {
@@ -92,48 +103,31 @@ export function PosView14Returns() {
       return;
     }
 
-    // El servidor valida el PIN (o el permiso de la sesión) y registra quién aprobó.
+    // Valida PIN online u offline según conectividad
     setSubmitting(true);
-    let data: { ok?: boolean; error?: string; return_record?: { return_number: string; total_refunded_usd: number } } | null = null;
-    try {
-      const resp = await fetch(`/api/t/${activeTenantSlug}/pos/returns`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          idempotency_key: `ret-${selectedSale.id}-${Date.now()}`,
-          original_sale_id: selectedSale.id,
-          shift_id: activeShift.id,
-          return_type: returnType,
-          lines: itemsToReturn.map((item) => ({
-            sale_line_id: item.lineId,
-            quantity_returned: item.quantity,
-            condition: damagedLines[item.lineId] ? 'damaged' : 'sellable',
-          })),
-          reason,
-          notes: notes.trim() || undefined,
-          refund_method: refundMethod,
-          supervisor_id: isSupervisorSession ? undefined : supervisorId,
-          supervisor_pin: isSupervisorSession ? undefined : supervisorPin.trim(),
-        }),
-      });
-      data = await resp.json().catch(() => null);
-    } catch {
-      data = { ok: false, error: 'Sin conexión con el servidor. Las devoluciones requieren conexión.' };
-    } finally {
-      setSubmitting(false);
-      setSupervisorPin('');
-    }
+    const res = await recordSaleReturn({
+      originalSale: selectedSale,
+      shiftId: activeShift.id,
+      returnType,
+      lines: itemsToReturn,
+      reason,
+      notes: notes.trim() || undefined,
+      refundMethod,
+      supervisorId: isSupervisorSession ? undefined : supervisorId,
+      supervisorPin: isSupervisorSession ? undefined : supervisorPin.trim(),
+    });
+    setSubmitting(false);
+    setSupervisorPin('');
 
-    if (!data?.ok || !data.return_record) {
-      setErrorMsg(data?.error ?? 'El servidor rechazó la devolución.');
+    if (!res.ok) {
+      setErrorMsg(res.error ?? 'No se pudo procesar la devolución.');
       return;
     }
 
-    await Promise.all([reloadProducts(), reloadSales(), reloadReturns(), refreshActiveShift()]).catch(() => {});
     showNotification(
-      'Devolución registrada',
-      `Reverso ${data.return_record.return_number} por $${Number(data.return_record.total_refunded_usd || 0).toFixed(2)} USD.`,
-      'success',
+      res.offline ? 'Devolución guardada sin conexión' : 'Devolución registrada',
+      `Reverso ${res.returnNumber ?? ''} por $${Number(res.totalRefundedUsd || 0).toFixed(2)} USD.${res.offline ? ' Se sincronizará al volver la red.' : ''}`,
+      res.offline ? 'alert' : 'success',
     );
     navigateTo('POS-13');
   };

@@ -6,7 +6,7 @@ import { usePos } from './pos-context';
 import type { PosCustomer } from '@/lib/types';
 
 export function PosView05CustomerSelector() {
-  const { customers, selectedCustomer, setSelectedCustomer, navigateTo, showNotification, addCustomer, activeTenantSlug } = usePos();
+  const { customers, selectedCustomer, setSelectedCustomer, navigateTo, showNotification, addCustomer, activeTenantSlug, isOnline } = usePos();
 
   const [query, setQuery] = useState('');
   const [activeCust, setActiveCust] = useState<PosCustomer>(selectedCustomer ?? customers[0]);
@@ -62,7 +62,7 @@ export function PosView05CustomerSelector() {
   );
 
   useEffect(() => {
-    if (!query.trim() || filtered.length > 0) {
+    if (!isOnline || !query.trim() || filtered.length > 0) {
       setRemoteResults([]);
       return;
     }

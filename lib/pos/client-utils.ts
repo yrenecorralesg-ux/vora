@@ -8,6 +8,7 @@ export interface PosStaffUser {
   role: string;
   is_active: boolean;
   has_pin: boolean;
+  offline_pin_ready?: boolean;
   created_at?: string;
 }
 
@@ -17,6 +18,7 @@ export interface PosMe {
   email: string | null;
   role: string;
   has_pin: boolean;
+  offline_pin_ready?: boolean;
   can_approve: boolean;
   permissions: Record<string, boolean>;
 }
