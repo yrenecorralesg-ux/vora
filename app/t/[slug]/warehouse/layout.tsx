@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { requireWarehousePage, type WarehouseContext, type WarehouseFunction, type WarehousePermission } from '@/lib/warehouse/access';
 import { hasTenantPermission } from '@/lib/tenant-api-auth';
+import { isFullCrossModuleRole } from '@/lib/role-modules';
 import { WarehouseSidebar } from '@/components/warehouse/wh-sidebar';
 import { WhBackBar } from '@/components/warehouse/back-bar';
 
@@ -85,6 +86,7 @@ export default async function WarehouseLayout({ children, params }: { children: 
         tenantName={ctx.tenantName}
         hidden={hidden}
         canConfigurePos={canConfigurePos}
+        canAccessPos={isFullCrossModuleRole(ctx.role)}
         branding={{
           primaryColor,
           secondaryColor,

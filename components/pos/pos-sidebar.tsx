@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { usePos } from './pos-context';
 import { cn } from '@/lib/utils';
+import { canAccessPosView, isFullCrossModuleRole } from '@/lib/role-modules';
 
 export function PosSidebar() {
   const {
@@ -94,44 +95,68 @@ export function PosSidebar() {
     'POS-20',
   ].includes(currentView);
 
+  const allowView = (view: string) =>
+    canAccessPosView({
+      view,
+      role: activeUser.role,
+      can,
+      isFuncActive,
+    });
+
   const posSubmodules = [
-    {
-      id: 'pos_main',
-      label: 'Caja y Terminal',
-      icon: Store,
-      isActive: [
-        'POS-01',
-        'POS-02',
-        'POS-06',
-        'POS-11',
-        'POS-12',
-        'POS-14',
-        'POS-15',
-      ].includes(currentView),
-      onClick: () => navigateTo('POS-01'),
-    },
-    {
-      id: 'sales',
-      label: 'Ventas',
-      icon: Receipt,
-      isActive: currentView === 'POS-13',
-      onClick: () => navigateTo('POS-13'),
-    },
-    {
-      id: 'products',
-      label: 'Productos',
-      icon: Package,
-      isActive: currentView === 'POS-03-04',
-      onClick: () => navigateTo('POS-03-04'),
-    },
-    {
-      id: 'customers',
-      label: 'Clientes',
-      icon: Users,
-      isActive: currentView === 'POS-05',
-      onClick: () => navigateTo('POS-05'),
-    },
-    ...(isFuncActive('pos_reports')
+    ...(allowView('POS-01')
+      ? [
+        {
+          id: 'pos_main',
+          label: 'Caja y Terminal',
+          icon: Store,
+          isActive: [
+            'POS-01',
+            'POS-02',
+            'POS-06',
+            'POS-11',
+            'POS-12',
+            'POS-14',
+            'POS-15',
+          ].includes(currentView),
+          onClick: () => navigateTo('POS-01'),
+        },
+      ]
+      : []),
+    ...(allowView('POS-13')
+      ? [
+        {
+          id: 'sales',
+          label: 'Ventas',
+          icon: Receipt,
+          isActive: currentView === 'POS-13',
+          onClick: () => navigateTo('POS-13'),
+        },
+      ]
+      : []),
+    ...(allowView('POS-03-04')
+      ? [
+        {
+          id: 'products',
+          label: 'Productos',
+          icon: Package,
+          isActive: currentView === 'POS-03-04',
+          onClick: () => navigateTo('POS-03-04'),
+        },
+      ]
+      : []),
+    ...(allowView('POS-05')
+      ? [
+        {
+          id: 'customers',
+          label: 'Clientes',
+          icon: Users,
+          isActive: currentView === 'POS-05',
+          onClick: () => navigateTo('POS-05'),
+        },
+      ]
+      : []),
+    ...(allowView('POS-16')
       ? [
         {
           id: 'reports',
@@ -142,7 +167,7 @@ export function PosSidebar() {
         },
       ]
       : []),
-    ...(isFuncActive('pos_supervisor_users_crud')
+    ...(allowView('POS-19')
       ? [
         {
           id: 'staff_users',
@@ -153,7 +178,7 @@ export function PosSidebar() {
         },
       ]
       : []),
-    ...(isFuncActive('pos_order_dispatch_kds')
+    ...(allowView('POS-20')
       ? [
         {
           id: 'dispatch_kds',
@@ -164,7 +189,7 @@ export function PosSidebar() {
         },
       ]
       : []),
-    ...(isFuncActive('pos_settings') && can('pos.settings.manage')
+    ...(allowView('POS-17')
       ? [
         {
           id: 'settings',
@@ -296,8 +321,8 @@ export function PosSidebar() {
             )}
           </div>
 
-          {/* Módulo Principal 2: Warehouse (si está contratado o habilitado) */}
-          {(isWarehouseEnabled || true) && (
+          {/* Módulo Principal 2: Warehouse (solo si está activo y el rol tiene acceso completo) */}
+          {isWarehouseEnabled && isFullCrossModuleRole(activeUser.role) && (
             <div className="flex flex-col mt-1">
               <button
                 type="button"

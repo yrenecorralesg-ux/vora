@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 import { TheFactoryHkaProvider } from '@/lib/pos-hka-provider';
 import { getSale } from '@/lib/pos/server';
 import type { PosFiscalIntegration, PosFiscalStatus } from '@/lib/types';
@@ -70,7 +70,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const integration = await loadIntegration(getSupabaseServiceClient(), auth.access.tenantId);
   return NextResponse.json({ ok: true, integration });
@@ -80,7 +80,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   if (!(await hasTenantPermission(auth.access, 'pos.fiscal.issue')))
     return permissionDenied('Tu rol no permite operaciones fiscales.');

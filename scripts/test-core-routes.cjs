@@ -703,6 +703,145 @@ async function offlinePosTests() {
     assert.equal(forgedRes.status, 307);
     assert.equal(new URL(forgedRes.headers.get('location')).pathname, '/t/pepito/login');
   });
+
+  await moduleIsolationTests();
+}
+
+async function moduleIsolationTests() {
+  const posServer = load('lib/pos/server.ts', { 'server-only': {} });
+  const whPinHash = posServer.hashPin('5913');
+  const modRoles = load('lib/role-modules.ts');
+
+  await test('role-modules policy restricts POS submodules and cross-module visibility cleanly', async () => {
+    assert.equal(modRoles.isFullCrossModuleRole('tenant_admin'), true);
+    assert.equal(modRoles.isFullCrossModuleRole('pos_store_admin'), false);
+    assert.equal(modRoles.isFullCrossModuleRole('wh_manager'), false);
+    assert.equal(modRoles.canAccessModule('pos_cashier', 'warehouse'), false);
+    assert.equal(modRoles.canAccessModule('wh_manager', 'pos'), false);
+    assert.equal(modRoles.canAccessModule('member', 'pos'), false);
+    assert.equal(modRoles.canAccessModule('member', 'warehouse'), false);
+    assert.equal(modRoles.canAccessTenantFeature('member', 'commerce.pos'), false);
+    assert.equal(modRoles.canAccessTenantFeature('member', 'crm.customers'), true);
+
+    const allOn = () => true;
+    const cashierCan = (p) => ['pos.sales.create', 'pos.payments.register', 'pos.cash.open', 'pos.cash.close'].includes(p);
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-01', role: 'pos_cashier', can: cashierCan, isFuncActive: allOn }), true);
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-16', role: 'pos_cashier', can: cashierCan, isFuncActive: allOn }), false);
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-19', role: 'pos_cashier', can: cashierCan, isFuncActive: allOn }), false);
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-17', role: 'pos_cashier', can: cashierCan, isFuncActive: allOn }), false);
+
+    const supCan = (p) => cashierCan(p) || p === 'pos.reports.view' || p === 'pos.refunds.approve';
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-16', role: 'pos_supervisor', can: supCan, isFuncActive: allOn }), true);
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-19', role: 'pos_supervisor', can: supCan, isFuncActive: allOn }), true);
+
+    const audCan = (p) => p === 'pos.reports.view';
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-01', role: 'pos_auditor', can: audCan, isFuncActive: allOn }), false);
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-13', role: 'pos_auditor', can: audCan, isFuncActive: allOn }), true);
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-16', role: 'pos_auditor', can: audCan, isFuncActive: allOn }), true);
+    assert.equal(modRoles.canAccessPosView({ view: 'POS-19', role: 'pos_auditor', can: audCan, isFuncActive: allOn }), false);
+  });
+
+  const db = {
+    tenants: [
+      { id: 'tA', slug: 'empresa-a', commercial_name: 'Empresa A', commercial_status: 'active', technical_status: 'ready' },
+    ],
+    tenant_memberships: [
+      { tenant_id: 'tA', auth_user_id: 'admin-a', role: 'tenant_admin', status: 'active', created_at: '2026-11-01' },
+      { tenant_id: 'tA', auth_user_id: 'cajero-a', role: 'pos_cashier', status: 'active', created_at: '2026-11-02' },
+      { tenant_id: 'tA', auth_user_id: 'auditor-a', role: 'pos_auditor', status: 'active', created_at: '2026-11-03' },
+      { tenant_id: 'tA', auth_user_id: 'wh-a', role: 'wh_manager', status: 'active', created_at: '2026-11-04' },
+      { tenant_id: 'tA', auth_user_id: 'member-a', role: 'member', status: 'active', created_at: '2026-11-05' },
+    ],
+    role_permissions: [
+      { role_key: 'pos_cashier', permission: 'pos.sales.create', scope: 'tenant' },
+      { role_key: 'pos_auditor', permission: 'pos.reports.view', scope: 'tenant' },
+      { role_key: 'wh_manager', permission: 'catalog.create', scope: 'tenant' },
+      { role_key: 'wh_manager', permission: 'warehouse.configure', scope: 'tenant' },
+    ],
+    tenant_role_matrix: [],
+    tenant_features: [
+      { tenant_id: 'tA', feature_key: 'commerce.pos', enabled: true, contracted: true, config: {} },
+      { tenant_id: 'tA', feature_key: 'warehouse.inventory', enabled: true, contracted: true, config: {} },
+      { tenant_id: 'tA', feature_key: 'crm.customers', enabled: true, contracted: true, config: {} },
+    ],
+    warehouse_settings: [{ tenant_id: 'tA' }],
+    warehouse_warehouses: [{ id: 'wh-1', tenant_id: 'tA', name: 'Principal', code: 'PRINCIPAL' }],
+    warehouse_balances: [],
+    pos_staff_pins: [
+      { tenant_id: 'tA', auth_user_id: 'wh-a', pin_hash: whPinHash, failed_attempts: 0, locked_until: null },
+    ],
+    pos_tenant_settings: [
+      { tenant_id: 'tA', active_exchange_rate: 40, max_cashier_discount_percent: 5, allow_partial_payments: true, active_methods: ['efectivo'], internal_doc_prefix: 'COMP-INT-' },
+    ],
+  };
+
+  const service = fakeDb(db, []);
+  const tsMod = load('lib/tenant-session.ts', { 'next/headers': { cookies: () => ({ get: () => undefined }) } });
+  const asRoleUser = (userId, role) => {
+    const token = tsMod.createTenantSessionToken({
+      userId,
+      email: `${userId}@test.local`,
+      name: userId,
+      role,
+      tenantId: 'tA',
+      slug: 'empresa-a',
+    });
+    const cookieName = tsMod.getTenantCookieName('empresa-a');
+    return {
+      'server-only': {},
+      'next/headers': { cookies: () => ({ get: (name) => (name === cookieName ? { value: token } : undefined) }) },
+      'next/navigation': { redirect: (to) => { throw new Error(`REDIRECT:${to}`); } },
+      '@/lib/auth': { requireSession: async () => ({ id: userId, email: `${userId}@test.local` }), isSuperAdmin: async () => false, requireSuperAdmin: async () => null },
+      '@/lib/supabase-server': { getSupabaseServerClient: () => ({}), getSupabaseServiceClient: () => service },
+    };
+  };
+
+  const ctx = { params: { slug: 'empresa-a' } };
+  const getReq = () => new NextRequest('https://vora.venesoftca.com/api/test');
+  const postReq = (b) => new NextRequest('https://vora.venesoftca.com/api/test', { method: 'POST', body: JSON.stringify(b) });
+
+  await test('cross-module API requests are blocked with 403 across POS and Warehouse', async () => {
+    assert.equal((await load('app/api/t/[slug]/pos/features/route.ts', asRoleUser('wh-a', 'wh_manager')).GET(getReq(), ctx)).status, 403);
+    assert.equal((await load('app/api/t/[slug]/pos/features/route.ts', asRoleUser('member-a', 'member')).GET(getReq(), ctx)).status, 403);
+    assert.equal((await load('app/api/t/[slug]/pos/features/route.ts', asRoleUser('cajero-a', 'pos_cashier')).GET(getReq(), ctx)).status, 200);
+    assert.equal((await load('app/api/t/[slug]/warehouse/stock/route.ts', asRoleUser('cajero-a', 'pos_cashier')).GET(getReq(), ctx)).status, 403);
+    assert.equal((await load('app/api/t/[slug]/warehouse/stock/route.ts', asRoleUser('member-a', 'member')).GET(getReq(), ctx)).status, 403);
+    assert.equal((await load('app/api/t/[slug]/warehouse/stock/route.ts', asRoleUser('wh-a', 'wh_manager')).GET(getReq(), ctx)).status, 200);
+    assert.equal((await load('app/api/t/[slug]/warehouse/stock/route.ts', asRoleUser('admin-a', 'tenant_admin')).GET(getReq(), ctx)).status, 200);
+  });
+
+  await test('POS operator lists exclude wh_* and member and reject PIN switching to wh_*', async () => {
+    const usersRes = await load('app/api/t/[slug]/pos/users/route.ts', asRoleUser('cajero-a', 'pos_cashier')).GET(getReq(), ctx);
+    assert.equal(usersRes.status, 200);
+    const usersBody = await usersRes.json();
+    const userIds = usersBody.users.map((u) => u.id);
+    assert.deepEqual(userIds.sort(), ['admin-a', 'auditor-a', 'cajero-a']);
+
+    const bundleRes = await load('app/api/t/[slug]/pos/offline-bundle/route.ts', asRoleUser('cajero-a', 'pos_cashier')).GET(getReq(), ctx);
+    assert.equal(bundleRes.status, 200);
+    const bundleBody = await bundleRes.json();
+    assert.deepEqual(bundleBody.operators.map((o) => o.id).sort(), ['admin-a', 'auditor-a', 'cajero-a']);
+
+    const switchRes = await load('app/api/t/[slug]/pos/switch-operator/route.ts', asRoleUser('cajero-a', 'pos_cashier')).POST(
+      postReq({ userId: 'wh-a', pin: '5913' }),
+      ctx,
+    );
+    assert.equal(switchRes.status, 403);
+  });
+
+  await test('page guards redirect cross-module visits to the caller home module', async () => {
+    const whAccessCashier = load('lib/warehouse/access.ts', asRoleUser('cajero-a', 'pos_cashier'));
+    await assert.rejects(() => whAccessCashier.requireWarehousePage('empresa-a'), /REDIRECT:\/t\/empresa-a\/pos$/);
+
+    const whAccessMember = load('lib/warehouse/access.ts', asRoleUser('member-a', 'member'));
+    await assert.rejects(() => whAccessMember.requireWarehousePage('empresa-a'), /REDIRECT:\/t\/empresa-a$/);
+
+    const tAccessCashier = load('lib/tenant-access.ts', asRoleUser('cajero-a', 'pos_cashier'));
+    await assert.rejects(() => tAccessCashier.requireTenantFeature('empresa-a', 'crm.customers'), /REDIRECT:\/t\/empresa-a\/pos$/);
+
+    const tAccessWh = load('lib/tenant-access.ts', asRoleUser('wh-a', 'wh_manager'));
+    await assert.rejects(() => tAccessWh.requireTenantFeature('empresa-a', 'crm.customers'), /REDIRECT:\/t\/empresa-a\/warehouse$/);
+  });
 }
 
 function rpcCallsFrom(calls, fn) {

@@ -37,6 +37,7 @@ import {
 import { loadOfflineSnapshot, saveOfflineSnapshot } from '@/lib/pos-offline-db';
 import { publishCustomerDisplayState } from '@/lib/desktop-bridge';
 import { formatPagoMovilQrPayload } from '@/lib/pos-pago-movil';
+import { canAccessPosView, defaultPosViewForRole } from '@/lib/role-modules';
 import {
   apiError,
   buildSalesBookCsv,
@@ -2477,8 +2478,21 @@ export function PosProvider({
   }, []);
 
   const navigateTo = (view: PosViewKey) => {
+    if (me && !canAccessPosView({ view, role: me.role, can, isFuncActive })) {
+      showNotification('Acceso restringido', 'Tu rol no tiene permiso para acceder a esta sección.', 'alert');
+      return;
+    }
     setCurrentView(view);
   };
+
+  useEffect(() => {
+    if (!me) return;
+    const allowed = canAccessPosView({ view: currentView, role: me.role, can, isFuncActive });
+    if (!allowed) {
+      setCurrentView(defaultPosViewForRole(me.role));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me, currentView, posFeatures, isModuleEnabled]);
 
   return (
     <PosContext.Provider

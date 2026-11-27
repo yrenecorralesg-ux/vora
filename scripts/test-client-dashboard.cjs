@@ -4,17 +4,19 @@ let admin=false,member=true,ready=true,checks=0,deny=false;
 const dashboardFeature={feature_key:'crm.dashboard',enabled:true,contracted:true,features:{name:'Resumen',description:'Panel'}};
 let features=[dashboardFeature];
 const profile=()=>({id:'tenant-test',commercial_name:'test1',technical_status:ready?'ready':'pending_setup'});
-const client={from(table){const data=table==='tenants'?profile():table==='tenant_memberships'?(member?{id:'member'}:null):table==='tenant_branding'?{primary_color:'#5c4428',logo_url:'/logo-test1.png'}:features;const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data}),then:resolve=>Promise.resolve({data}).then(resolve)};return q;}};
+const client={from(table){const data=table==='tenants'?profile():table==='tenant_memberships'?(member?{id:'member',role:'tenant_admin'}:null):table==='tenant_branding'?{primary_color:'#5c4428',logo_url:'/logo-test1.png'}:features;const q={select:()=>q,eq:()=>q,maybeSingle:async()=>({data}),then:resolve=>Promise.resolve({data}).then(resolve)};return q;}};
 function load(file,mocks){const code=ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;const mod={exports:{}};vm.runInThisContext(`(function(require,module,exports){${code}\n})`)(name=>name in mocks?mocks[name]:require(name),mod,mod.exports);return mod.exports;}
 const icons=new Proxy({},{get:()=>()=>null});
 const helper={canPreviewTenant:(a,requested,m)=>a&&(requested||!m),parseTenantBanners:()=>({header:null})};
 const preview=()=>null;
 const page=load('app/t/[slug]/page.tsx',{
  '@/lib/auth':{requireSession:async()=>({id:'client'}),isSuperAdmin:async()=>admin},
+ '@/lib/tenant-session':{getTenantSession:async()=>null},
+ '@/lib/role-modules':load('lib/role-modules.ts',{}),
  '@/lib/tenant-preview':helper,
  '@/components/tenant-dashboard-preview':{TenantDashboardPreview:preview},
  '@/lib/tenant-access':{requireTenantFeature:async(slug,key)=>{checks++;assert.equal(slug,'test1');assert.equal(key,'crm.dashboard');if(deny)throw new Error('denied');}},
- '@/lib/supabase-server':{getSupabaseServerClient:()=>client},'lucide-react':icons,
+ '@/lib/supabase-server':{getSupabaseServerClient:()=>client,getSupabaseServiceClient:()=>client},'lucide-react':icons,
 }).default;
 async function main(){
  const args={params:{slug:'test1'},searchParams:{}};

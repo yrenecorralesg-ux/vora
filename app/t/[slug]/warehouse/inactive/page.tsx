@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { Warehouse } from 'lucide-react';
 import { isSuperAdmin, requireSession } from '@/lib/auth';
 import { getSupabaseServerClient } from '@/lib/supabase-server';
+import { getTenantSession } from '@/lib/tenant-session';
+import { isFullCrossModuleRole } from '@/lib/role-modules';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +28,8 @@ export default async function WarehouseInactivePage({ params, searchParams }: { 
   const session = getSupabaseServerClient();
   const user = await requireSession(session);
   const admin = user ? await isSuperAdmin(user.id, session) : false;
+  const tenantSession = await getTenantSession(params.slug);
+  const canOpenPos = admin || isFullCrossModuleRole(tenantSession?.role);
 
   return (
     <div className="mx-auto max-w-lg rounded-2xl border border-[#E4E0D6] bg-white p-8 text-center">
@@ -47,7 +51,11 @@ export default async function WarehouseInactivePage({ params, searchParams }: { 
         <p className="mt-4 text-[13px] text-slate-600">Pide al administrador de VORA que active el módulo.</p>
       )}
       <div className="mt-6 flex flex-wrap justify-center gap-2">
-        <Link href={`/t/${params.slug}/pos`} className="inline-flex h-9 items-center rounded-xl border border-[#E7E2D7] px-4 text-[13px]">Ir al POS</Link>
+        {canOpenPos ? (
+          <Link href={`/t/${params.slug}/pos`} className="inline-flex h-9 items-center rounded-xl border border-[#E7E2D7] px-4 text-[13px]">Ir al POS</Link>
+        ) : (
+          <Link href={`/t/${params.slug}/login`} className="inline-flex h-9 items-center rounded-xl border border-[#E7E2D7] px-4 text-[13px]">Volver al acceso</Link>
+        )}
         {admin && (
           <Link href="/admin/tenants" className="inline-flex h-9 items-center rounded-xl bg-[#285C49] px-4 text-[13px] font-semibold text-white">Abrir el gestor</Link>
         )}

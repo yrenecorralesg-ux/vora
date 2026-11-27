@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 import {
   PosError,
   getShift,
@@ -22,7 +22,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const service = getSupabaseServiceClient();
   const { searchParams } = new URL(request.url);
@@ -56,7 +56,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const baseAccess = auth.access;
   const service = getSupabaseServiceClient();

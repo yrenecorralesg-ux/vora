@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ImagePlaceholder } from '@/components/image-placeholder';
+import { canAccessTenantFeature } from '@/lib/role-modules';
 
 export interface CrmNavItem {
   featureKey: string;
@@ -51,7 +52,7 @@ const PosBadgeIcon = () => <span className="font-mono text-[10px] font-bold">POS
 
 export const ALL_CRM_MODULES: CrmNavItem[] = [
   { featureKey: 'commerce.pos', label: 'VORA POS', href: '/t/[slug]/pos', icon: PosBadgeIcon },
-  { featureKey: 'crm.dashboard', label: 'Resumen', href: '/t/[slug]/pos', icon: LayoutDashboard },
+  { featureKey: 'crm.dashboard', label: 'Resumen', href: '/t/[slug]', icon: LayoutDashboard },
   { featureKey: 'crm.customers', label: 'Clientes', href: '/t/[slug]/customers', icon: Users },
   { featureKey: 'capture.fairs', label: 'Captura en feria', href: '/t/[slug]/capture', icon: Store },
   { featureKey: 'crm.segments', label: 'Segmentos', href: '/t/[slug]/segments', icon: PieChart },
@@ -73,6 +74,7 @@ export function CrmSidebar({
   slug,
   tenantName,
   logoUrl,
+  userRole,
   isPreview,
   primaryColor,
   secondaryColor,
@@ -85,9 +87,11 @@ export function CrmSidebar({
   const base = `/t/${slug}`;
   const isSolee = slug === 'solee';
 
-  // Modular dynamic filtering: always include dashboard, others only if enabled
+  // Modular dynamic filtering: solo mostrar features habilitadas y accesibles por rol
   const navItems = ALL_CRM_MODULES.filter(
-    (item) => item.featureKey === 'crm.dashboard' || enabledFeatures.includes(item.featureKey),
+    (item) =>
+      (item.featureKey === 'crm.dashboard' || enabledFeatures.includes(item.featureKey)) &&
+      (isPreview || canAccessTenantFeature(userRole, item.featureKey)),
   );
 
   const isActive = (href: string) => {

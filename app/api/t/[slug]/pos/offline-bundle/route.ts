@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi, hasTenantPermission } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, hasTenantPermission } from '@/lib/tenant-api-auth';
+import { isPosOperatorRole } from '@/lib/role-modules';
+import { FULL_ACCESS_ROLES, resolveRolePermissions } from '@/lib/warehouse/access';
 import { userDisplayNames, type OfflinePinBundle } from '@/lib/pos/server';
 
 export const dynamic = 'force-dynamic';
@@ -30,7 +32,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const service = getSupabaseServiceClient();
   const { tenantId } = auth.access;
@@ -56,7 +58,7 @@ export async function GET(
     bundleMap.set(p.auth_user_id, p.offline_bundle ?? null);
   }
 
-  const activeMembers = members ?? [];
+  const activeMembers = (members ?? []).filter((m) => isPosOperatorRole(m.role as string));
   const names = await userDisplayNames(
     service,
     activeMembers.map((m) => m.auth_user_id as string),
@@ -68,6 +70,11 @@ export async function GET(
     for (const p of POS_PERMISSIONS) {
       perms[p] = await hasTenantPermission({ tenantId, userId: auth.access.userId, role, email: null }, p);
     }
+    const whPerms = FULL_ACCESS_ROLES.includes(role)
+      ? null
+      : await resolveRolePermissions(service, tenantId, role);
+    perms['catalog.create'] = whPerms === null ? true : whPerms.has('catalog.create');
+    perms['warehouse.configure'] = whPerms === null ? true : whPerms.has('warehouse.configure');
     permsByRole.set(role, perms);
   }
 

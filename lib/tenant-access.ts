@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { getTenantSession } from '@/lib/tenant-session';
 import { hasTenantPermission } from '@/lib/tenant-api-auth';
+import { canAccessModule, canAccessTenantFeature, homePathForRole } from '@/lib/role-modules';
 
 export async function requireTenantFeature(
   slug: string,
@@ -29,6 +30,9 @@ export async function requireTenantFeature(
   ]);
 
   if (!tenant || !membership) redirect(`/t/${slug}/login`);
+  if (!canAccessTenantFeature(membership.role, featureKey)) {
+    redirect(homePathForRole(slug, membership.role));
+  }
 
   const { data: feature } = await service
     .from('tenant_features')
@@ -75,6 +79,9 @@ export async function requirePosPermission(
   ]);
 
   if (!tenant || !membership) redirect(`/t/${slug}/login`);
+  if (!canAccessModule(membership.role, 'pos')) {
+    redirect(homePathForRole(slug, membership.role));
+  }
 
   const allowed = await hasTenantPermission(
     {

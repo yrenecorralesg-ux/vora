@@ -157,9 +157,15 @@ export default async function TenantCrmLayout({
   const admin = false;
   const isPreview = false;
 
-  // Selector POS ↔ Warehouse, común a todo el portal de la empresa.
+  // Selector POS ↔ Warehouse, común a todo el portal de la empresa (solo roles admin totales).
   const rail = (
-    <ModuleRail slug={tenant.slug} tenantId={tenant.id} enabledFeatures={enabledFeatures} isSuperAdmin={false} />
+    <ModuleRail
+      slug={tenant.slug}
+      tenantId={tenant.id}
+      enabledFeatures={enabledFeatures}
+      userRole={userRole}
+      isSuperAdmin={false}
+    />
   );
 
   /* 7. Render ------------------------------------------------------------- */

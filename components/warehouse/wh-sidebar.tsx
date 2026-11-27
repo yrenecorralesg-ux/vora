@@ -113,6 +113,7 @@ function NavContent({
   pathname,
   hidden,
   canConfigurePos,
+  canAccessPos,
   branding,
   onNavigate,
 }: {
@@ -121,6 +122,7 @@ function NavContent({
   pathname: string;
   hidden: string[];
   canConfigurePos: boolean;
+  canAccessPos: boolean;
   branding?: WarehouseSidebarBranding;
   onNavigate?: () => void;
 }) {
@@ -192,48 +194,50 @@ function NavContent({
         )}
       </div>
 
-      {/* Módulo Principal: Punto de Venta */}
-      <div className="flex flex-col mt-1">
-        <button
-          type="button"
-          onClick={() => setPosExpanded((prev) => !prev)}
-          className="group flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white transition-all"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <Store className="h-4.5 w-4.5 shrink-0 transition-transform group-hover:scale-105" />
-            <span className="truncate">Punto de Venta</span>
-          </div>
-          <ChevronDown
-            className={cn(
-              'h-4 w-4 shrink-0 transition-transform duration-200 text-white/70',
-              posExpanded ? 'rotate-0' : '-rotate-90',
-            )}
-          />
-        </button>
-
-        {/* Desglose de Submódulos POS */}
-        {posExpanded && (
-          <div
-            className="ml-4 mt-1 pl-3 border-l-2 flex flex-col gap-1"
-            style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
+      {/* Módulo Principal: Punto de Venta (solo para administradores de empresa) */}
+      {canAccessPos && (
+        <div className="flex flex-col mt-1">
+          <button
+            type="button"
+            onClick={() => setPosExpanded((prev) => !prev)}
+            className="group flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-sm font-semibold text-white/80 hover:bg-white/10 hover:text-white transition-all"
           >
-            {activePosLinks.map((item, idx) => {
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={`${item.label}-${idx}`}
-                  href={`/t/${slug}${item.href}`}
-                  onClick={onNavigate}
-                  className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/10 hover:text-white transition-all"
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Store className="h-4.5 w-4.5 shrink-0 transition-transform group-hover:scale-105" />
+              <span className="truncate">Punto de Venta</span>
+            </div>
+            <ChevronDown
+              className={cn(
+                'h-4 w-4 shrink-0 transition-transform duration-200 text-white/70',
+                posExpanded ? 'rotate-0' : '-rotate-90',
+              )}
+            />
+          </button>
+
+          {/* Desglose de Submódulos POS */}
+          {posExpanded && (
+            <div
+              className="ml-4 mt-1 pl-3 border-l-2 flex flex-col gap-1"
+              style={{ borderColor: `color-mix(in srgb, ${secondaryColor} 50%, transparent)` }}
+            >
+              {activePosLinks.map((item, idx) => {
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={`${item.label}-${idx}`}
+                    href={`/t/${slug}${item.href}`}
+                    onClick={onNavigate}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-white/75 hover:bg-white/10 hover:text-white transition-all"
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </nav>
   );
 }
@@ -246,12 +250,14 @@ export function WarehouseSidebar({
   tenantName,
   hidden = [],
   canConfigurePos = false,
+  canAccessPos = false,
   branding,
 }: {
   slug: string;
   tenantName: string;
   hidden?: string[];
   canConfigurePos?: boolean;
+  canAccessPos?: boolean;
   branding?: WarehouseSidebarBranding;
 }) {
   const pathname = usePathname();
@@ -288,6 +294,7 @@ export function WarehouseSidebar({
             pathname={pathname}
             hidden={hidden}
             canConfigurePos={canConfigurePos}
+            canAccessPos={canAccessPos}
             branding={branding}
           />
         </div>
@@ -358,6 +365,7 @@ export function WarehouseSidebar({
                 pathname={pathname}
                 hidden={hidden}
                 canConfigurePos={canConfigurePos}
+                canAccessPos={canAccessPos}
                 branding={branding}
                 onNavigate={() => setOpen(false)}
               />

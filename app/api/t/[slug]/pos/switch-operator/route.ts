@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi, hasTenantPermission } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 import { verifyUserPin } from '@/lib/pos/server';
 import { setTenantSessionCookie } from '@/lib/tenant-session';
 import { FULL_ACCESS_ROLES, resolveRolePermissions } from '@/lib/warehouse/access';
+import { isPosOperatorRole } from '@/lib/role-modules';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -30,7 +31,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
 
   let body: Record<string, any>;
@@ -57,6 +58,9 @@ export async function POST(
   if (!check.ok) {
     return NextResponse.json({ ok: false, error: check.error }, { status: check.status });
   }
+  if (!isPosOperatorRole(check.role)) {
+    return permissionDenied('Solo usuarios habilitados para POS pueden operar esta terminal.');
+  }
 
   const { data: userRes } = await service.auth.admin.getUserById(targetUserId);
   const targetUser = userRes?.user;
@@ -78,6 +82,7 @@ export async function POST(
     ? null
     : await resolveRolePermissions(service, tenantId, check.role);
   permissions['warehouse.configure'] = whPerms === null ? true : whPerms.has('warehouse.configure');
+  permissions['catalog.create'] = whPerms === null ? true : whPerms.has('catalog.create');
 
   const response = NextResponse.json({
     ok: true,

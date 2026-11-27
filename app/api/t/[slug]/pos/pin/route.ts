@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 import {
   PosError,
   createOfflinePinBundle,
@@ -25,7 +25,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const service = getSupabaseServiceClient();
   let row: { updated_at?: string; locked_until?: string | null; offline_bundle?: unknown } | null = null;
@@ -64,7 +64,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   if (auth.access.role === 'super_admin')
     return permissionDenied('El PIN del POS es personal de los usuarios de la empresa.');

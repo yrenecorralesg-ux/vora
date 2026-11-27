@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, KeyRound, UserCheck, X, Wifi, WifiOff, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { usePos } from './pos-context';
+import { isPosOperatorRole } from '@/lib/role-modules';
 
 const ROLE_LABELS: Record<string, string> = {
   tenant_admin: 'Admin Empresa',
@@ -37,9 +38,9 @@ export function PosOperatorModal() {
 
   const [tab, setTab] = useState<'switch' | 'pin'>('switch');
   const eligibleOperators = offlineOperators.length > 0
-    ? offlineOperators
+    ? offlineOperators.filter((o) => isPosOperatorRole(o.role))
     : staffUsers
-        .filter((u) => u.is_active)
+        .filter((u) => u.is_active && isPosOperatorRole(u.role))
         .map((u) => ({
           id: u.id,
           name: u.name,

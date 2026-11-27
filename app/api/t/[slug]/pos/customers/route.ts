@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi } from '@/lib/tenant-api-auth';
 import { mapCustomer } from '@/lib/pos/server';
 import type { PosCustomer } from '@/lib/types';
 
@@ -11,7 +11,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
 
   try {
@@ -86,7 +86,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
 
   try {

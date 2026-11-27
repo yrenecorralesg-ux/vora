@@ -1,7 +1,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi, hasTenantPermission } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, hasTenantPermission } from '@/lib/tenant-api-auth';
 import { FULL_ACCESS_ROLES, resolveRolePermissions } from '@/lib/warehouse/access';
+import { isPosOperatorRole } from '@/lib/role-modules';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,7 +17,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const service = getSupabaseServiceClient();
   const { tenantId, userId, role } = auth.access;
@@ -29,6 +30,7 @@ export async function GET(
       .order('created_at'),
     service.from('pos_staff_pins').select('auth_user_id, offline_bundle').eq('tenant_id', tenantId),
   ]);
+  const posMembers = (members ?? []).filter((m) => isPosOperatorRole(m.role as string));
   const pins = pinsRes.error
     ? (await service.from('pos_staff_pins').select('auth_user_id').eq('tenant_id', tenantId)).data
     : pinsRes.data;
@@ -37,7 +39,7 @@ export async function GET(
   const withOfflinePin = new Set(
     (pins ?? []).filter((p: any) => Boolean(p.offline_bundle)).map((p: any) => p.auth_user_id as string),
   );
-  const ids = Array.from(new Set([...(members ?? []).map((m) => m.auth_user_id as string), userId]));
+  const ids = Array.from(new Set([...posMembers.map((m) => m.auth_user_id as string), userId]));
   const profiles = new Map<string, { name: string; email: string | null }>();
   await Promise.all(
     ids.map(async (id) => {
@@ -51,7 +53,7 @@ export async function GET(
     }),
   );
 
-  const users = (members ?? []).map((m) => ({
+  const users = posMembers.map((m) => ({
     id: m.auth_user_id as string,
     name: profiles.get(m.auth_user_id)?.name ?? 'Usuario',
     email: profiles.get(m.auth_user_id)?.email ?? null,
@@ -79,6 +81,7 @@ export async function GET(
     ? null
     : await resolveRolePermissions(service, tenantId, role);
   permissions['warehouse.configure'] = whPerms === null ? true : whPerms.has('warehouse.configure');
+  permissions['catalog.create'] = whPerms === null ? true : whPerms.has('catalog.create');
 
   return NextResponse.json({
     ok: true,
@@ -107,19 +110,19 @@ const managedInGestor = () =>
   );
 
 export async function POST(_request: NextRequest, { params }: { params: { slug: string } }) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   return managedInGestor();
 }
 
 export async function PUT(_request: NextRequest, { params }: { params: { slug: string } }) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   return managedInGestor();
 }
 
 export async function DELETE(_request: NextRequest, { params }: { params: { slug: string } }) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   return managedInGestor();
 }

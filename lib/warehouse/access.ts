@@ -3,12 +3,12 @@ import * as React from 'react';
 import { NextResponse } from 'next/server';
 import { redirect } from 'next/navigation';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { authorizeTenantApi, type TenantApiAccess } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, type TenantApiAccess } from '@/lib/tenant-api-auth';
 import { isSuperAdmin, requireSession } from '@/lib/auth';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
-
 import { getTenantSession } from '@/lib/tenant-session';
 import { getTenantConfigRoles } from '@/lib/config-permissions';
+import { canAccessModule, homePathForRole } from '@/lib/role-modules';
 
 export const WAREHOUSE_FEATURE = 'warehouse.inventory';
 
@@ -187,7 +187,7 @@ export async function authorizeWarehouse(
   slug: string,
   opts: { permission?: WarehousePermission; anyOf?: string[]; fn?: WarehouseFunction } = {},
 ): Promise<WarehouseApiResult> {
-  const auth = await authorizeTenantApi(slug);
+  const auth = await authorizeTenantModuleApi(slug, 'warehouse');
   if (!auth.ok) return auth;
   const loaded = await loadContext(auth.access);
   if (!loaded.ok)
@@ -238,6 +238,9 @@ const loadPageContext = memo(async (slug: string): Promise<PageLoad> => {
   ]);
 
   if (!tenant || !membership) return { ok: false, to: `/t/${slug}/login` };
+  if (!canAccessModule(membership.role, 'warehouse')) {
+    return { ok: false, to: homePathForRole(slug, membership.role) };
+  }
 
   const loaded = await loadContext(
     {

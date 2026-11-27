@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
 import { CRM_MODULES_CATALOG } from '@/lib/modules-config';
-import { authorizeTenantApi } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi } from '@/lib/tenant-api-auth';
 import { loadPosConfig } from '@/lib/pos/server';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
 
   try {

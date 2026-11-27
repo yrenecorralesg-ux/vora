@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { ArrowLeft, ShoppingCart, Warehouse } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { isFullCrossModuleRole } from '@/lib/role-modules';
 
 interface ModuleEntry {
   key: string;
@@ -23,14 +24,17 @@ export function ModuleRail({
   slug,
   tenantId,
   enabledFeatures,
+  userRole,
   isSuperAdmin,
 }: {
   slug: string;
   tenantId: string;
   enabledFeatures: string[];
+  userRole?: string;
   isSuperAdmin: boolean;
 }) {
   const pathname = usePathname();
+  if (!isSuperAdmin && !isFullCrossModuleRole(userRole)) return null;
   const modules: ModuleEntry[] = [
     { key: 'commerce.pos', label: 'POS', title: 'VORA POS · Punto de venta', href: `/t/${slug}/pos`, icon: ShoppingCart, enabled: enabledFeatures.includes('commerce.pos') },
     { key: 'warehouse.inventory', label: 'Warehouse', title: 'VORA Warehouse · Inventario', href: `/t/${slug}/warehouse`, icon: Warehouse, enabled: enabledFeatures.includes('warehouse.inventory') },

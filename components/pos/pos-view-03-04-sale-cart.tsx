@@ -24,6 +24,7 @@ import {
 import { usePos } from './pos-context';
 import type { PosProduct } from '@/lib/types';
 import { connectScaleWebSerial } from '@/lib/pos-hardware';
+import { isFullCrossModuleRole } from '@/lib/role-modules';
 
 export function PosView0304SaleCart() {
   const {
@@ -57,11 +58,18 @@ export function PosView0304SaleCart() {
     supervisors,
     requestSupervisorAuthorization,
     can,
+    activeUser,
+    catalogSource,
     activeTenantSlug,
     reloadProducts,
     tenantBranding,
     isWarehouseEnabled,
   } = usePos();
+
+  const canCreateProduct = (catalogSource === 'warehouse' && isWarehouseEnabled)
+    ? can('catalog.create')
+    : can('pos.settings.manage');
+  const canOpenWarehouseCatalog = isWarehouseEnabled && isFullCrossModuleRole(activeUser.role);
 
   // Filtros de Catálogo
   const [searchQuery, setSearchQuery] = useState('');
@@ -353,24 +361,26 @@ export function PosView0304SaleCart() {
               </div>
             )}
 
-            <div className="flex items-center border-l border-[#DCE3DF] pl-2">
-              <button
-                type="button"
-                onClick={() => {
-                  if (!isOnline) {
-                    showNotification('Sin conexión', 'El alta rápida de productos requiere conexión con el inventario del servidor.', 'alert');
-                    return;
-                  }
-                  setShowNewProductModal(true);
-                }}
-                title="Crear nuevo producto en inventario y almacén"
-                className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-white shadow-xs transition hover:opacity-90 disabled:opacity-50"
-                style={{ backgroundColor: tenantBranding?.primaryColor || '#144D37' }}
-              >
-                <Plus className="h-4 w-4" />
-                <span className="hidden sm:inline text-[11px]">Nuevo Producto</span>
-              </button>
-            </div>
+            {canCreateProduct && (
+              <div className="flex items-center border-l border-[#DCE3DF] pl-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isOnline) {
+                      showNotification('Sin conexión', 'El alta rápida de productos requiere conexión con el inventario del servidor.', 'alert');
+                      return;
+                    }
+                    setShowNewProductModal(true);
+                  }}
+                  title="Crear nuevo producto en inventario"
+                  className="flex h-8 items-center gap-1.5 rounded-xl px-2.5 text-xs font-bold text-white shadow-xs transition hover:opacity-90 disabled:opacity-50"
+                  style={{ backgroundColor: tenantBranding?.primaryColor || '#144D37' }}
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline text-[11px]">Nuevo Producto</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Pastillas de Categorías Redondeadas */}
@@ -1255,14 +1265,16 @@ export function PosView0304SaleCart() {
               {isWarehouseEnabled && (
                 <div className="flex items-center justify-between rounded-xl bg-slate-50 p-2.5 border border-slate-100 text-[11px] text-slate-600">
                   <span>Módulo Almacén activo: las existencias ingresarán al Kardex con asentamiento automático.</span>
-                  <a
-                    href={`/t/${activeTenantSlug}/warehouse/catalog/new`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-bold underline text-slate-900 shrink-0 ml-2"
-                  >
-                    Ficha completa
-                  </a>
+                  {canOpenWarehouseCatalog && (
+                    <a
+                      href={`/t/${activeTenantSlug}/warehouse/catalog/new`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-bold underline text-slate-900 shrink-0 ml-2"
+                    >
+                      Ficha completa
+                    </a>
+                  )}
                 </div>
               )}
 

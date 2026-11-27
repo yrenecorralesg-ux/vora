@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Users, Search, KeyRound, ShieldCheck } from 'lucide-react';
 import { usePos } from './pos-context';
+import { isPosOperatorRole } from '@/lib/role-modules';
 
 const ROLE_LABELS: Record<string, string> = {
   tenant_admin: 'Administrador de empresa',
@@ -28,19 +29,20 @@ export function PosView19Users() {
   const [query, setQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
 
+  const posStaff = staffUsers.filter((u) => isPosOperatorRole(u.role));
   const q = query.trim().toLowerCase();
-  const filtered = staffUsers.filter(
+  const filtered = posStaff.filter(
     (u) =>
       (roleFilter === 'all' || u.role === roleFilter) &&
       (!q || u.name.toLowerCase().includes(q) || (u.email ?? '').toLowerCase().includes(q)),
   );
-  const roles = Array.from(new Set(staffUsers.map((u) => u.role)));
+  const roles = Array.from(new Set(posStaff.map((u) => u.role)));
   const supervisorIds = new Set(supervisors.map((s) => s.id));
 
   const stats = [
-    { label: 'Total personal', value: staffUsers.length, hint: 'Usuarios de la empresa' },
-    { label: 'Activos', value: staffUsers.filter((u) => u.is_active).length, hint: 'Con acceso vigente' },
-    { label: 'Cajeros', value: staffUsers.filter((u) => u.role === 'pos_cashier' && u.is_active).length, hint: 'Rol cajero' },
+    { label: 'Total personal POS', value: posStaff.length, hint: 'Operadores POS y administradores' },
+    { label: 'Activos', value: posStaff.filter((u) => u.is_active).length, hint: 'Con acceso vigente' },
+    { label: 'Cajeros', value: posStaff.filter((u) => u.role === 'pos_cashier' && u.is_active).length, hint: 'Rol cajero' },
     { label: 'Autorizan con PIN', value: supervisors.length, hint: 'Supervisores con PIN' },
   ];
 

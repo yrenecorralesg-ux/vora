@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 import { getSale, resolveActorFromOfflineProof, sqlErrorMessage } from '@/lib/pos/server';
 
 export const dynamic = 'force-dynamic';
@@ -12,7 +12,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { slug: string; id: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const sale = await getSale(getSupabaseServiceClient(), auth.access.tenantId, params.id);
   if (!sale) return NextResponse.json({ ok: false, error: 'Venta no encontrada.' }, { status: 404 });
@@ -27,7 +27,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string; id: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const baseAccess = auth.access;
   const service = getSupabaseServiceClient();

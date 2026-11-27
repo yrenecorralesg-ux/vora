@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase-server';
-import { authorizeTenantApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
+import { authorizeTenantModuleApi, hasTenantPermission, permissionDenied } from '@/lib/tenant-api-auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -11,7 +11,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   const saleId = new URL(request.url).searchParams.get('sale_id');
   let q = getSupabaseServiceClient().from('pos_sale_payments').select('*').eq('tenant_id', auth.access.tenantId);
@@ -26,7 +26,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: { slug: string } },
 ) {
-  const auth = await authorizeTenantApi(params.slug);
+  const auth = await authorizeTenantModuleApi(params.slug, 'pos');
   if (!auth.ok) return auth.response;
   if (!(await hasTenantPermission(auth.access, 'pos.payments.register')))
     return permissionDenied('Tu rol no permite verificar pagos.');

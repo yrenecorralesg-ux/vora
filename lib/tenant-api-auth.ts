@@ -7,6 +7,7 @@ import {
 } from '@/lib/supabase-server';
 import { getTenantSession } from '@/lib/tenant-session';
 import { getTenantConfigRoles } from '@/lib/config-permissions';
+import { canAccessModule, type VoraModule } from '@/lib/role-modules';
 
 export interface TenantApiAccess {
   tenantId: string;
@@ -109,6 +110,26 @@ export async function authorizeTenantApi(
     ok: true,
     access: { tenantId: tenant.id, userId: user.id, role: membership.role, email: user.email ?? null },
   };
+}
+
+/** Exige sesión en la empresa y además que el rol pertenezca al módulo solicitado. */
+export async function authorizeTenantModuleApi(
+  slug: string,
+  mod: VoraModule,
+): Promise<TenantApiAuthResult> {
+  const auth = await authorizeTenantApi(slug);
+  if (!auth.ok) return auth;
+  if (!canAccessModule(auth.access.role, mod)) {
+    const label = mod === 'pos' ? 'POS' : mod === 'warehouse' ? 'Warehouse' : 'CRM';
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: `Tu rol no tiene acceso al módulo ${label}.` },
+        { status: 403 },
+      ),
+    };
+  }
+  return auth;
 }
 
 /** Roles con todos los permisos del tenant. */

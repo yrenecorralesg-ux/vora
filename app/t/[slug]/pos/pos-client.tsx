@@ -24,9 +24,15 @@ import { PosView17Settings } from '@/components/pos/pos-view-17-settings';
 import { PosView18FiscalConfig } from '@/components/pos/pos-view-18-fiscal-config';
 import { PosView19Users } from '@/components/pos/pos-view-19-users';
 import { PosView20DispatchKds } from '@/components/pos/pos-view-20-dispatch-kds';
+import { canAccessPosView, defaultPosViewForRole } from '@/lib/role-modules';
 
 export function PosModuleContent() {
-  const { currentView, isModuleEnabled, isFuncActive, activeTenantSlug, tenantName, tenantBranding } = usePos();
+  const { currentView, isModuleEnabled, isFuncActive, activeTenantSlug, tenantName, tenantBranding, me, can } = usePos();
+
+  const resolvedView =
+    me && !canAccessPosView({ view: currentView, role: me.role, can, isFuncActive })
+      ? defaultPosViewForRole(me.role)
+      : currentView;
 
   if (!isModuleEnabled) {
     return (
@@ -95,25 +101,25 @@ export function PosModuleContent() {
         {/* Lienzo Operativo Central */}
         <main
           className={`flex-1 px-6 pb-8 lg:px-8 lg:pb-8 print:p-0 print:m-0 ${
-            currentView === 'POS-01' ? 'pt-6 lg:pt-8' : 'pt-1.5 lg:pt-2'
+            resolvedView === 'POS-01' ? 'pt-6 lg:pt-8' : 'pt-1.5 lg:pt-2'
           }`}
         >
           <div className="mx-auto max-w-7xl print:max-w-none print:w-full">
-            {currentView === 'POS-01' && <PosView01Dashboard />}
-            {currentView === 'POS-02' && <PosView02OpenShift />}
-            {currentView === 'POS-03-04' && <PosView0304SaleCart />}
-            {currentView === 'POS-05' && <PosView05CustomerSelector />}
-            {currentView === 'POS-06' && <PosView06Checkout />}
-            {currentView === 'POS-11' && <PosView11ConfirmedSale />}
-            {currentView === 'POS-12' && <PosView12DocumentPdf />}
-            {currentView === 'POS-13' && <PosView13History />}
-            {currentView === 'POS-14' && <PosView14Returns />}
-            {currentView === 'POS-15' && <PosView15ShiftClosure />}
-            {currentView === 'POS-16' && <PosView16Reports />}
-            {currentView === 'POS-17' && <PosView17Settings />}
-            {currentView === 'POS-18' && (isFuncActive('pos_fiscal') ? <PosView18FiscalConfig /> : <PosView17Settings />)}
-            {currentView === 'POS-19' && <PosView19Users />}
-            {currentView === 'POS-20' && (isFuncActive('pos_order_dispatch_kds') ? <PosView20DispatchKds /> : <PosView01Dashboard />)}
+            {resolvedView === 'POS-01' && <PosView01Dashboard />}
+            {resolvedView === 'POS-02' && <PosView02OpenShift />}
+            {resolvedView === 'POS-03-04' && <PosView0304SaleCart />}
+            {resolvedView === 'POS-05' && <PosView05CustomerSelector />}
+            {resolvedView === 'POS-06' && <PosView06Checkout />}
+            {resolvedView === 'POS-11' && <PosView11ConfirmedSale />}
+            {resolvedView === 'POS-12' && <PosView12DocumentPdf />}
+            {resolvedView === 'POS-13' && <PosView13History />}
+            {resolvedView === 'POS-14' && <PosView14Returns />}
+            {resolvedView === 'POS-15' && <PosView15ShiftClosure />}
+            {resolvedView === 'POS-16' && <PosView16Reports />}
+            {resolvedView === 'POS-17' && <PosView17Settings />}
+            {resolvedView === 'POS-18' && (isFuncActive('pos_fiscal') ? <PosView18FiscalConfig /> : <PosView17Settings />)}
+            {resolvedView === 'POS-19' && <PosView19Users />}
+            {resolvedView === 'POS-20' && (isFuncActive('pos_order_dispatch_kds') ? <PosView20DispatchKds /> : <PosView01Dashboard />)}
           </div>
         </main>
       </div>

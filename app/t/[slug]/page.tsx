@@ -8,6 +8,7 @@ import {
 
 import { getTenantSession } from '@/lib/tenant-session';
 import { requireTenantFeature } from '@/lib/tenant-access';
+import { canAccessModule, homePathForRole, isFullCrossModuleRole } from '@/lib/role-modules';
 import { getSupabaseServerClient, getSupabaseServiceClient } from '@/lib/supabase-server';
 
 export const dynamic = 'force-dynamic';
@@ -36,12 +37,18 @@ export default async function TenantDashboardPage({
     const actorUserId = tenantSession?.userId ?? viewer?.id ?? '';
     const { data: member } = await db
       .from('tenant_memberships')
-      .select('id')
+      .select('id,role')
       .eq('tenant_id', profile.id)
       .eq('auth_user_id', actorUserId)
       .eq('status', 'active')
       .maybeSingle();
     const preview = viewer ? canPreviewTenant(admin, searchParams.preview === '1', !!member) : false;
+    if (!preview && member && !isFullCrossModuleRole(member.role)) {
+      const target = homePathForRole(params.slug, member.role);
+      if (target !== `/t/${params.slug}`) {
+        redirect(target);
+      }
+    }
     if (preview || (profile.technical_status === 'ready' && (admin || !!member))) {
       const [{ data: brand }, { data: assignments }] = await Promise.all([
         db
@@ -56,13 +63,14 @@ export default async function TenantDashboardPage({
           .select('feature_key,enabled,contracted,features(name,description)')
           .eq('tenant_id', profile.id),
       ]);
-      // El portal de la empresa abre su sistema operativo principal: POS si lo
-      // tiene activo; si solo tiene Warehouse, Warehouse; si no, el panel CRM.
+      // El portal de la empresa abre su sistema operativo principal según rol y módulos activos.
       const active = (key: string) =>
         assignments?.some((row) => row.feature_key === key && row.enabled && row.contracted) ?? false;
       if (!preview) {
-        if (active('commerce.pos')) redirect(`/t/${params.slug}/pos`);
-        if (active('warehouse.inventory') && !active('crm.dashboard')) redirect(`/t/${params.slug}/warehouse`);
+        if (active('commerce.pos') && canAccessModule(member?.role, 'pos')) redirect(`/t/${params.slug}/pos`);
+        if (active('warehouse.inventory') && !active('crm.dashboard') && canAccessModule(member?.role, 'warehouse')) {
+          redirect(`/t/${params.slug}/warehouse`);
+        }
         // Acceso de cliente: mantiene las comprobaciones de estado, membresía y contratación.
         await requireTenantFeature(params.slug, 'crm.dashboard');
       }
